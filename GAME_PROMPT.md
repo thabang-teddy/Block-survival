@@ -12,9 +12,11 @@ define the asset conventions, the block colour palette and the island generator 
 
 ## 1. Non-negotiable constraints
 
-1. **Stack:** Vite + React 18 + TypeScript, three.js via **React Three Fiber** (`@react-three/fiber`)
-   and `@react-three/drei`, `zustand` for UI state. Laravel 11 is a **separate JSON API only**
-   (Phase 7) — never render the game through Blade.
+1. **Stack:** one **Laravel** application with **Inertia.js + React** (TypeScript) as the frontend;
+   three.js via **React Three Fiber** (`@react-three/fiber`) and `@react-three/drei`, `zustand` for
+   UI state. The game is an Inertia page; Laravel provides the page, session auth, and the JSON
+   endpoints the running game calls (Phase 7). Keep the simulation in plain TypeScript classes —
+   React and Inertia only handle the menu, HUD and data props.
 2. **One island, not an infinite world.** The world is a single floating island generated in JS
    by porting `Design/blender_scripts/islands.py` (`generate_island`, `add_tree`, `n2`) using the
    `Island_Large` parameters: `size=56, seed=11, max_height=9, depth=16, pad_radius=8, lake=True`.
@@ -148,27 +150,29 @@ nights survived × 100 + kills × 5, shown on the Tab scoreboard.
 
 ## 8. Laravel backend (Phase 7, last)
 
-Laravel 11 API on `/api`, Sanctum tokens, in a `server/` folder:
-`POST /auth/register|login`, `POST /rooms` (creates code → host peer id, TTL 2 h),
-`GET /rooms/{code}` (resolve peer id), `POST /scores` + `GET /leaderboard`,
-`PUT /saves/{id}` (host uploads gzipped block diff + player inventories; `GET` restores).
+The same Laravel app that serves the Inertia page. Session auth (`POST /register|login|logout`
+as Inertia form posts), and JSON routes under `/api` sharing that session:
+`POST /rooms` (creates code → host peer id, TTL 2 h), `GET /rooms/{code}` (resolve peer id),
+`POST /scores` + `GET /leaderboard`, `PUT /saves/{slot}` (host uploads gzipped block diff +
+inventory; `GET` restores). The menu's data (user, leaderboard, cloud save) comes as Inertia props.
 Rate-limit everything. Later: Laravel Reverb as the WebRTC signalling channel.
 
 ## 9. Project layout
 
 ```
-game/
-  src/
-    world/      island generator (port of islands.py), chunk store, mesher, raycast, palette.ts
-    physics/    aabb.ts, playerController.ts
-    entities/   player, zombie, zombieAI (flow field), item drops
-    items/      registry (blocks, tools, weapons), recipes.ts
-    net/        peer host/client, messages, snapshot interpolation
-    render/     R3F scene, lights, day/night, view-model, bloom
-    ui/         HUD, inventory, crafting, menus, lobby
-    state/      zustand stores (UI only — sim state lives in plain classes)
-  public/assets/  → copy of Design/Characters and Design/Assets (GLBs)
-server/           Laravel (Phase 7)
+app/, routes/, database/   Laravel (controllers, session auth, /api routes, models, migrations)
+resources/js/
+  app.tsx, Pages/Play.tsx  Inertia bootstrap and the one page
+  world/      island generator (port of islands.py), chunk store, mesher, raycast, palette.ts
+  physics/    aabb.ts, playerController.ts
+  entities/   drops, crates, pathfinding, zombie sim
+  items/      registry (blocks, tools, weapons), recipes.ts, inventory
+  game/       Game (the simulation), Avatar, DayNight, score
+  net/        protocol, PeerJS transport, host/client sessions, snapshot interpolation, api client
+  render/     R3F scene, lights, day/night, view-model, bloom, renderers
+  ui/         HUD, inventory, crafting, menu
+  state/      zustand stores (UI only — sim state lives in plain classes)
+public/assets/  → copy of Design/Characters, Design/Assets (GLBs)
 ```
 
 Keep files < 400 lines; keep the simulation in plain TypeScript classes ticked from one
