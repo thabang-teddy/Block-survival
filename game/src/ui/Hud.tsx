@@ -10,6 +10,8 @@ import { ItemIcon } from './ItemIcon'
 import { CraftingPanel } from './CraftingPanel'
 import { MainMenu } from './MainMenu'
 import { formatTime } from '../game/score'
+import { api } from '../net/api'
+import { useState } from 'react'
 import './hud.css'
 
 function Slot({ stack, index, active }: { stack: ItemStack | null; index: number; active: boolean }) {
@@ -73,8 +75,21 @@ export function Hud() {
   const role = useUiStore(s => s.role)
   const netStatus = useUiStore(s => s.netStatus)
   const netError = useUiStore(s => s.netError)
+  const [saving, setSaving] = useState('')
 
   if (!launch) return <MainMenu />
+
+  const saveToCloud = async () => {
+    if (!game) return
+    setSaving('Saving…')
+    try {
+      await game.saveToCloud()
+      setSaving('Saved')
+    } catch (e) {
+      setSaving(e instanceof Error ? e.message : 'Save failed')
+    }
+    setTimeout(() => setSaving(''), 2500)
+  }
 
   return (
     <div className={`hud${poisoned ? ' poisoned' : ''}`}>
@@ -175,9 +190,16 @@ export function Hud() {
             <li><b>E</b> inventory &amp; crafting · <b>F</b> workbench / bed / loot · <b>R</b> reload</li>
           </ul>
           {timeAlive > 2 && (
-            <button className="restart" onClick={e => { e.stopPropagation(); restart() }}>
-              {role === 'client' ? 'Leave game' : 'Back to menu'}
-            </button>
+            <div className="pause-actions" onClick={e => e.stopPropagation()}>
+              {role === 'host' && api.loggedIn && (
+                <button className="restart secondary" onClick={saveToCloud} disabled={saving === 'Saving…'}>
+                  {saving || 'Save to cloud'}
+                </button>
+              )}
+              <button className="restart" onClick={() => restart()}>
+                {role === 'client' ? 'Leave game' : 'Back to menu'}
+              </button>
+            </div>
           )}
           {role === 'host' && !roomCode && (
             <p className="fine">Hosting online? Start from the menu with <b>Host a game</b> to get a room code.</p>

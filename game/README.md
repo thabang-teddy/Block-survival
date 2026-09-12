@@ -42,6 +42,13 @@ rifle to aim · **Tab** scoreboard · Esc pause (resume by clicking, or Restart)
 Dying leaves your inventory in a crate where you fell and respawns you after 5 s at your bed
 (or the build pad). Score = nights survived × 100 + kills × 5; the best score is kept in localStorage.
 
+## Accounts, leaderboard, cloud saves (optional)
+
+Run the Laravel API in `../server` (`php artisan serve --port=8000`); Vite proxies `/api` to it.
+Sign in from the main menu: your score is posted at every dawn and on death, the world autosaves to
+your cloud slot at dawn (or from the pause screen), and **Continue cloud save** restores it — block
+edits, props, clock, inventory and respawn point. Hosting also registers the room code with the API.
+
 ## Multiplayer
 
 Up to 4 players, peer-to-peer over WebRTC (PeerJS DataChannels, public PeerJS signalling for now).

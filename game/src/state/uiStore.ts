@@ -8,6 +8,7 @@ import type { CameraMode, Game, Panel, Role } from '../game/Game'
 import type { Phase } from '../game/DayNight'
 import type { HostSession } from '../net/HostSession'
 import type { ClientSession } from '../net/ClientSession'
+import type { SaveData } from '../net/api'
 
 export interface ScoreRow {
   id: string
@@ -20,7 +21,7 @@ export interface ScoreRow {
 
 /** how the current run was started; null = main menu */
 export type Launch =
-  | { role: 'host'; name: string; session: HostSession }
+  | { role: 'host'; name: string; session: HostSession; restore?: SaveData }
   | { role: 'client'; name: string; session: ClientSession }
 
 export interface UiSnapshot {

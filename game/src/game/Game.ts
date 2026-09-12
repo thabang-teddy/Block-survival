@@ -34,6 +34,7 @@ import { computeScore, loadBest, nightsSurvived, saveBest } from './score'
 import type { HostSession } from '../net/HostSession'
 import type { ClientSession } from '../net/ClientSession'
 import type { BlockEdit, ClientMessage, PlayerSnap, PrivateState, Snapshot } from '../net/protocol'
+import { api, type SaveData } from '../net/api'
 import { useUiStore } from '../state/uiStore'
 
 export const REACH = 5
@@ -64,7 +65,11 @@ export interface GameOptions {
   role: Role
   name: string
   session: HostSession | ClientSession
+  /** host only: continue from a cloud save */
+  restore?: SaveData
 }
+
+export const CLOUD_SLOT = 'main'
 
 type Ray = { ox: number; oy: number; oz: number; dx: number; dy: number; dz: number }
 
@@ -144,6 +149,11 @@ export class Game {
       this.applyBlockEdits(w.edits)
       this.dayNight.time = w.time
       spawn = w.spawn
+    } else if (opts.restore) {
+      this.applyBlockEdits(opts.restore.edits)
+      this.dayNight.time = opts.restore.time
+      this.dayNight.update(0)
+      spawn = opts.restore.spawn
     }
     const t1 = performance.now()
     this.chunks = new ChunkRenderer(this.world)
@@ -156,6 +166,11 @@ export class Game {
     const localId = opts.session.role === 'client' ? opts.session.welcome!.you : HOST_ID
     this.local = new Avatar(localId, opts.name, spawn)
     this.avatars.set(localId, this.local)
+    if (opts.restore) {
+      this.local.inventory.replace(opts.restore.inventory)
+      this.local.kills = opts.restore.kills
+      this.local.deaths = opts.restore.deaths
+    }
     this.player = new PlayerController(this.world, spawn)
     this.input = new Input(canvas)
     this.drops = new DropManager(this.world)
@@ -442,6 +457,8 @@ export class Game {
         this.spawnTimes = []
         this.broadcastMessage(`Dawn — you survived night ${dn.night}`)
         this.bestScore = saveBest(this.score)
+        this.postScore()
+        if (api.loggedIn) this.saveToCloud().catch(() => {})
       }
     }
     while (this.spawnTimes.length && dn.time >= this.spawnTimes[0]) {
@@ -487,6 +504,7 @@ export class Game {
       a.push({ dead: true, respawnIn: RESPAWN_SECONDS, magazine: 0, reloading: false, poisoned: false })
     }
     this.bestScore = saveBest(this.score)
+    if (a === this.local) this.postScore()
   }
 
   private respawn(a: Avatar): void {
@@ -666,6 +684,37 @@ export class Game {
       if (p.id === block && Math.hypot(p.x + 0.5 - a.x, p.y + 0.5 - (a.y + 0.9), p.z + 0.5 - a.z) <= radius) return true
     }
     return false
+  }
+
+  // ---------------------------------------------------------------- cloud (host, logged in)
+  /** record the host's own run on the leaderboard; silent when logged out or offline */
+  private postScore(): void {
+    if (!this.isHost || !api.loggedIn) return
+    const a = this.local
+    api.postScore(this.nightsSurvived, a.kills, a.deaths, Math.floor(this.dayNight.time))
+      .then(r => { this.bestScore = Math.max(this.bestScore, r.best) })
+      .catch(() => {})
+  }
+
+  buildSave(): SaveData {
+    return {
+      version: 1,
+      seed: this.seed,
+      time: this.dayNight.time,
+      edits: this.worldEdits(),
+      inventory: this.local.inventory.all(),
+      spawn: this.local.spawn,
+      kills: this.local.kills,
+      deaths: this.local.deaths,
+    }
+  }
+
+  /** upload the world (block diff, clock, the host's inventory) to the account's cloud slot */
+  async saveToCloud(): Promise<void> {
+    if (!this.isHost) throw new Error('Only the host can save')
+    if (!api.loggedIn) throw new Error('Log in to save to the cloud')
+    await api.saveGame(CLOUD_SLOT, this.buildSave(), this.dayNight.night)
+    this.showMessage('Saved to the cloud')
   }
 
   // ---------------------------------------------------------------- messages

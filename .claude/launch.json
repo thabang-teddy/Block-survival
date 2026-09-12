@@ -8,6 +8,12 @@
       "port": 5173
     },
     {
+      "name": "api",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["server/artisan", "serve", "--host=127.0.0.1", "--port=8000"],
+      "port": 8000
+    },
+    {
       "name": "design-viewer",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8765", "--directory", "Design"],

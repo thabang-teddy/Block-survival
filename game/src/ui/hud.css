@@ -268,3 +268,21 @@ body { user-select: none; }
 .menu .join { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 10px; }
 .menu .join input { font: 800 18px ui-monospace, Consolas, monospace; letter-spacing: 4px; text-transform: uppercase; text-align: center; }
 .menu .error { margin: 12px 0 0; color: #ff8a7a; font-size: 13px; }
+
+/* ---- pause actions / account / leaderboard */
+.pause-actions { display: flex; gap: 10px; justify-content: center; margin-top: 22px; }
+.pause-actions .restart { margin: 0; }
+.restart.secondary { background: rgba(255,255,255,.12); color: var(--hud-ink); }
+.menu .wide { width: 100%; margin-top: 10px; }
+.menu .link { background: none; border: 0; padding: 0; color: var(--hud-accent); cursor: pointer; font: 600 13px inherit; text-decoration: underline; }
+.menu .account-line { margin: 12px 0 0; font-size: 13px; opacity: .9; }
+.menu .fine-inline { opacity: .55; font-size: 12px; }
+.menu .account { display: grid; gap: 8px; margin-top: 12px; padding: 12px; border-radius: 8px; background: rgba(255,255,255,.04); }
+.menu .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.menu .tabs button { padding: 7px; font-size: 13px; }
+.menu .tabs button.on { background: rgba(232,178,58,.2); border-color: var(--hud-accent); }
+.menu .board { margin-top: 16px; text-align: left; }
+.menu .board h3 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; opacity: .6; }
+.menu .board ol { margin: 0; padding: 0 0 0 20px; font-size: 13px; columns: 2; column-gap: 18px; }
+.menu .board li { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; break-inside: avoid; }
+.menu .board li b { font-family: ui-monospace, Consolas, monospace; color: var(--hud-accent); }

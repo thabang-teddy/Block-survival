@@ -6,9 +6,13 @@
 import type { Game } from '../game/Game'
 import { HostTransport, type Link } from './transport'
 import {
-  decode, encode, makeRoomCode, MAX_PLAYERS, PROTOCOL_VERSION, SNAPSHOT_HZ,
+  decode, encode, makeRoomCode, MAX_PLAYERS, peerIdForRoom, PROTOCOL_VERSION, SNAPSHOT_HZ,
   type ClientMessage, type HostMessage, type Welcome,
 } from './protocol'
+import { api } from './api'
+
+/** how often the host refreshes its room row on the API (seconds) */
+const ROOM_REFRESH_SECONDS = 60
 
 export class HostSession {
   readonly role = 'host' as const
@@ -19,6 +23,7 @@ export class HostSession {
   /** links that connected but have not said hello yet */
   private readonly pending = new Set<string>()
   onPlayersChanged: (() => void) | null = null
+  private roomRefreshTimer = 0
 
   constructor(code = makeRoomCode()) {
     this.code = code
@@ -37,7 +42,7 @@ export class HostSession {
   }
 
   /** Register the room code with the signalling server so friends can join. */
-  async listen(): Promise<void> {
+  async listen(hostName = 'Survivor'): Promise<void> {
     if (this.transport) return
     const t = new HostTransport({
       onOpen: link => { this.pending.add(link.id) },
@@ -46,11 +51,19 @@ export class HostSession {
     })
     await t.listen(this.code)
     this.transport = t
+    // the API row records live rooms and the host's name; joining works without it
+    // because the code is also the PeerJS id
+    api.createRoom(this.code, peerIdForRoom(this.code), hostName).catch(() => {})
   }
 
   tick(dt: number): void {
     const game = this.game
     if (!game || !this.transport) return
+    this.roomRefreshTimer += dt
+    if (this.roomRefreshTimer >= ROOM_REFRESH_SECONDS) {
+      this.roomRefreshTimer = 0
+      api.refreshRoom(this.code, peerIdForRoom(this.code), game.avatars.size).catch(() => {})
+    }
     // block edits go out immediately, snapshots at a fixed rate, private state when dirty
     const edits = game.takeBlockEdits()
     if (edits.length) this.transport.broadcast(encode({ t: 'blocks', edits }))
@@ -73,7 +86,10 @@ export class HostSession {
   }
 
   dispose(): void {
-    this.transport?.broadcast(encode({ t: 'bye' }))
+    if (this.transport) {
+      this.transport.broadcast(encode({ t: 'bye' }))
+      api.closeRoom(this.code, peerIdForRoom(this.code)).catch(() => {})
+    }
     this.transport?.dispose()
     this.transport = null
   }
