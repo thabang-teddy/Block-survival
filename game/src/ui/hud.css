@@ -1,0 +1,60 @@
+:root {
+  --hud-ink: #f2f0e8;
+  --hud-panel: rgba(16, 20, 24, 0.72);
+  --hud-accent: #e8b23a;
+  --hud-orange: #d9772a;
+  --hud-green: #6fb04a;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+html, body, #root { margin: 0; height: 100%; overflow: hidden; background: #87b4d8; }
+body { user-select: none; }
+
+.stats { left: auto !important; right: 8px; top: 64px !important; }
+
+.hud { position: fixed; inset: 0; pointer-events: none; color: var(--hud-ink); }
+
+.logo {
+  position: absolute; top: 14px; left: 18px;
+  font-weight: 900; font-size: 26px; line-height: 0.9; letter-spacing: 1px;
+  color: #fff; text-shadow: 0 3px 0 #2b2b2b, 0 0 12px rgba(0,0,0,.5);
+}
+.logo span { display: block; font-size: 18px; color: var(--hud-orange); }
+
+.debug {
+  position: absolute; top: 14px; right: 18px;
+  font: 600 13px/1 ui-monospace, Consolas, monospace;
+  padding: 8px 10px; border-radius: 6px; background: var(--hud-panel);
+}
+
+.crosshair {
+  position: absolute; left: 50%; top: 50%; width: 18px; height: 18px;
+  transform: translate(-50%, -50%);
+}
+.crosshair::before, .crosshair::after {
+  content: ''; position: absolute; background: #fff; mix-blend-mode: difference;
+}
+.crosshair::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
+.crosshair::after { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
+
+.hotbar {
+  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; padding: 6px; border-radius: 8px; background: var(--hud-panel);
+}
+.slot {
+  width: 58px; height: 58px; border-radius: 6px; position: relative;
+  background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.12);
+  display: grid; place-items: end center; padding-bottom: 5px; box-sizing: border-box;
+}
+.slot.active { border-color: var(--hud-accent); background: rgba(232,178,58,.18); }
+.slot .key { position: absolute; top: 3px; left: 5px; font-size: 11px; opacity: .7; }
+.slot .name { font-size: 11px; font-weight: 600; text-transform: capitalize; }
+
+.overlay {
+  position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
+  background: rgba(10, 14, 18, 0.55); backdrop-filter: blur(3px);
+}
+.overlay h1 { margin: 0 0 6px; font-size: 44px; font-weight: 900; text-shadow: 0 4px 0 #2b2b2b; }
+.overlay p { margin: 0 0 22px; font-size: 20px; color: var(--hud-accent); }
+.overlay ul { list-style: none; padding: 0; margin: 0; font-size: 14px; opacity: .85; line-height: 1.8; }
+.overlay b { color: var(--hud-accent); }
