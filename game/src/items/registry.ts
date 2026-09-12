@@ -32,7 +32,10 @@ const blockItem = (name: BlockName): ItemDef => ({
   colour: BLOCK_DEFS[BLOCK[name]].colours[0],
 })
 
-const PLACEABLE: readonly BlockName[] = BLOCK_NAMES.filter(n => n !== 'air' && n !== 'water')
+/** props get bespoke item defs below */
+const PLACEABLE: readonly BlockName[] = BLOCK_NAMES.filter(
+  n => n !== 'air' && n !== 'water' && n !== 'torch' && n !== 'workbench' && n !== 'bed',
+)
 
 export const ITEMS: Readonly<Record<string, ItemDef>> = Object.fromEntries(
   [
@@ -46,9 +49,9 @@ export const ITEMS: Readonly<Record<string, ItemDef>> = Object.fromEntries(
     { id: 'sword', name: 'sword', kind: 'weapon', maxStack: 1, model: MODEL('Sword'), colour: [0.85, 0.65, 0.20] },
     { id: 'rifle', name: 'rifle', kind: 'weapon', maxStack: 1, model: MODEL('Rifle'), colour: [0.62, 0.52, 0.34] },
     { id: 'ammo', name: 'rifle ammo', kind: 'material', maxStack: 120, colour: [0.75, 0.62, 0.30] },
-    { id: 'torch', name: 'torch', kind: 'tool', maxStack: 64, model: MODEL('Torch'), colour: [1.0, 0.55, 0.10] },
-    { id: 'workbench', name: 'workbench', kind: 'prop', maxStack: 8, model: MODEL('Workbench'), colour: [0.58, 0.44, 0.26] },
-    { id: 'bed', name: 'bed', kind: 'prop', maxStack: 1, model: MODEL('Bed'), colour: [0.35, 0.45, 0.30] },
+    { id: 'torch', name: 'torch', kind: 'prop', maxStack: 64, model: MODEL('Torch'), block: BLOCK.torch, colour: [1.0, 0.55, 0.10] },
+    { id: 'workbench', name: 'workbench', kind: 'prop', maxStack: 8, model: MODEL('Workbench'), block: BLOCK.workbench, colour: [0.58, 0.44, 0.26] },
+    { id: 'bed', name: 'bed', kind: 'prop', maxStack: 1, model: MODEL('Bed'), block: BLOCK.bed, colour: [0.35, 0.45, 0.30] },
   ].map(d => [d.id, d as ItemDef]),
 )
 
@@ -64,6 +67,7 @@ export function dropForBlock(id: number): string | null {
     case BLOCK.air:
     case BLOCK.water: return null
     case BLOCK.grass: return 'dirt'
+    case BLOCK.stone: return 'cobble' // Minecraft convention; cobble is the wall block
     case BLOCK.ore_coal: return 'coal'
     case BLOCK.ore_iron: return 'iron'
     default: return BLOCK_NAMES[id]
@@ -76,8 +80,9 @@ const HARDNESS: Readonly<Record<number, number>> = {
   [BLOCK.snow]: 0.4, [BLOCK.leaves]: 0.35, [BLOCK.glass]: 0.5,
   [BLOCK.log]: 3, [BLOCK.planks]: 2.2,
   [BLOCK.stone]: 5, [BLOCK.cobble]: 4.5, [BLOCK.ore_coal]: 5, [BLOCK.ore_iron]: 6,
+  [BLOCK.torch]: 0.2, [BLOCK.workbench]: 1.5, [BLOCK.bed]: 1.0, [BLOCK.reinforced_wall]: 9,
 }
-const NEEDS_PICKAXE = new Set<number>([BLOCK.stone, BLOCK.cobble, BLOCK.ore_coal, BLOCK.ore_iron])
+const NEEDS_PICKAXE = new Set<number>([BLOCK.stone, BLOCK.cobble, BLOCK.ore_coal, BLOCK.ore_iron, BLOCK.reinforced_wall])
 const PICKAXE_SPEED = [1, 1.5, 2.5, 4] as const
 
 /** Seconds to break `block` holding `item` (Infinity = cannot). */

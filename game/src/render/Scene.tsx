@@ -7,6 +7,7 @@ import { Sky, Stats } from '@react-three/drei'
 import * as THREE from 'three'
 import { Game } from '../game/Game'
 import { PlayerBody } from './PlayerBody'
+import { useUiStore } from '../state/uiStore'
 
 const SKY_COLOUR = '#87b4d8'
 const SUN_POSITION: [number, number, number] = [60, 80, 30]
@@ -19,10 +20,12 @@ function GameLoop() {
   useEffect(() => {
     const g = new Game(gl.domElement, camera as THREE.PerspectiveCamera)
     setGame(g)
+    useUiStore.getState().setGame(g)
     if (import.meta.env.DEV) Object.assign(window, { __game: g, __gl: gl })
     return () => {
       g.dispose()
       setGame(null)
+      useUiStore.getState().setGame(null)
     }
   }, [gl, camera])
 
@@ -34,8 +37,10 @@ function GameLoop() {
       {/* the camera must be in the scene graph for the first-person view-model (its child) to render */}
       <primitive object={camera} />
       <primitive object={game.chunks.group} />
+      <primitive object={game.props.group} />
       <primitive object={game.drops.group} />
       <primitive object={game.highlight} />
+      <primitive object={game.heldLight} />
       <Suspense fallback={null}>
         <PlayerBody game={game} />
       </Suspense>

@@ -22,6 +22,11 @@ export const BLOCK = {
   snow: 12,
   ore_iron: 13,
   ore_coal: 14,
+  // ---- Phase 3: props (rendered as GLB models, not chunk faces) and crafted blocks
+  torch: 15,
+  workbench: 16,
+  bed: 17,
+  reinforced_wall: 18,
 } as const
 
 export type BlockId = (typeof BLOCK)[keyof typeof BLOCK]
@@ -30,6 +35,7 @@ export type BlockName = keyof typeof BLOCK
 export const BLOCK_NAMES: readonly BlockName[] = [
   'air', 'grass', 'dirt', 'stone', 'cobble', 'sand', 'gravel', 'log',
   'planks', 'leaves', 'water', 'glass', 'snow', 'ore_iron', 'ore_coal',
+  'torch', 'workbench', 'bed', 'reinforced_wall',
 ]
 
 interface BlockDef {
@@ -41,6 +47,10 @@ interface BlockDef {
   seeThrough: boolean
   /** blocks player movement */
   solid: boolean
+  /** drawn as a placed GLB model by the PropRenderer instead of chunk faces */
+  prop?: boolean
+  /** gives off light (PropRenderer assigns a PointLight to the nearest few) */
+  light?: boolean
 }
 
 const solidRgb = (c: Rgb): readonly [Rgb, Rgb, Rgb] => [c, c, c]
@@ -67,8 +77,16 @@ export const BLOCK_DEFS: Readonly<Record<BlockId, BlockDef>> = {
   [BLOCK.snow]: { colours: solidRgb([0.95, 0.96, 0.98]), alpha: 1, seeThrough: false, solid: true },
   [BLOCK.ore_iron]: { colours: solidRgb([0.62, 0.55, 0.48]), alpha: 1, seeThrough: false, solid: true },
   [BLOCK.ore_coal]: { colours: solidRgb([0.30, 0.30, 0.30]), alpha: 1, seeThrough: false, solid: true },
+  [BLOCK.torch]: { colours: solidRgb([1.0, 0.55, 0.10]), alpha: 1, seeThrough: true, solid: false, prop: true, light: true },
+  [BLOCK.workbench]: { colours: solidRgb([0.58, 0.44, 0.26]), alpha: 1, seeThrough: true, solid: true, prop: true },
+  [BLOCK.bed]: { colours: solidRgb([0.35, 0.45, 0.30]), alpha: 1, seeThrough: true, solid: false, prop: true },
+  [BLOCK.reinforced_wall]: {
+    colours: [[0.36, 0.38, 0.40], [0.30, 0.32, 0.35], [0.30, 0.32, 0.35]],
+    alpha: 1, seeThrough: false, solid: true,
+  },
 }
 
 export const isSolid = (id: number): boolean => BLOCK_DEFS[id as BlockId]?.solid ?? false
 export const isSeeThrough = (id: number): boolean => BLOCK_DEFS[id as BlockId]?.seeThrough ?? true
 export const isTranslucent = (id: number): boolean => (BLOCK_DEFS[id as BlockId]?.alpha ?? 0) < 1 && id !== AIR
+export const isProp = (id: number): boolean => BLOCK_DEFS[id as BlockId]?.prop ?? false

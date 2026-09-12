@@ -89,3 +89,71 @@ body { user-select: none; }
 .overlay p { margin: 0 0 22px; font-size: 20px; color: var(--hud-accent); }
 .overlay ul { list-style: none; padding: 0; margin: 0; font-size: 14px; opacity: .85; line-height: 1.8; }
 .overlay b { color: var(--hud-accent); }
+
+/* ---- toast + interact hint */
+.toast {
+  position: absolute; top: 18%; left: 50%; transform: translateX(-50%);
+  padding: 8px 16px; border-radius: 6px; background: var(--hud-panel);
+  font-weight: 700; font-size: 15px; color: var(--hud-accent);
+}
+.interact-hint {
+  position: absolute; top: 56%; left: 50%; transform: translateX(-50%);
+  padding: 5px 10px; border-radius: 5px; background: var(--hud-panel); font-size: 13px; font-weight: 600;
+}
+
+/* ---- crafting panel */
+.panel-backdrop {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  background: rgba(10, 14, 18, 0.5); backdrop-filter: blur(2px); pointer-events: auto;
+}
+.panel {
+  width: min(720px, 94vw); max-height: 94vh; overflow: auto; box-sizing: border-box;
+  padding: 14px 18px 12px; border-radius: 10px; background: rgba(24, 28, 32, 0.96);
+  border: 1px solid rgba(255,255,255,.12); box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+.panel header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.panel h2 { margin: 0; font-size: 20px; font-weight: 900; }
+.bench-tag { font-size: 12px; padding: 3px 8px; border-radius: 10px; background: rgba(255,255,255,.08); opacity: .8; }
+.bench-tag.on { background: rgba(111,176,74,.25); color: #bfe8a5; opacity: 1; }
+.panel .close { margin-left: auto; background: none; border: 0; color: #fff; font-size: 18px; cursor: pointer; opacity: .7; }
+.panel .close:hover { opacity: 1; }
+
+.craft-body { display: grid; grid-template-columns: 1fr 250px; gap: 14px; }
+.recipes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; align-content: start; }
+.recipe {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer;
+  background: rgba(255,255,255,.05); border: 1px solid transparent; font-size: 13px; text-transform: capitalize;
+}
+.recipe:hover { background: rgba(255,255,255,.1); }
+.recipe.selected { border-color: var(--hud-accent); background: rgba(232,178,58,.15); }
+.recipe.missing, .recipe.needsBench { opacity: .5; }
+.recipe .rname { flex: 1; }
+.recipe .bench-mark { font-size: 12px; opacity: .7; }
+
+.details { display: grid; gap: 10px; align-content: start; padding: 10px; border-radius: 8px; background: rgba(255,255,255,.04); }
+.details .out { display: flex; align-items: center; gap: 10px; }
+.details h3 { margin: 0; font-size: 16px; text-transform: capitalize; }
+.inputs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.inputs li { display: flex; align-items: center; gap: 8px; font-size: 13px; text-transform: capitalize; }
+.inputs li b { margin-left: auto; font: 700 12px ui-monospace, Consolas, monospace; }
+.inputs li.lack b { color: #f08a6a; }
+.inputs li.have b { color: #bfe8a5; }
+.craft {
+  padding: 9px; border: 0; border-radius: 6px; font: 800 14px inherit; cursor: pointer;
+  background: var(--hud-accent); color: #1a1a1a;
+}
+.craft:disabled { background: rgba(255,255,255,.12); color: rgba(255,255,255,.5); cursor: default; }
+
+.inv-grid { display: grid; grid-template-columns: repeat(9, 52px); gap: 5px; margin-top: 14px; justify-content: center; }
+.inv-grid .slot { width: 52px; height: 52px; cursor: pointer; }
+.inv-grid .slot .icon.block { width: 22px; height: 22px; }
+.inv-grid .slot .icon.glyph { font-size: 20px; }
+.inv-grid .slot:hover { background: rgba(255,255,255,.14); }
+.inv-grid .slot.hot { border-color: rgba(232,178,58,.35); }
+.inv-grid .slot.picked { border-color: #fff; background: rgba(255,255,255,.2); }
+.inv-grid .slot:nth-child(10) { margin-top: 6px; }
+.panel .hint { margin: 10px 0 0; font-size: 12px; opacity: .6; text-align: center; }
+.panel .hint b { color: var(--hud-accent); }
+
+.icon.large.block { width: 40px; height: 40px; }
+.icon.large.glyph { font-size: 36px; }

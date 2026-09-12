@@ -25,9 +25,27 @@ export const toChunkCoord = (x: number, y: number, z: number): ChunkCoord => ({
 export const localIndex = (x: number, y: number, z: number): number =>
   ((x & MASK) << 8) | ((y & MASK) << 4) | (z & MASK)
 
+export const blockKey = (x: number, y: number, z: number): string => `${x},${y},${z}`
+
+/** Extra data for prop blocks (torch, workbench, bed). */
+export interface PropMeta {
+  id: number
+  x: number
+  y: number
+  z: number
+  /** facing, multiples of π/2 */
+  yaw: number
+  /** for multi-cell props: the other cell; `primary` cells own the model */
+  partner?: { x: number; y: number; z: number }
+  primary: boolean
+}
+
 export class World {
   private readonly chunks = new Map<string, Uint8Array>()
   private readonly dirty = new Set<string>()
+  /** prop block metadata keyed by blockKey; bumps `propsVersion` on change */
+  readonly props = new Map<string, PropMeta>()
+  propsVersion = 0
   /** inclusive block-space bounds of everything ever written */
   readonly bounds = { minX: 0, minY: 0, minZ: 0, maxX: 0, maxY: 0, maxZ: 0, empty: true }
 
@@ -67,9 +85,22 @@ export class World {
     const i = localIndex(x, y, z)
     if (c[i] === id) return
     c[i] = id
+    const pk = blockKey(x, y, z)
+    if (this.props.delete(pk)) this.propsVersion++
     this.dirty.add(key)
     this.markNeighbourChunks(x, y, z, cx, cy, cz)
     this.growBounds(x, y, z)
+  }
+
+  /** Place a prop block with its metadata (call after setBlock would have cleared old meta). */
+  setProp(meta: PropMeta): void {
+    this.setBlock(meta.x, meta.y, meta.z, meta.id)
+    this.props.set(blockKey(meta.x, meta.y, meta.z), meta)
+    this.propsVersion++
+  }
+
+  getProp(x: number, y: number, z: number): PropMeta | undefined {
+    return this.props.get(blockKey(x, y, z))
   }
 
   /** Same as setBlock but never overwrites an existing block (Python's `if key not in vox`). */

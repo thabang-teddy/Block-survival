@@ -4,7 +4,7 @@
  */
 import { create } from 'zustand'
 import type { ItemStack } from '../items/inventory'
-import type { CameraMode } from '../game/Game'
+import type { CameraMode, Game, Panel } from '../game/Game'
 
 export interface UiSnapshot {
   locked: boolean
@@ -21,9 +21,18 @@ export interface UiSnapshot {
   breakProgress: number
   /** false when the targeted block needs a pickaxe you are not holding */
   canBreak: boolean
+  panel: Panel
+  nearWorkbench: boolean
+  /** transient toast, empty when none */
+  message: string
+  /** e.g. "F  craft" when looking at a workbench */
+  interactHint: string
 }
 
 interface UiState extends UiSnapshot {
+  /** the live simulation, for panels that need to call actions */
+  game: Game | null
+  setGame(game: Game | null): void
   sync(next: UiSnapshot): void
 }
 
@@ -44,6 +53,12 @@ export const useUiStore = create<UiState>((set, get) => ({
   cameraMode: 'first',
   breakProgress: 0,
   canBreak: true,
+  panel: 'none',
+  nearWorkbench: false,
+  message: '',
+  interactHint: '',
+  game: null,
+  setGame: game => set({ game }),
   sync(next) {
     const cur = get()
     const pos = roundPos(next.position)
@@ -60,6 +75,8 @@ export const useUiStore = create<UiState>((set, get) => ({
       cur.health === health && cur.stamina === stamina && ammoSame &&
       cur.cameraMode === next.cameraMode &&
       cur.breakProgress === breakProgress && cur.canBreak === next.canBreak &&
+      cur.panel === next.panel && cur.nearWorkbench === next.nearWorkbench &&
+      cur.message === next.message && cur.interactHint === next.interactHint &&
       cur.position[0] === pos[0] && cur.position[1] === pos[1] && cur.position[2] === pos[2]
     ) return
     set({
@@ -74,6 +91,10 @@ export const useUiStore = create<UiState>((set, get) => ({
       cameraMode: next.cameraMode,
       breakProgress,
       canBreak: next.canBreak,
+      panel: next.panel,
+      nearWorkbench: next.nearWorkbench,
+      message: next.message,
+      interactHint: next.interactHint,
     })
   },
 }))

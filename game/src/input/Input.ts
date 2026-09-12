@@ -15,11 +15,15 @@ export type InputEvent =
   | { type: 'toggleCamera' }
   | { type: 'drop' }
   | { type: 'reload' }
+  | { type: 'inventory' }
+  | { type: 'interact' }
 
 const KEY_EVENTS: Readonly<Record<string, InputEvent>> = {
   KeyV: { type: 'toggleCamera' },
   KeyQ: { type: 'drop' },
   KeyR: { type: 'reload' },
+  KeyE: { type: 'inventory' },
+  KeyF: { type: 'interact' },
 }
 
 export class Input {
@@ -76,8 +80,19 @@ export class Input {
     return out
   }
 
-  private onCanvasClick = (): void => {
+  /** suppress the click-to-lock while a UI panel is open */
+  panelOpen = false
+
+  requestLock(): void {
     if (!this.locked) this.canvas.requestPointerLock()
+  }
+
+  releaseLock(): void {
+    if (this.locked) document.exitPointerLock()
+  }
+
+  private onCanvasClick = (): void => {
+    if (!this.locked && !this.panelOpen) this.canvas.requestPointerLock()
   }
 
   private onLockChange = (): void => {

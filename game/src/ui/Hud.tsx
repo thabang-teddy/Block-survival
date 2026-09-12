@@ -4,24 +4,11 @@
  */
 import { useUiStore } from '../state/uiStore'
 import { BLOCK_NAMES } from '../world/palette'
-import { getItem, type ItemDef } from '../items/registry'
+import { getItem } from '../items/registry'
 import type { ItemStack } from '../items/inventory'
+import { ItemIcon } from './ItemIcon'
+import { CraftingPanel } from './CraftingPanel'
 import './hud.css'
-
-const ICONS: Readonly<Record<string, string>> = {
-  pickaxe_wood: '⛏', pickaxe_stone: '⛏', pickaxe_iron: '⛏', sword: '🗡', rifle: '🔫',
-  torch: '🔥', ammo: '▮', stick: '╱', coal: '●', iron: '▣', workbench: '🛠', bed: '🛏',
-}
-
-const css = (c: readonly [number, number, number], mul = 1): string =>
-  `rgb(${Math.round(c[0] * 255 * mul)} ${Math.round(c[1] * 255 * mul)} ${Math.round(c[2] * 255 * mul)})`
-
-function ItemIcon({ def }: { def: ItemDef }) {
-  if (def.kind === 'block') {
-    return <span className="icon block" style={{ background: css(def.colour), borderColor: css(def.colour, 0.6) }} />
-  }
-  return <span className="icon glyph" style={{ color: css(def.colour, 1.2) }}>{ICONS[def.id] ?? '?'}</span>
-}
 
 function Slot({ stack, index, active }: { stack: ItemStack | null; index: number; active: boolean }) {
   const def = stack ? getItem(stack.id) : null
@@ -57,6 +44,9 @@ export function Hud() {
   const cameraMode = useUiStore(s => s.cameraMode)
   const breakProgress = useUiStore(s => s.breakProgress)
   const canBreak = useUiStore(s => s.canBreak)
+  const panel = useUiStore(s => s.panel)
+  const message = useUiStore(s => s.message)
+  const interactHint = useUiStore(s => s.interactHint)
 
   return (
     <div className="hud">
@@ -81,6 +71,9 @@ export function Hud() {
         </div>
       )}
 
+      {message && <div className="toast">{message}</div>}
+      {locked && interactHint && <div className="interact-hint">{interactHint}</div>}
+
       {locked && (
         <div className="crosshair" aria-hidden>
           {breakProgress > 0 && (
@@ -93,14 +86,16 @@ export function Hud() {
         {hotbar.map((stack, i) => <Slot key={i} stack={stack} index={i} active={i === slot} />)}
       </div>
 
-      {!locked && (
+      {panel === 'crafting' && <CraftingPanel />}
+
+      {!locked && panel === 'none' && (
         <div className="overlay">
           <h1>Block Survival</h1>
           <p>Click to play</p>
           <ul>
             <li><b>WASD</b> move · <b>Shift</b> sprint · <b>Space</b> jump · <b>V</b> camera</li>
             <li><b>Hold left</b> dig / swing · <b>Right</b> place · <b>1–9</b> select · <b>Q</b> drop</li>
-            <li><b>R</b> reload · <b>Esc</b> release mouse</li>
+            <li><b>E</b> inventory &amp; crafting · <b>F</b> use workbench / bed · <b>R</b> reload</li>
           </ul>
         </div>
       )}

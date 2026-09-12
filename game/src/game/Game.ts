@@ -3,37 +3,39 @@
  * React never holds sim state — it only reads snapshots through the UI store.
  */
 import * as THREE from 'three'
-import { World } from '../world/chunkStore'
+import { World, type PropMeta } from '../world/chunkStore'
 import { generateIsland, ISLAND_LARGE, type IslandInfo } from '../world/islandGen'
 import { raycastVoxels, type RayHit } from '../world/raycast'
-import { AIR, BLOCK, isSolid } from '../world/palette'
+import { AIR, BLOCK, isProp, isSolid } from '../world/palette'
 import { ChunkRenderer } from '../render/ChunkRenderer'
+import { PropRenderer } from '../render/PropRenderer'
 import { ViewModel } from '../render/ViewModel'
 import { PlayerController, PLAYER } from '../physics/playerController'
 import { Input, type InputEvent } from '../input/Input'
 import { Inventory } from '../items/inventory'
 import { breakTime, dropForBlock, getItem } from '../items/registry'
+import { craft, getRecipe } from '../items/recipes'
 import { DropManager } from '../entities/drops'
 import { useUiStore } from '../state/uiStore'
 
 export const REACH = 5
 export type CameraMode = 'first' | 'third'
 export type AnimName = 'Idle' | 'Walk' | 'Run' | 'Aim' | 'Swing'
+export type Panel = 'none' | 'crafting'
 
 const MAX_DT = 1 / 20
 const SWING_SECONDS = 0.4
 const THIRD_PERSON = { back: 3.5, right: 0.6, up: 1.6, clearance: 0.35 } as const
 const RIFLE_MAG = 30
-
-/** Phase 2 starter kit so every held item can be seen; Phase 3 replaces it with crafting. */
-const STARTER_KIT: readonly [string, number][] = [
-  ['pickaxe_wood', 1], ['sword', 1], ['torch', 8], ['rifle', 1], ['ammo', 90], ['planks', 32],
-]
+/** a Workbench within this distance of the player enables bench recipes */
+export const BENCH_REACH = 3
+const MESSAGE_SECONDS = 2.5
 
 export class Game {
   readonly world = new World()
   readonly island: IslandInfo
   readonly chunks: ChunkRenderer
+  readonly props: PropRenderer
   readonly player: PlayerController
   readonly input: Input
   readonly inventory = new Inventory()
@@ -42,6 +44,8 @@ export class Game {
   readonly camera: THREE.PerspectiveCamera
   /** wireframe cube on the targeted block */
   readonly highlight: THREE.LineSegments
+  /** light carried by the player while holding a torch */
+  readonly heldLight = new THREE.PointLight(0xffb060, 8, 7, 2)
   target: RayHit | null = null
   hotbarSlot = 0
   cameraMode: CameraMode = 'first'
@@ -49,6 +53,10 @@ export class Game {
   anim: AnimName = 'Idle'
   /** rifle rounds currently loaded */
   magazine = RIFLE_MAG
+  panel: Panel = 'none'
+  nearWorkbench = false
+  private message = ''
+  private messageUntil = 0
   private swingUntil = 0
   private time = 0
   private breaking: { x: number; y: number; z: number; progress: number } | null = null
@@ -64,6 +72,7 @@ export class Game {
     const t1 = performance.now()
     this.chunks = new ChunkRenderer(this.world)
     this.chunks.buildAll()
+    this.props = new PropRenderer(this.world)
     const t2 = performance.now()
     console.info(
       `island: ${this.island.voxelCount} voxels, ${this.world.chunkCount} chunks — gen ${(t1 - t0).toFixed(0)} ms, mesh ${(t2 - t1).toFixed(0)} ms`,
@@ -71,7 +80,6 @@ export class Game {
     this.player = new PlayerController(this.world, this.island.spawn)
     this.input = new Input(canvas)
     this.drops = new DropManager(this.world)
-    for (const [id, n] of STARTER_KIT) this.inventory.add(id, n)
     this.highlight = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002)),
       new THREE.LineBasicMaterial({ color: 0x111111, transparent: true, opacity: 0.6 }),
@@ -82,6 +90,7 @@ export class Game {
   dispose(): void {
     this.input.dispose()
     this.chunks.dispose()
+    this.props.dispose()
     this.drops.dispose()
     this.viewModel.dispose()
     this.camera.remove(this.viewModel.group)
@@ -108,8 +117,56 @@ export class Game {
     this.viewModel.setItem(this.heldItem)
     this.viewModel.update(dt, moving, this.cameraMode === 'first')
     this.updateAnim(moving)
+    this.nearWorkbench = this.isNear(BLOCK.workbench, BENCH_REACH)
+    this.heldLight.visible = this.heldItem === 'torch'
+    this.heldLight.position.set(s.x, s.y + 1.3, s.z)
     this.chunks.update()
+    this.props.update(dt, this.camera.position.x, this.camera.position.y, this.camera.position.z)
     this.publishUi()
+  }
+
+  /** is a prop block of this kind within `radius` of the player's chest? */
+  isNear(block: number, radius: number): boolean {
+    const s = this.player.state
+    for (const p of this.world.props.values()) {
+      if (p.id === block && Math.hypot(p.x + 0.5 - s.x, p.y + 0.5 - (s.y + 0.9), p.z + 0.5 - s.z) <= radius) return true
+    }
+    return false
+  }
+
+  // ---------------------------------------------------------------- panels
+  openPanel(panel: Panel): void {
+    this.panel = panel
+    this.input.panelOpen = true
+    this.input.releaseLock()
+    this.breaking = null
+  }
+
+  closePanel(): void {
+    this.panel = 'none'
+    this.input.panelOpen = false
+    this.input.requestLock()
+  }
+
+  /** Craft a recipe from the UI; overflow that does not fit is dropped at the feet. */
+  craftRecipe(recipeId: string): boolean {
+    const recipe = getRecipe(recipeId)
+    const result = craft(this.inventory, recipe, this.nearWorkbench)
+    if (!result) return false
+    if (result.overflow > 0) {
+      const s = this.player.state
+      this.drops.spawn(recipe.output.id, result.overflow, s.x, s.y + 1, s.z)
+    }
+    return true
+  }
+
+  moveSlot(from: number, to: number): void {
+    if (from !== to) this.inventory.swap(from, to)
+  }
+
+  showMessage(text: string): void {
+    this.message = text
+    this.messageUntil = this.time + MESSAGE_SECONDS
   }
 
   private handleEvent(ev: InputEvent): void {
@@ -121,6 +178,20 @@ export class Game {
       case 'toggleCamera': this.cameraMode = this.cameraMode === 'first' ? 'third' : 'first'; break
       case 'drop': this.dropHeld(); break
       case 'reload': this.reload(); break
+      case 'inventory': this.openPanel('crafting'); break
+      case 'interact': this.interact(); break
+    }
+  }
+
+  /** F: use the targeted prop — bed sets the respawn point, workbench opens crafting. */
+  private interact(): void {
+    const t = this.target
+    if (!t) return
+    if (t.block === BLOCK.bed) {
+      this.player.spawn = { x: t.x + 0.5, y: t.y + 1, z: t.z + 0.5 }
+      this.showMessage('Respawn point set')
+    } else if (t.block === BLOCK.workbench) {
+      this.openPanel('crafting')
     }
   }
 
@@ -232,9 +303,23 @@ export class Game {
   }
 
   private breakBlock(x: number, y: number, z: number, block: number): void {
+    // multi-cell props (bed) go together and drop once
+    const partner = this.world.getProp(x, y, z)?.partner
     this.world.setBlock(x, y, z, AIR)
+    if (partner) this.world.setBlock(partner.x, partner.y, partner.z, AIR)
     const item = dropForBlock(block)
     if (item) this.drops.spawn(item, 1, x + 0.5, y + 0.3, z + 0.5, (Math.random() - 0.5) * 2, 2.5, (Math.random() - 0.5) * 2)
+  }
+
+  private canOccupy(x: number, y: number, z: number, solid: boolean): boolean {
+    const existing = this.world.getBlock(x, y, z)
+    if (existing !== AIR && existing !== BLOCK.water) return false
+    return !(solid && this.player.overlapsVoxel(x, y, z))
+  }
+
+  /** the player's facing snapped to a quarter turn, as a prop yaw (models face +Z at yaw 0) */
+  private facingYaw(): number {
+    return Math.round(this.player.state.yaw / (Math.PI / 2)) * (Math.PI / 2)
   }
 
   place(): void {
@@ -246,12 +331,30 @@ export class Game {
     const x = t.x + t.nx
     const y = t.y + t.ny
     const z = t.z + t.nz
-    const existing = this.world.getBlock(x, y, z)
-    if (existing !== AIR && existing !== BLOCK.water) return
-    if (isSolid(def.block) && this.player.overlapsVoxel(x, y, z)) return
-    if (this.inventory.takeFromSlot(this.hotbarSlot, 1) !== 1) return
-    this.world.setBlock(x, y, z, def.block)
+    if (!this.canOccupy(x, y, z, isSolid(def.block))) return
+    if (isProp(def.block)) {
+      if (!this.placeProp(def.block, x, y, z)) return
+    } else {
+      this.world.setBlock(x, y, z, def.block)
+    }
+    this.inventory.takeFromSlot(this.hotbarSlot, 1)
     this.swing()
+  }
+
+  /** Props need a solid floor; the bed also needs its second cell. Returns false if blocked. */
+  private placeProp(block: number, x: number, y: number, z: number): boolean {
+    if (!isSolid(this.world.getBlock(x, y - 1, z))) return false
+    const yaw = this.facingYaw()
+    const meta: PropMeta = { id: block, x, y, z, yaw, primary: true }
+    if (block === BLOCK.bed) {
+      const fx = x + Math.round(Math.sin(yaw))
+      const fz = z + Math.round(Math.cos(yaw))
+      if (!this.canOccupy(fx, y, fz, false) || !isSolid(this.world.getBlock(fx, y - 1, fz))) return false
+      meta.partner = { x: fx, y, z: fz }
+      this.world.setProp({ id: block, x: fx, y, z: fz, yaw, primary: false, partner: { x, y, z } })
+    }
+    this.world.setProp(meta)
+    return true
   }
 
   private dropHeld(): void {
@@ -281,6 +384,11 @@ export class Game {
       cameraMode: this.cameraMode,
       breakProgress: this.breaking?.progress ?? 0,
       canBreak: this.target ? Number.isFinite(breakTime(this.target.block, held)) : true,
+      panel: this.panel,
+      nearWorkbench: this.nearWorkbench,
+      message: this.time < this.messageUntil ? this.message : '',
+      interactHint: this.target?.block === BLOCK.bed ? 'F  set respawn'
+        : this.target?.block === BLOCK.workbench ? 'F  craft' : '',
     })
   }
 }

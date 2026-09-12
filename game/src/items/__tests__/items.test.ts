@@ -17,7 +17,7 @@ describe('registry', () => {
     expect(dropForBlock(BLOCK.ore_coal)).toBe('coal')
     expect(dropForBlock(BLOCK.ore_iron)).toBe('iron')
     expect(dropForBlock(BLOCK.water)).toBeNull()
-    expect(dropForBlock(BLOCK.stone)).toBe('stone')
+    expect(dropForBlock(BLOCK.stone)).toBe('cobble')
     expect(dropForBlock(BLOCK.leaves)).toBe('leaves')
   })
 

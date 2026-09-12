@@ -201,3 +201,27 @@ describe('raycast', () => {
     expect(Math.abs(hit.nx) + Math.abs(hit.nz)).toBe(1)
   })
 })
+
+describe('props', () => {
+  test('setProp stores metadata, setBlock over it clears it, versions bump', () => {
+    const w = new World()
+    const v0 = w.propsVersion
+    w.setProp({ id: BLOCK.torch, x: 1, y: 2, z: 3, yaw: 0, primary: true })
+    expect(w.getBlock(1, 2, 3)).toBe(BLOCK.torch)
+    expect(w.getProp(1, 2, 3)?.id).toBe(BLOCK.torch)
+    expect(w.propsVersion).toBeGreaterThan(v0)
+    const v1 = w.propsVersion
+    w.setBlock(1, 2, 3, AIR)
+    expect(w.getProp(1, 2, 3)).toBeUndefined()
+    expect(w.propsVersion).toBeGreaterThan(v1)
+  })
+
+  test('prop blocks emit no chunk faces but neighbours still draw against them', () => {
+    const w = new World()
+    w.setBlock(0, 0, 0, BLOCK.stone)
+    const solo = meshChunk(w, 0, 0, 0).opaque!
+    w.setProp({ id: BLOCK.workbench, x: 0, y: 1, z: 0, yaw: 0, primary: true })
+    const withProp = meshChunk(w, 0, 0, 0).opaque!
+    expect(withProp.indices.length).toBe(solo.indices.length) // stone top face still drawn, no bench faces
+  })
+})

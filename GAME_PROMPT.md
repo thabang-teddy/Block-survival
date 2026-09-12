@@ -91,8 +91,9 @@ slots along the bottom centre. Damage vignette on hit. All HUD is React DOM over
 Inventory: 9 hotbar + 27 backpack slots, stack size 64. Pick up by walking over dropped items.
 
 **Gathering:** punching a log with an empty hand takes 3 s; wooden/stone/iron pickaxe speeds are
-1.5× / 2.5× / 4×. Stone, ore and cobble **require a pickaxe**. Leaves drop leaves. Sand digs by
-hand. Water and bedrock-level stone (lowest 2 layers) are indestructible.
+1.5× / 2.5× / 4×. Stone, ore and cobble **require a pickaxe**. Stone drops **cobble** (the wall
+block); grass drops dirt; ore drops coal / iron directly (no smelting). Leaves drop leaves. Sand
+digs by hand. Water and bedrock-level stone (lowest 2 layers) are indestructible.
 
 **Recipes** (hand = anywhere; bench = must be within 3 m of a placed Workbench, press F):
 
@@ -107,7 +108,6 @@ hand. Water and bedrock-level stone (lowest 2 layers) are indestructible.
 | Iron Pickaxe | Iron ×3 + Stick ×2 | bench |
 | Sword | Iron ×2 + Stick ×1 | bench |
 | Glass ×4 | Sand ×4 + Coal ×1 | bench |
-| Stone Wall ×4 (cobble block) | Stone ×4 | bench |
 | Reinforced Wall ×4 | Cobble ×4 + Iron ×1 | bench |
 | Bed | Planks ×3 + Leaves ×3 | bench |
 | Rifle | Iron ×8 + Planks ×2 + Coal ×2 | bench |

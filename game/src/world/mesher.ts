@@ -4,7 +4,7 @@
  * Produces two geometries per chunk: opaque and translucent (water, glass).
  */
 import { CHUNK, type World } from './chunkStore'
-import { AIR, BLOCK, BLOCK_DEFS, isSeeThrough, isTranslucent, type BlockId, type Rgb } from './palette'
+import { AIR, BLOCK, BLOCK_DEFS, isProp, isSeeThrough, isTranslucent, type BlockId, type Rgb } from './palette'
 
 export interface MeshData {
   positions: Float32Array
@@ -85,7 +85,7 @@ class Builder {
 }
 
 /** Does a block occlude ambient light? (opaque-ish solids) */
-const occludes = (id: number): boolean => id !== AIR && id !== BLOCK.water && id !== BLOCK.glass
+const occludes = (id: number): boolean => id !== AIR && id !== BLOCK.water && id !== BLOCK.glass && !isProp(id)
 
 function vertexAo(world: World, x: number, y: number, z: number,
   n: readonly [number, number, number],
@@ -122,7 +122,7 @@ export function meshChunk(world: World, cx: number, cy: number, cz: number): Chu
     for (let ly = 0; ly < CHUNK; ly++) {
       for (let lz = 0; lz < CHUNK; lz++) {
         const kind = chunk[(lx << 8) | (ly << 4) | lz]
-        if (kind === AIR) continue
+        if (kind === AIR || isProp(kind)) continue
         const x = ox + lx
         const y = oy + ly
         const z = oz + lz
