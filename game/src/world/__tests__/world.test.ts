@@ -68,19 +68,35 @@ describe('noise', () => {
 })
 
 describe('islandGen', () => {
-  test('Island_Large has a flat grass build pad at y=2 with spawn on top', () => {
+  test('Island_Large has a flat grass build pad at terrain height with spawn on top', () => {
     const w = new World()
     const info = generateIsland(w, ISLAND_LARGE)
     expect(info.voxelCount).toBeGreaterThan(10_000)
-    // every column inside the pad radius is grass at y=2 with air above
+    const h = info.padHeight
+    expect(h).toBeGreaterThanOrEqual(6) // inland terrain, not the y=2 pit from islands.py
+    expect(h % 2).toBe(0) // snapped to a terrace step
+    // every column inside the pad radius is grass at padHeight with air above
     for (let x = -8; x <= 8; x++) {
       for (let z = -8; z <= 8; z++) {
         if (Math.hypot(x, z) > ISLAND_LARGE.padRadius) continue
-        expect(w.getBlock(x, 2, z), `pad column ${x},${z}`).toBe(BLOCK.grass)
-        expect(w.getBlock(x, 3, z)).toBe(AIR)
+        expect(w.getBlock(x, h, z), `pad column ${x},${z}`).toBe(BLOCK.grass)
+        expect(w.getBlock(x, h + 1, z)).toBe(AIR)
       }
     }
-    expect(info.spawn).toEqual({ x: 0.5, y: 3, z: 0.5 })
+    // the ring just outside the pad is within one terrace of it (no cliff)
+    let maxStep = 0
+    for (let x = -12; x <= 12; x++) {
+      for (let z = -12; z <= 12; z++) {
+        const d = Math.hypot(x, z)
+        if (d <= 8 || d > 11) continue
+        let top = 20
+        while (top > -20 && !w.getBlock(x, top, z)) top--
+        if (w.getBlock(x, top, z) === BLOCK.leaves || w.getBlock(x, top, z) === BLOCK.log) continue
+        maxStep = Math.max(maxStep, Math.abs(top - h))
+      }
+    }
+    expect(maxStep).toBeLessThanOrEqual(4)
+    expect(info.spawn).toEqual({ x: 0.5, y: h + 1, z: 0.5 })
   })
 
   test('is deterministic for a seed and contains water, ore and trees', () => {

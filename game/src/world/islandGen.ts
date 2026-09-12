@@ -30,6 +30,8 @@ export const ISLAND_MEDIUM: IslandParams = {
 export interface IslandInfo {
   /** feet position on top of the build pad */
   spawn: { x: number; y: number; z: number }
+  /** y of the pad's top block */
+  padHeight: number
   voxelCount: number
 }
 
@@ -78,10 +80,27 @@ export function generateIsland(world: World, p: IslandParams): IslandInfo {
       let h = mask * maxHeight + 2 * n2(x, z, seed + 1, 0.16)
       h = mask > 0.5 ? Math.round(h / 2) * 2 : Math.round(h) // terraces inland
       h = Math.max(0, Math.min(maxHeight + 2, h))
-      if (padRadius && Math.hypot(x, z) <= padRadius) h = 2
       let dep = Math.trunc(mask * depth + 2 * n2(x, z, seed + 2, 0.13) * mask)
       dep = Math.max(1, dep)
       heights.set(colKey(x, z), { x, z, h, dep })
+    }
+  }
+
+  // ---- build pad: flat, at the height of the surrounding terrain (islands.py pinned it
+  // to y=2, which left the spawn at the bottom of a 9-block pit)
+  let padHeight = 2
+  if (padRadius) {
+    const ring: number[] = []
+    for (const { x, z, h } of heights.values()) {
+      const dist = Math.hypot(x, z)
+      if (dist > padRadius && dist <= padRadius + 3) ring.push(h)
+    }
+    if (ring.length) {
+      ring.sort((a, b) => a - b)
+      padHeight = Math.round(ring[ring.length >> 1] / 2) * 2 // median, snapped to a terrace
+    }
+    for (const col of heights.values()) {
+      if (Math.hypot(col.x, col.z) <= padRadius) col.h = padHeight
     }
   }
 
@@ -150,7 +169,8 @@ export function generateIsland(world: World, p: IslandParams): IslandInfo {
     if (lakeCells.has(colKey(x, z))) continue
     if (world.getBlock(x, h, z) !== BLOCK.grass) continue
     const dist = Math.hypot(x, z)
-    if (dist > padRadius + 1 && dist < R * 0.85) grassCells.push({ x, y: h, z })
+    // +3: the radius-2 canopy must not overhang the pad
+    if (dist > padRadius + 3 && dist < R * 0.85) grassCells.push({ x, y: h, z })
   }
   const shuffled = rng.shuffle(grassCells)
   const placed: { x: number; z: number }[] = []
@@ -163,5 +183,5 @@ export function generateIsland(world: World, p: IslandParams): IslandInfo {
     }
   }
 
-  return { spawn: { x: 0.5, y: 3, z: 0.5 }, voxelCount }
+  return { spawn: { x: 0.5, y: padHeight + 1, z: 0.5 }, padHeight, voxelCount }
 }

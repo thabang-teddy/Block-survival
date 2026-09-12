@@ -99,6 +99,6 @@ describe('playerController', () => {
     const p = new PlayerController(new World(), { x: 5, y: 1, z: 5 })
     for (let i = 0; i < 600; i++) p.update(1 / 60, fakeInput())
     expect(p.state.y).toBeGreaterThan(PLAYER.voidY)
-    expect([p.state.x, p.state.z]).toEqual([0.5, 0.5])
+    expect([p.state.x, p.state.z]).toEqual([5, 5]) // back over the spawn column (still falling: empty world)
   })
 })

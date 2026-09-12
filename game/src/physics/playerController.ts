@@ -37,11 +37,14 @@ export interface PlayerState {
 
 export class PlayerController {
   readonly state: PlayerState
+  /** respawn point (the bed sets this in Phase 5) */
+  spawn: { x: number; y: number; z: number }
   private readonly world: World
   private jumpQueued = false
 
   constructor(world: World, spawn: { x: number; y: number; z: number }) {
     this.world = world
+    this.spawn = { ...spawn }
     this.state = { x: spawn.x, y: spawn.y, z: spawn.z, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, onGround: false }
   }
 
@@ -101,7 +104,7 @@ export class PlayerController {
     s.vy = Math.max(s.vy, -50)
 
     this.move(s.vx * dt, s.vy * dt, s.vz * dt)
-    if (s.y < PLAYER.voidY) this.teleport(0.5, 3, 0.5)
+    if (s.y < PLAYER.voidY) this.teleport(this.spawn.x, this.spawn.y, this.spawn.z)
   }
 
   private move(dx: number, dy: number, dz: number): void {
