@@ -11,6 +11,10 @@ export default defineConfig({
       'three',
       'three/examples/jsm/loaders/GLTFLoader.js',
       'three/examples/jsm/utils/SkeletonUtils.js',
+      'three/examples/jsm/postprocessing/EffectComposer.js',
+      'three/examples/jsm/postprocessing/RenderPass.js',
+      'three/examples/jsm/postprocessing/UnrealBloomPass.js',
+      'three/examples/jsm/postprocessing/OutputPass.js',
     ],
   },
 })

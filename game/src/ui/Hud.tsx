@@ -47,14 +47,31 @@ export function Hud() {
   const panel = useUiStore(s => s.panel)
   const message = useUiStore(s => s.message)
   const interactHint = useUiStore(s => s.interactHint)
+  const timer = useUiStore(s => s.timer)
+  const phase = useUiStore(s => s.phase)
+  const night = useUiStore(s => s.night)
+  const zombies = useUiStore(s => s.zombies)
+  const kills = useUiStore(s => s.kills)
+  const hurtAt = useUiStore(s => s.hurtAt)
+  const poisoned = useUiStore(s => s.poisoned)
+  const aiming = useUiStore(s => s.aiming)
+  const reloading = useUiStore(s => s.reloading)
 
   return (
-    <div className="hud">
+    <div className={`hud${poisoned ? ' poisoned' : ''}`}>
+      {/* key forces the vignette animation to restart on every hit */}
+      {hurtAt > 0 && <div key={hurtAt} className="hurt" aria-hidden />}
+      {aiming && <div className="scope" aria-hidden />}
+
       <div className="logo">BLOCK<span>SURVIVAL</span></div>
+      <div className={`timer ${phase}`}>
+        <span className="clock">{timer}</span>
+        <span className="label">{phase === 'night' ? `night ${night} · ${zombies} out there` : night ? `day ${night + 1}` : 'sunset in'}</span>
+      </div>
       <div className="debug">
         {x.toFixed(1)}, {y.toFixed(1)}, {z.toFixed(1)}
         {targetBlock ? ` · ${BLOCK_NAMES[targetBlock].replace('_', ' ')}${canBreak ? '' : ' (needs pickaxe)'}` : ''}
-        {` · ${cameraMode === 'first' ? '1st' : '3rd'} person (V)`}
+        {` · ${cameraMode === 'first' ? '1st' : '3rd'} person (V) · kills ${kills}`}
       </div>
 
       <div className="vitals">
@@ -63,8 +80,8 @@ export function Hud() {
       </div>
 
       {ammo && (
-        <div className="ammo">
-          <span className="mag">{ammo.mag}</span>
+        <div className={`ammo${reloading ? ' reloading' : ''}`}>
+          <span className="mag">{reloading ? '··' : ammo.mag}</span>
           <span className="sep">/</span>
           <span className="reserve">{ammo.reserve}</span>
           <span className="mag-icon">▮</span>
@@ -74,7 +91,7 @@ export function Hud() {
       {message && <div className="toast">{message}</div>}
       {locked && interactHint && <div className="interact-hint">{interactHint}</div>}
 
-      {locked && (
+      {locked && !aiming && (
         <div className="crosshair" aria-hidden>
           {breakProgress > 0 && (
             <div className="break-ring" style={{ background: `conic-gradient(#fff ${breakProgress * 360}deg, transparent 0)` }} />

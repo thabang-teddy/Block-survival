@@ -10,7 +10,7 @@
 html, body, #root { margin: 0; height: 100%; overflow: hidden; background: #87b4d8; }
 body { user-select: none; }
 
-.stats { left: auto !important; right: 8px; top: 64px !important; }
+.stats { left: auto !important; right: 8px; top: 130px !important; }
 
 .hud { position: fixed; inset: 0; pointer-events: none; color: var(--hud-ink); }
 
@@ -22,7 +22,7 @@ body { user-select: none; }
 .logo span { display: block; font-size: 18px; color: var(--hud-orange); }
 
 .debug {
-  position: absolute; top: 14px; right: 18px;
+  position: absolute; top: 96px; right: 18px;
   font: 600 13px/1 ui-monospace, Consolas, monospace;
   padding: 8px 10px; border-radius: 6px; background: var(--hud-panel);
 }
@@ -157,3 +157,37 @@ body { user-select: none; }
 
 .icon.large.block { width: 40px; height: 40px; }
 .icon.large.glyph { font-size: 36px; }
+
+/* ---- timer (top-right) */
+.timer {
+  position: absolute; top: 14px; right: 18px; text-align: right;
+  padding: 6px 12px; border-radius: 6px; background: var(--hud-panel);
+}
+.timer .clock { display: block; font: 900 34px/1 ui-monospace, Consolas, monospace; letter-spacing: 1px; }
+.timer .label { display: block; margin-top: 3px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; opacity: .75; }
+.timer.night .clock { color: #ff4a3a; text-shadow: 0 0 10px rgba(255,74,58,.7); animation: pulse 1s ease-in-out infinite; }
+.timer.night .label { color: #ff8a7a; opacity: 1; }
+@keyframes pulse { 50% { opacity: .55; } }
+
+/* ---- damage / poison / scope overlays */
+.hurt {
+  position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 120px 40px rgba(200, 20, 20, .55);
+  animation: hurt .45s ease-out forwards;
+}
+@keyframes hurt { from { opacity: 1 } to { opacity: 0 } }
+.hud.poisoned::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 160px 60px rgba(70, 200, 40, .35);
+}
+.hud.poisoned .health .fill { background: linear-gradient(#9ee06a, #4f9a2a); }
+.scope {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle at center, transparent 0, transparent 31vh, rgba(0,0,0,.92) 32.5vh, #000 34vh);
+}
+.scope::before, .scope::after {
+  content: ''; position: absolute; left: 50%; top: 50%; background: #111; transform: translate(-50%, -50%);
+}
+.scope::before { width: 2px; height: 64vh; }
+.scope::after { height: 2px; width: 64vh; }
+.ammo.reloading .mag { color: var(--hud-accent); animation: pulse .5s ease-in-out infinite; }

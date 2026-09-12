@@ -86,3 +86,30 @@ export function moveBox(world: World, box: Box, dx: number, dy: number, dz: numb
   b.z += rz.moved
   return { box: b, hitX: rx.hit, hitY: ry.hit, hitZ: rz.hit }
 }
+
+/** Ray vs box (slab test). Returns the entry distance along the unit direction, or null. */
+export function rayBox(
+  ox: number, oy: number, oz: number,
+  dx: number, dy: number, dz: number,
+  b: Box,
+): number | null {
+  let tMin = 0
+  let tMax = Infinity
+  const mins = [b.x, b.y, b.z]
+  const maxs = [b.x + b.w, b.y + b.h, b.z + b.d]
+  const o = [ox, oy, oz]
+  const d = [dx, dy, dz]
+  for (let i = 0; i < 3; i++) {
+    if (Math.abs(d[i]) < 1e-9) {
+      if (o[i] < mins[i] || o[i] > maxs[i]) return null
+      continue
+    }
+    let t1 = (mins[i] - o[i]) / d[i]
+    let t2 = (maxs[i] - o[i]) / d[i]
+    if (t1 > t2) { const t = t1; t1 = t2; t2 = t }
+    tMin = Math.max(tMin, t1)
+    tMax = Math.min(tMax, t2)
+    if (tMin > tMax) return null
+  }
+  return tMin
+}

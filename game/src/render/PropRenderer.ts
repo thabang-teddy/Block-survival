@@ -10,7 +10,7 @@ import { loadModel } from './assets'
 
 export const MAX_LIGHTS = 12
 const LIGHT_REASSIGN_SECONDS = 0.25
-const TORCH_LIGHT = { colour: 0xffb060, intensity: 14, distance: 10, decay: 2 } as const
+const TORCH_LIGHT = { colour: 0xffb060, intensity: 9, distance: 9, decay: 2 } as const
 
 const MODELS: Readonly<Record<number, string>> = {
   [BLOCK.torch]: '/assets/Assets/Torch.glb',

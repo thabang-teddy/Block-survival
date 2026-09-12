@@ -16,6 +16,12 @@ import { Inventory } from '../items/inventory'
 import { breakTime, dropForBlock, getItem } from '../items/registry'
 import { craft, getRecipe } from '../items/recipes'
 import { DropManager } from '../entities/drops'
+import { kindsForNight, ZombieManager, ZOMBIE, ZOMBIE_STATS, zombiesForNight, type Zombie } from '../entities/zombies'
+import { ZombieRenderer, preloadZombies } from '../render/ZombieRenderer'
+import { CombatFx } from '../render/CombatFx'
+import { DayNight, NIGHT_SECONDS } from './DayNight'
+import { rayBox } from '../physics/aabb'
+import { makeRng } from '../world/noise'
 import { useUiStore } from '../state/uiStore'
 
 export const REACH = 5
@@ -30,6 +36,12 @@ const RIFLE_MAG = 30
 /** a Workbench within this distance of the player enables bench recipes */
 export const BENCH_REACH = 3
 const MESSAGE_SECONDS = 2.5
+const RIFLE = { damage: 12, headshot: 2, interval: 0.12, reloadSeconds: 2, range: 80, kick: 0.012 } as const
+const SWORD = { damage: 20, reach: 2.5, arcCos: Math.cos(Math.PI / 6), knockback: 6 } as const
+const ADS = { fov: 20, normalFov: 75, speed: 12 } as const
+const POISON = { seconds: 5, dps: 2 } as const
+/** groups arrive during the first 70 % of the night */
+const SPAWN_WINDOW = 0.7
 
 export class Game {
   readonly world = new World()
@@ -41,6 +53,10 @@ export class Game {
   readonly inventory = new Inventory()
   readonly drops: DropManager
   readonly viewModel = new ViewModel()
+  readonly dayNight = new DayNight()
+  readonly zombies: ZombieManager
+  readonly zombieRenderer = new ZombieRenderer()
+  readonly fx = new CombatFx()
   readonly camera: THREE.PerspectiveCamera
   /** wireframe cube on the targeted block */
   readonly highlight: THREE.LineSegments
@@ -55,6 +71,17 @@ export class Game {
   magazine = RIFLE_MAG
   panel: Panel = 'none'
   nearWorkbench = false
+  /** right mouse held with the rifle: scope view */
+  aiming = false
+  deaths = 0
+  /** sim time of the last hit taken (HUD vignette) */
+  hurtAt = -10
+  private poisonUntil = 0
+  private reloadUntil = 0
+  private pendingRounds = 0
+  private nextShotAt = 0
+  /** sim times at which the next zombie groups spawn this night */
+  private spawnTimes: number[] = []
   private message = ''
   private messageUntil = 0
   private swingUntil = 0
@@ -80,6 +107,15 @@ export class Game {
     this.player = new PlayerController(this.world, this.island.spawn)
     this.input = new Input(canvas)
     this.drops = new DropManager(this.world)
+    this.zombies = new ZombieManager(
+      {
+        world: this.world,
+        damagePlayer: (amount, poison) => this.hurt(amount, poison),
+        breakBlock: (x, y, z) => this.breakBlock(x, y, z, this.world.getBlock(x, y, z)),
+      },
+      makeRng(Date.now() & 0xffff),
+    )
+    preloadZombies()
     this.highlight = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002)),
       new THREE.LineBasicMaterial({ color: 0x111111, transparent: true, opacity: 0.6 }),
@@ -92,6 +128,8 @@ export class Game {
     this.chunks.dispose()
     this.props.dispose()
     this.drops.dispose()
+    this.zombieRenderer.dispose()
+    this.fx.dispose()
     this.viewModel.dispose()
     this.camera.remove(this.viewModel.group)
     this.highlight.geometry.dispose()
@@ -104,14 +142,25 @@ export class Game {
   update(rawDt: number): void {
     const dt = Math.min(rawDt, MAX_DT)
     this.time += dt
+    if (this.pendingRounds && this.time >= this.reloadUntil) {
+      this.magazine += this.pendingRounds
+      this.pendingRounds = 0
+    }
     const look = this.input.takeLook()
     this.player.look(look.dx, look.dy)
     for (const ev of this.input.takeEvents()) this.handleEvent(ev)
     this.player.update(dt, this.input)
+    this.updateCombat(dt)
     this.syncCamera()
     this.updateTarget()
     this.updateBreaking(dt)
     const s = this.player.state
+    this.updateNight(dt)
+    this.zombies.update(dt, [{ x: s.x, y: s.y, z: s.z }])
+    this.zombieRenderer.update(dt, this.zombies)
+    this.fx.update(dt)
+    if (this.time < this.poisonUntil) this.player.damage(POISON.dps * dt)
+    if (s.health <= 0) this.die()
     const moving = Math.hypot(s.vx, s.vz) > 0.5 && s.onGround
     this.drops.update(dt, s.x, s.y, s.z, this.inventory)
     this.viewModel.setItem(this.heldItem)
@@ -123,6 +172,111 @@ export class Game {
     this.chunks.update()
     this.props.update(dt, this.camera.position.x, this.camera.position.y, this.camera.position.z)
     this.publishUi()
+  }
+
+  // ---------------------------------------------------------------- night
+  private updateNight(dt: number): void {
+    const dn = this.dayNight
+    dn.update(dt)
+    if (dn.justChanged) {
+      if (dn.phase === 'night') this.scheduleNight(dn.night)
+      else {
+        this.zombies.burnAll()
+        this.spawnTimes = []
+        this.showMessage(`Dawn — you survived night ${dn.night}`)
+      }
+    }
+    while (this.spawnTimes.length && dn.time >= this.spawnTimes[0]) {
+      this.spawnTimes.shift()
+      const s = this.player.state
+      this.zombies.spawnGroup(kindsForNight(dn.night), 3 + Math.floor(Math.random() * 4), [{ x: s.x, y: s.y, z: s.z }], 28)
+    }
+  }
+
+  /** Split the night's zombie count into groups of 3–6 spread over the spawn window. */
+  private scheduleNight(night: number): void {
+    const total = zombiesForNight(night)
+    const groups = Math.max(1, Math.round(total / 4.5))
+    const window = NIGHT_SECONDS * SPAWN_WINDOW
+    this.spawnTimes = Array.from({ length: groups }, (_, i) => this.dayNight.time + 2 + (i * window) / groups)
+    this.showMessage(`Night ${night} — they are coming`)
+  }
+
+  private hurt(amount: number, poison: boolean): void {
+    this.player.damage(amount)
+    this.hurtAt = this.time
+    if (poison) this.poisonUntil = this.time + POISON.seconds
+  }
+
+  /** Phase 4 stand-in for death: respawn at the bed / pad with full vitals. Phase 5 adds the loot crate. */
+  private die(): void {
+    this.deaths++
+    const sp = this.player.spawn
+    this.player.teleport(sp.x, sp.y, sp.z)
+    this.player.state.health = PLAYER.maxHealth
+    this.player.state.stamina = PLAYER.maxStamina
+    this.poisonUntil = 0
+    this.showMessage('You died')
+  }
+
+  // ---------------------------------------------------------------- combat
+  private updateCombat(dt: number): void {
+    const rifle = this.heldItem === 'rifle'
+    this.aiming = rifle && this.input.isButtonDown(2) && this.panel === 'none'
+    const targetFov = this.aiming ? ADS.fov : ADS.normalFov
+    if (Math.abs(this.camera.fov - targetFov) > 0.01) {
+      this.camera.fov += (targetFov - this.camera.fov) * Math.min(1, ADS.speed * dt)
+      this.camera.updateProjectionMatrix()
+    }
+    // hold to fire
+    if (rifle && this.input.isButtonDown(0) && this.time >= this.nextShotAt) this.fire()
+  }
+
+  /** zombies the sword can reach: within reach of the eye and inside a 60° cone */
+  private swordTargets(): Zombie[] {
+    const dir = this.camera.getWorldDirection(this.tmpDir)
+    const s = this.player.state
+    const ex = s.x
+    const ey = s.y + PLAYER.eyeHeight
+    const ez = s.z
+    const out: Zombie[] = []
+    for (const z of this.zombies.zombies) {
+      if (z.state !== 'chase' && z.state !== 'attack') continue
+      const dx = z.x - ex
+      const dy = z.y + 1 - ey
+      const dz = z.z - ez
+      const d = Math.hypot(dx, dy, dz)
+      if (d > SWORD.reach) continue
+      const cos = (dx * dir.x + dy * dir.y + dz * dir.z) / (d || 1)
+      if (cos >= SWORD.arcCos) out.push(z)
+    }
+    return out
+  }
+
+  private swordAttack(): void {
+    const dir = this.camera.getWorldDirection(this.tmpDir)
+    for (const z of this.swordTargets()) {
+      this.zombies.damage(z, SWORD.damage, dir.x * SWORD.knockback, dir.z * SWORD.knockback)
+    }
+  }
+
+  /** Hitscan: nearest zombie box along the view ray, unless a block is closer. */
+  private rifleHit(): { zombie: Zombie; distance: number; headshot: boolean; point: THREE.Vector3 } | null {
+    const dir = this.camera.getWorldDirection(this.tmpDir).clone()
+    const o = this.camera.position
+    const wall = raycastVoxels(this.world, o.x, o.y, o.z, dir.x, dir.y, dir.z, RIFLE.range)
+    const limit = wall ? wall.distance : RIFLE.range
+    let best: Zombie | null = null
+    let bestT = limit
+    for (const z of this.zombies.zombies) {
+      if (z.state !== 'chase' && z.state !== 'attack') continue
+      const half = ZOMBIE.width / 2
+      const t = rayBox(o.x, o.y, o.z, dir.x, dir.y, dir.z, { x: z.x - half, y: z.y, z: z.z - half, w: ZOMBIE.width, h: 2, d: ZOMBIE.width })
+      if (t !== null && t < bestT) { best = z; bestT = t }
+    }
+    if (!best) return null
+    const point = new THREE.Vector3(o.x + dir.x * bestT, o.y + dir.y * bestT, o.z + dir.z * bestT)
+    return { zombie: best, distance: bestT, headshot: point.y > best.y + 1.5, point }
   }
 
   /** is a prop block of this kind within `radius` of the player's chest? */
@@ -256,26 +410,48 @@ export class Game {
       this.fire()
       return
     }
+    if (held === 'sword') this.swordAttack()
     this.swing()
   }
 
+  get reloading(): boolean {
+    return this.time < this.reloadUntil
+  }
+
   private fire(): void {
+    if (this.reloading || this.panel !== 'none' || this.time < this.nextShotAt) return
     if (this.magazine <= 0) {
       this.reload()
       return
     }
     this.magazine--
+    this.nextShotAt = this.time + RIFLE.interval
     this.swing()
-    // hitscan damage arrives with zombies in Phase 4
+    this.player.look(0, -RIFLE.kick / PLAYER.mouseSensitivity)
+    const dir = this.camera.getWorldDirection(this.tmpDir)
+    const o = this.camera.position
+    const muzzle = new THREE.Vector3(o.x + dir.x * 0.6, o.y - 0.15, o.z + dir.z * 0.6)
+    this.fx.muzzleFlash(muzzle.x, muzzle.y, muzzle.z)
+    const hit = this.rifleHit()
+    if (hit) {
+      const dmg = RIFLE.damage * (hit.headshot ? RIFLE.headshot : 1) * ZOMBIE_STATS[hit.zombie.kind].rifleResist
+      this.zombies.damage(hit.zombie, dmg, dir.x * 1.5, dir.z * 1.5)
+      this.fx.tracer(muzzle, hit.point)
+    } else {
+      const wall = raycastVoxels(this.world, o.x, o.y, o.z, dir.x, dir.y, dir.z, RIFLE.range)
+      const d = wall ? wall.distance : RIFLE.range
+      this.fx.tracer(muzzle, new THREE.Vector3(o.x + dir.x * d, o.y + dir.y * d, o.z + dir.z * d))
+    }
   }
 
   private reload(): void {
-    if (this.heldItem !== 'rifle' || this.magazine === RIFLE_MAG) return
+    if (this.heldItem !== 'rifle' || this.magazine === RIFLE_MAG || this.reloading) return
     const need = RIFLE_MAG - this.magazine
     const have = Math.min(need, this.inventory.count('ammo'))
     if (have <= 0) return
     this.inventory.remove('ammo', have)
-    this.magazine += have
+    this.reloadUntil = this.time + RIFLE.reloadSeconds
+    this.pendingRounds = have // loaded when the reload finishes
   }
 
   /** Hold-to-dig: progress accumulates while the left button is held on the same block. */
@@ -387,6 +563,15 @@ export class Game {
       panel: this.panel,
       nearWorkbench: this.nearWorkbench,
       message: this.time < this.messageUntil ? this.message : '',
+      timer: this.dayNight.timerText,
+      phase: this.dayNight.phase,
+      night: this.dayNight.night,
+      zombies: this.zombies.liveCount,
+      kills: this.zombies.kills,
+      hurtAt: this.hurtAt,
+      poisoned: this.time < this.poisonUntil,
+      aiming: this.aiming,
+      reloading: this.reloading,
       interactHint: this.target?.block === BLOCK.bed ? 'F  set respawn'
         : this.target?.block === BLOCK.workbench ? 'F  craft' : '',
     })

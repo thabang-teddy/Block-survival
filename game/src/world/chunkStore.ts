@@ -9,6 +9,8 @@ const SHIFT = 4 // log2(CHUNK)
 const MASK = CHUNK - 1
 
 export const chunkKey = (cx: number, cy: number, cz: number): string => `${cx},${cy},${cz}`
+/** allocation-free chunk key for the hot getBlock path (±512 chunks) */
+const numKey = (cx: number, cy: number, cz: number): number => ((cx + 512) * 1024 + (cy + 512)) * 1024 + (cz + 512)
 
 export interface ChunkCoord {
   cx: number
@@ -42,6 +44,9 @@ export interface PropMeta {
 
 export class World {
   private readonly chunks = new Map<string, Uint8Array>()
+  private readonly chunksByNum = new Map<number, Uint8Array>()
+  private lastKey = NaN
+  private lastChunk: Uint8Array | undefined
   private readonly dirty = new Set<string>()
   /** prop block metadata keyed by blockKey; bumps `propsVersion` on change */
   readonly props = new Map<string, PropMeta>()
@@ -62,7 +67,14 @@ export class World {
   }
 
   getBlock(x: number, y: number, z: number): number {
-    const c = this.chunks.get(chunkKey(x >> SHIFT, y >> SHIFT, z >> SHIFT))
+    const k = numKey(x >> SHIFT, y >> SHIFT, z >> SHIFT)
+    let c: Uint8Array | undefined
+    if (k === this.lastKey) c = this.lastChunk
+    else {
+      c = this.chunksByNum.get(k)
+      this.lastKey = k
+      this.lastChunk = c
+    }
     return c ? c[localIndex(x, y, z)] : AIR
   }
 
@@ -81,6 +93,8 @@ export class World {
       if (id === AIR) return
       c = new Uint8Array(CHUNK * CHUNK * CHUNK)
       this.chunks.set(key, c)
+      this.chunksByNum.set(numKey(cx, cy, cz), c)
+      this.lastKey = NaN
     }
     const i = localIndex(x, y, z)
     if (c[i] === id) return

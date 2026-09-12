@@ -5,6 +5,7 @@
 import { create } from 'zustand'
 import type { ItemStack } from '../items/inventory'
 import type { CameraMode, Game, Panel } from '../game/Game'
+import type { Phase } from '../game/DayNight'
 
 export interface UiSnapshot {
   locked: boolean
@@ -27,6 +28,17 @@ export interface UiSnapshot {
   message: string
   /** e.g. "F  craft" when looking at a workbench */
   interactHint: string
+  /** MM:SS to the next sunset / dawn */
+  timer: string
+  phase: Phase
+  night: number
+  zombies: number
+  kills: number
+  /** sim time of the last hit taken; the HUD flashes when it changes */
+  hurtAt: number
+  poisoned: boolean
+  aiming: boolean
+  reloading: boolean
 }
 
 interface UiState extends UiSnapshot {
@@ -57,6 +69,15 @@ export const useUiStore = create<UiState>((set, get) => ({
   nearWorkbench: false,
   message: '',
   interactHint: '',
+  timer: '5:00',
+  phase: 'day',
+  night: 0,
+  zombies: 0,
+  kills: 0,
+  hurtAt: -10,
+  poisoned: false,
+  aiming: false,
+  reloading: false,
   game: null,
   setGame: game => set({ game }),
   sync(next) {
@@ -77,6 +98,9 @@ export const useUiStore = create<UiState>((set, get) => ({
       cur.breakProgress === breakProgress && cur.canBreak === next.canBreak &&
       cur.panel === next.panel && cur.nearWorkbench === next.nearWorkbench &&
       cur.message === next.message && cur.interactHint === next.interactHint &&
+      cur.timer === next.timer && cur.phase === next.phase && cur.night === next.night &&
+      cur.zombies === next.zombies && cur.kills === next.kills && cur.hurtAt === next.hurtAt &&
+      cur.poisoned === next.poisoned && cur.aiming === next.aiming && cur.reloading === next.reloading &&
       cur.position[0] === pos[0] && cur.position[1] === pos[1] && cur.position[2] === pos[2]
     ) return
     set({
@@ -95,6 +119,15 @@ export const useUiStore = create<UiState>((set, get) => ({
       nearWorkbench: next.nearWorkbench,
       message: next.message,
       interactHint: next.interactHint,
+      timer: next.timer,
+      phase: next.phase,
+      night: next.night,
+      zombies: next.zombies,
+      kills: next.kills,
+      hurtAt: next.hurtAt,
+      poisoned: next.poisoned,
+      aiming: next.aiming,
+      reloading: next.reloading,
     })
   },
 }))
