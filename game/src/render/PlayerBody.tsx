@@ -54,6 +54,9 @@ export function PlayerBody({ game }: Props) {
     scene.visible = game.cameraMode === 'third'
     scene.position.set(s.x, s.y, s.z)
     scene.rotation.y = s.yaw + Math.PI // model faces +Z, yaw 0 looks down -Z
+    // dead: topple onto the back over the first half-second of the respawn wait
+    const fallen = game.dead ? Math.min(1, Math.max(0, game.deadFor * 2)) : 0
+    scene.rotation.x = -fallen * (Math.PI / 2)
 
     const next = game.anim
     if (next !== current.current) {

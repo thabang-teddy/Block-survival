@@ -113,15 +113,17 @@ export class PlayerController {
     s.pitch = Math.max(-limit, Math.min(limit, s.pitch))
   }
 
-  update(dt: number, input: Input): void {
+  /** `frozen` (dead / in a menu): keys are ignored, only gravity applies */
+  update(dt: number, input: Input, frozen = false): void {
     const s = this.state
+    const down = (code: string): boolean => !frozen && input.isDown(code)
     // ---- wish direction in world space (yaw 0 looks down -Z)
     let fwd = 0
     let side = 0
-    if (input.isDown('KeyW')) fwd += 1
-    if (input.isDown('KeyS')) fwd -= 1
-    if (input.isDown('KeyD')) side += 1
-    if (input.isDown('KeyA')) side -= 1
+    if (down('KeyW')) fwd += 1
+    if (down('KeyS')) fwd -= 1
+    if (down('KeyD')) side += 1
+    if (down('KeyA')) side -= 1
     const len = Math.hypot(fwd, side) || 1
     fwd /= len
     side /= len
@@ -129,14 +131,14 @@ export class PlayerController {
     const cosY = Math.cos(s.yaw)
     const wishX = -sinY * fwd + cosY * side
     const wishZ = -cosY * fwd - sinY * side
-    this.updateVitals(dt, input.isDown('ShiftLeft'), fwd !== 0 || side !== 0)
+    this.updateVitals(dt, down('ShiftLeft'), fwd !== 0 || side !== 0)
     const speed = s.sprinting ? PLAYER.sprintSpeed : PLAYER.walkSpeed
     const accel = (s.onGround ? PLAYER.groundAccel : PLAYER.airAccel) * dt
     s.vx += Math.max(-accel, Math.min(accel, wishX * speed - s.vx))
     s.vz += Math.max(-accel, Math.min(accel, wishZ * speed - s.vz))
 
     // ---- vertical
-    if (this.jumpQueued && s.onGround) s.vy = PLAYER.jumpSpeed
+    if (this.jumpQueued && s.onGround && !frozen) s.vy = PLAYER.jumpSpeed
     this.jumpQueued = false
     s.vy -= PLAYER.gravity * dt
     s.vy = Math.max(s.vy, -50)

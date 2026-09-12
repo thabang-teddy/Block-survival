@@ -18,9 +18,9 @@ src/
   physics/   swept AABB vs voxels, player controller (movement, stamina, health)
   input/     pointer-lock mouse + keyboard, edge-triggered event queue
   items/     item registry (blocks, tools, weapons, break times, drops), recipes + crafting, 36-slot inventory
-  entities/  dropped items; A* pathfinding over standing cells; zombie sim (variants, night
-             spawning, chase/attack AI, block breaking)
-  game/      Game (the simulation) and the DayNight clock
+  entities/  dropped items; loot crates; A* pathfinding over standing cells; zombie sim
+             (variants, night spawning, chase/attack AI, block breaking)
+  game/      Game (the simulation), the DayNight clock, score
   render/    ChunkRenderer, PropRenderer (torch/workbench/bed GLBs + torch light pool),
              ZombieRenderer (skinned clones), Lighting (day/night palettes), Effects (bloom),
              CombatFx, first-person ViewModel, third-person PlayerBody, GLB cache, R3F Scene
@@ -34,8 +34,11 @@ public/assets/  copies of Design/Characters and Design/Assets
 
 WASD move · Shift sprint · Space jump · **V** first/third person · mouse look ·
 hold **left** dig / swing · **right** place · **1–9** hotbar · **Q** drop · **R** reload ·
-**E** inventory & crafting · **F** use workbench / set respawn at a bed · hold **right** with the rifle to aim ·
-Esc release mouse.
+**E** inventory & crafting · **F** use workbench / set respawn at a bed / take loot · hold **right** with the
+rifle to aim · **Tab** scoreboard · Esc pause (resume by clicking, or Restart).
+
+Dying leaves your inventory in a crate where you fell and respawns you after 5 s at your bed
+(or the build pad). Score = nights survived × 100 + kills × 5; the best score is kept in localStorage.
 
 Dev console helpers: `__game.dayNight.time = 299` jumps to the first sunset.
 

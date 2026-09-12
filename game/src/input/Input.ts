@@ -132,6 +132,7 @@ export class Input {
       this.queue.push({ type: 'jump' })
       e.preventDefault()
     }
+    if (e.code === 'Tab') e.preventDefault() // held = scoreboard; never move focus
     const mapped = KEY_EVENTS[e.code]
     if (mapped) this.queue.push(mapped)
   }

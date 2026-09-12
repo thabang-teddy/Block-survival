@@ -16,8 +16,10 @@ const SKY_COLOUR = '#87b4d8'
 function GameLoop() {
   const { gl, camera } = useThree()
   const [game, setGame] = useState<Game | null>(null)
+  const run = useUiStore(s => s.run)
 
-  // created in an effect (not useMemo) so StrictMode's double-mount disposes the first copy
+  // created in an effect (not useMemo) so StrictMode's double-mount disposes the first copy;
+  // `run` changes when the player restarts
   useEffect(() => {
     const g = new Game(gl.domElement, camera as THREE.PerspectiveCamera)
     setGame(g)
@@ -28,7 +30,7 @@ function GameLoop() {
       setGame(null)
       useUiStore.getState().setGame(null)
     }
-  }, [gl, camera])
+  }, [gl, camera, run])
 
   useFrame((_, dt) => game?.update(dt))
 
@@ -41,6 +43,7 @@ function GameLoop() {
       <primitive object={game.chunks.group} />
       <primitive object={game.props.group} />
       <primitive object={game.drops.group} />
+      <primitive object={game.crates.group} />
       <primitive object={game.zombieRenderer.group} />
       <primitive object={game.fx.group} />
       <primitive object={game.highlight} />

@@ -39,12 +39,24 @@ export interface UiSnapshot {
   poisoned: boolean
   aiming: boolean
   reloading: boolean
+  dead: boolean
+  respawnIn: number
+  score: number
+  bestScore: number
+  nightsSurvived: number
+  deaths: number
+  timeAlive: number
+  /** Tab held */
+  scoreboard: boolean
 }
 
 interface UiState extends UiSnapshot {
   /** the live simulation, for panels that need to call actions */
   game: Game | null
+  /** bumps to tear the Game down and start a fresh one */
+  run: number
   setGame(game: Game | null): void
+  restart(): void
   sync(next: UiSnapshot): void
 }
 
@@ -78,14 +90,26 @@ export const useUiStore = create<UiState>((set, get) => ({
   poisoned: false,
   aiming: false,
   reloading: false,
+  dead: false,
+  respawnIn: 0,
+  score: 0,
+  bestScore: 0,
+  nightsSurvived: 0,
+  deaths: 0,
+  timeAlive: 0,
+  scoreboard: false,
   game: null,
+  run: 0,
   setGame: game => set({ game }),
+  restart: () => set(state => ({ run: state.run + 1 })),
   sync(next) {
     const cur = get()
     const pos = roundPos(next.position)
     const health = q(next.health, 1)
     const stamina = q(next.stamina, 1)
     const breakProgress = q(next.breakProgress, 0.02)
+    const respawnIn = Math.ceil(next.respawnIn)
+    const timeAlive = Math.floor(next.timeAlive)
     const ammoSame = (cur.ammo === null) === (next.ammo === null) &&
       (!next.ammo || (cur.ammo!.mag === next.ammo.mag && cur.ammo!.reserve === next.ammo.reserve))
     if (
@@ -101,6 +125,10 @@ export const useUiStore = create<UiState>((set, get) => ({
       cur.timer === next.timer && cur.phase === next.phase && cur.night === next.night &&
       cur.zombies === next.zombies && cur.kills === next.kills && cur.hurtAt === next.hurtAt &&
       cur.poisoned === next.poisoned && cur.aiming === next.aiming && cur.reloading === next.reloading &&
+      cur.dead === next.dead && cur.respawnIn === respawnIn && cur.score === next.score &&
+      cur.bestScore === next.bestScore && cur.nightsSurvived === next.nightsSurvived &&
+      cur.deaths === next.deaths && cur.scoreboard === next.scoreboard &&
+      (cur.timeAlive === timeAlive || !(next.scoreboard || !next.locked)) &&
       cur.position[0] === pos[0] && cur.position[1] === pos[1] && cur.position[2] === pos[2]
     ) return
     set({
@@ -128,6 +156,14 @@ export const useUiStore = create<UiState>((set, get) => ({
       poisoned: next.poisoned,
       aiming: next.aiming,
       reloading: next.reloading,
+      dead: next.dead,
+      respawnIn,
+      score: next.score,
+      bestScore: next.bestScore,
+      nightsSurvived: next.nightsSurvived,
+      deaths: next.deaths,
+      timeAlive,
+      scoreboard: next.scoreboard,
     })
   },
 }))

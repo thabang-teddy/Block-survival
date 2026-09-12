@@ -8,6 +8,7 @@ import { getItem } from '../items/registry'
 import type { ItemStack } from '../items/inventory'
 import { ItemIcon } from './ItemIcon'
 import { CraftingPanel } from './CraftingPanel'
+import { formatTime } from '../game/score'
 import './hud.css'
 
 function Slot({ stack, index, active }: { stack: ItemStack | null; index: number; active: boolean }) {
@@ -56,6 +57,16 @@ export function Hud() {
   const poisoned = useUiStore(s => s.poisoned)
   const aiming = useUiStore(s => s.aiming)
   const reloading = useUiStore(s => s.reloading)
+  const dead = useUiStore(s => s.dead)
+  const respawnIn = useUiStore(s => s.respawnIn)
+  const score = useUiStore(s => s.score)
+  const bestScore = useUiStore(s => s.bestScore)
+  const nightsSurvived = useUiStore(s => s.nightsSurvived)
+  const deaths = useUiStore(s => s.deaths)
+  const timeAlive = useUiStore(s => s.timeAlive)
+  const scoreboard = useUiStore(s => s.scoreboard)
+  const restart = useUiStore(s => s.restart)
+  const game = useUiStore(s => s.game)
 
   return (
     <div className={`hud${poisoned ? ' poisoned' : ''}`}>
@@ -105,15 +116,42 @@ export function Hud() {
 
       {panel === 'crafting' && <CraftingPanel />}
 
-      {!locked && panel === 'none' && (
-        <div className="overlay">
+      {dead && (
+        <div className="death">
+          <h1>You died</h1>
+          <p className="respawn">Respawning in <b>{respawnIn}</b></p>
+          <p className="sub">Your gear is in a crate where you fell · score {score}</p>
+        </div>
+      )}
+
+      {(scoreboard || (!locked && panel === 'none')) && (
+        <table className="scoreboard">
+          <thead>
+            <tr><th>Player</th><th>Score</th><th>Nights</th><th>Kills</th><th>Deaths</th><th>Time</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>You</td><td>{score}</td><td>{nightsSurvived}</td><td>{kills}</td><td>{deaths}</td><td>{formatTime(timeAlive)}</td></tr>
+          </tbody>
+          <tfoot>
+            <tr><td colSpan={6}>best {bestScore} · nights × 100 + kills × 5</td></tr>
+          </tfoot>
+        </table>
+      )}
+
+      {!locked && panel === 'none' && !dead && (
+        <div className="overlay" onClick={() => game?.input.requestLock()}>
           <h1>Block Survival</h1>
-          <p>Click to play</p>
+          <p>Click to {timeAlive > 2 ? 'resume' : 'play'}</p>
           <ul>
-            <li><b>WASD</b> move · <b>Shift</b> sprint · <b>Space</b> jump · <b>V</b> camera</li>
-            <li><b>Hold left</b> dig / swing · <b>Right</b> place · <b>1–9</b> select · <b>Q</b> drop</li>
-            <li><b>E</b> inventory &amp; crafting · <b>F</b> use workbench / bed · <b>R</b> reload</li>
+            <li><b>WASD</b> move · <b>Shift</b> sprint · <b>Space</b> jump · <b>V</b> camera · <b>Tab</b> scores</li>
+            <li><b>Hold left</b> dig / swing · <b>Right</b> place / aim · <b>1–9</b> select · <b>Q</b> drop</li>
+            <li><b>E</b> inventory &amp; crafting · <b>F</b> workbench / bed / loot · <b>R</b> reload</li>
           </ul>
+          {timeAlive > 2 && (
+            <button className="restart" onClick={e => { e.stopPropagation(); restart() }}>
+              Restart
+            </button>
+          )}
         </div>
       )}
     </div>

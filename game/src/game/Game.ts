@@ -19,7 +19,9 @@ import { DropManager } from '../entities/drops'
 import { kindsForNight, ZombieManager, ZOMBIE, ZOMBIE_STATS, zombiesForNight, type Zombie } from '../entities/zombies'
 import { ZombieRenderer, preloadZombies } from '../render/ZombieRenderer'
 import { CombatFx } from '../render/CombatFx'
+import { CrateManager, type LootCrate } from '../entities/crates'
 import { DayNight, NIGHT_SECONDS } from './DayNight'
+import { computeScore, loadBest, nightsSurvived, saveBest } from './score'
 import { rayBox } from '../physics/aabb'
 import { makeRng } from '../world/noise'
 import { useUiStore } from '../state/uiStore'
@@ -42,6 +44,7 @@ const ADS = { fov: 20, normalFov: 75, speed: 12 } as const
 const POISON = { seconds: 5, dps: 2 } as const
 /** groups arrive during the first 70 % of the night */
 const SPAWN_WINDOW = 0.7
+const RESPAWN_SECONDS = 5
 
 export class Game {
   readonly world = new World()
@@ -57,6 +60,7 @@ export class Game {
   readonly zombies: ZombieManager
   readonly zombieRenderer = new ZombieRenderer()
   readonly fx = new CombatFx()
+  readonly crates: CrateManager
   readonly camera: THREE.PerspectiveCamera
   /** wireframe cube on the targeted block */
   readonly highlight: THREE.LineSegments
@@ -74,6 +78,12 @@ export class Game {
   /** right mouse held with the rifle: scope view */
   aiming = false
   deaths = 0
+  dead = false
+  /** sim time the player comes back */
+  respawnAt = 0
+  crateTarget: LootCrate | null = null
+  bestScore = loadBest()
+  private cameraBeforeDeath: CameraMode = 'first'
   /** sim time of the last hit taken (HUD vignette) */
   hurtAt = -10
   private poisonUntil = 0
@@ -107,6 +117,7 @@ export class Game {
     this.player = new PlayerController(this.world, this.island.spawn)
     this.input = new Input(canvas)
     this.drops = new DropManager(this.world)
+    this.crates = new CrateManager(this.world)
     this.zombies = new ZombieManager(
       {
         world: this.world,
@@ -130,6 +141,7 @@ export class Game {
     this.drops.dispose()
     this.zombieRenderer.dispose()
     this.fx.dispose()
+    this.crates.dispose()
     this.viewModel.dispose()
     this.camera.remove(this.viewModel.group)
     this.highlight.geometry.dispose()
@@ -147,9 +159,10 @@ export class Game {
       this.pendingRounds = 0
     }
     const look = this.input.takeLook()
-    this.player.look(look.dx, look.dy)
-    for (const ev of this.input.takeEvents()) this.handleEvent(ev)
-    this.player.update(dt, this.input)
+    if (!this.dead) this.player.look(look.dx, look.dy)
+    for (const ev of this.input.takeEvents()) if (!this.dead) this.handleEvent(ev)
+    this.player.update(dt, this.input, this.dead)
+    if (this.dead && this.time >= this.respawnAt) this.respawn()
     this.updateCombat(dt)
     this.syncCamera()
     this.updateTarget()
@@ -160,7 +173,8 @@ export class Game {
     this.zombieRenderer.update(dt, this.zombies)
     this.fx.update(dt)
     if (this.time < this.poisonUntil) this.player.damage(POISON.dps * dt)
-    if (s.health <= 0) this.die()
+    if (s.health <= 0 && !this.dead) this.die()
+    this.crates.update(this.time)
     const moving = Math.hypot(s.vx, s.vz) > 0.5 && s.onGround
     this.drops.update(dt, s.x, s.y, s.z, this.inventory)
     this.viewModel.setItem(this.heldItem)
@@ -184,6 +198,7 @@ export class Game {
         this.zombies.burnAll()
         this.spawnTimes = []
         this.showMessage(`Dawn — you survived night ${dn.night}`)
+        this.bestScore = saveBest(this.score)
       }
     }
     while (this.spawnTimes.length && dn.time >= this.spawnTimes[0]) {
@@ -208,15 +223,52 @@ export class Game {
     if (poison) this.poisonUntil = this.time + POISON.seconds
   }
 
-  /** Phase 4 stand-in for death: respawn at the bed / pad with full vitals. Phase 5 adds the loot crate. */
+  /** seconds until the player respawns (0 when alive) */
+  get respawnIn(): number {
+    return this.dead ? Math.max(0, this.respawnAt - this.time) : 0
+  }
+
+  /** seconds since the player died (0 when alive) */
+  get deadFor(): number {
+    return this.dead ? RESPAWN_SECONDS - this.respawnIn : 0
+  }
+
+  get score(): number {
+    return computeScore(this.nightsSurvived, this.zombies.kills)
+  }
+
+  get nightsSurvived(): number {
+    return nightsSurvived(this.dayNight.night, this.dayNight.phase)
+  }
+
+  /** Death: the inventory becomes a loot crate where you fell; respawn after 5 s at the bed / pad. */
   private die(): void {
     this.deaths++
+    this.dead = true
+    this.respawnAt = this.time + RESPAWN_SECONDS
+    const s = this.player.state
+    this.crates.dropInventory(this.inventory, s.x, s.y + 0.5, s.z)
+    this.magazine = 0
+    this.pendingRounds = 0
+    this.reloadUntil = 0
+    this.breaking = null
+    this.aiming = false
+    this.poisonUntil = 0
+    this.cameraBeforeDeath = this.cameraMode
+    this.cameraMode = 'third'
+    if (this.panel !== 'none') this.closePanel()
+    this.bestScore = saveBest(this.score)
+  }
+
+  private respawn(): void {
+    this.dead = false
     const sp = this.player.spawn
     this.player.teleport(sp.x, sp.y, sp.z)
     this.player.state.health = PLAYER.maxHealth
     this.player.state.stamina = PLAYER.maxStamina
-    this.poisonUntil = 0
-    this.showMessage('You died')
+    this.player.state.sinceDamage = 0
+    this.cameraMode = this.cameraBeforeDeath
+    this.showMessage(this.crates.crates.length ? 'Your loot crate is where you fell' : 'Back on your feet')
   }
 
   // ---------------------------------------------------------------- combat
@@ -339,6 +391,11 @@ export class Game {
 
   /** F: use the targeted prop — bed sets the respawn point, workbench opens crafting. */
   private interact(): void {
+    if (this.crateTarget) {
+      const n = this.crates.loot(this.crateTarget, this.inventory)
+      this.showMessage(n ? `Took ${n} item${n === 1 ? '' : 's'}` : 'Inventory full')
+      return
+    }
     const t = this.target
     if (!t) return
     if (t.block === BLOCK.bed) {
@@ -380,6 +437,7 @@ export class Game {
     const oy = this.cameraMode === 'first' ? this.camera.position.y : s.y + PLAYER.eyeHeight
     const oz = this.cameraMode === 'first' ? this.camera.position.z : s.z
     this.target = raycastVoxels(this.world, ox, oy, oz, dir.x, dir.y, dir.z, REACH)
+    this.crateTarget = this.dead ? null : this.crates.targeted(ox, oy, oz, dir.x, dir.y, dir.z)
     if (this.target) {
       this.highlight.position.set(this.target.x + 0.5, this.target.y + 0.5, this.target.z + 0.5)
       this.highlight.visible = true
@@ -572,8 +630,17 @@ export class Game {
       poisoned: this.time < this.poisonUntil,
       aiming: this.aiming,
       reloading: this.reloading,
-      interactHint: this.target?.block === BLOCK.bed ? 'F  set respawn'
+      interactHint: this.crateTarget ? `F  take loot (${this.crateTarget.items.length})`
+        : this.target?.block === BLOCK.bed ? 'F  set respawn'
         : this.target?.block === BLOCK.workbench ? 'F  craft' : '',
+      dead: this.dead,
+      respawnIn: this.respawnIn,
+      score: this.score,
+      bestScore: this.bestScore,
+      nightsSurvived: this.nightsSurvived,
+      deaths: this.deaths,
+      timeAlive: this.dayNight.time,
+      scoreboard: this.input.isDown('Tab'),
     })
   }
 }

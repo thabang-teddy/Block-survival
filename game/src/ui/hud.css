@@ -83,8 +83,13 @@ body { user-select: none; }
 
 .overlay {
   position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
-  background: rgba(10, 14, 18, 0.55); backdrop-filter: blur(3px);
+  background: rgba(10, 14, 18, 0.55); backdrop-filter: blur(3px); pointer-events: auto;
 }
+.overlay .restart {
+  margin: 22px auto 0; padding: 10px 18px; border: 0; border-radius: 6px; cursor: pointer;
+  font: 800 14px inherit; background: var(--hud-accent); color: #1a1a1a;
+}
+.overlay .restart:hover { filter: brightness(1.1); }
 .overlay h1 { margin: 0 0 6px; font-size: 44px; font-weight: 900; text-shadow: 0 4px 0 #2b2b2b; }
 .overlay p { margin: 0 0 22px; font-size: 20px; color: var(--hud-accent); }
 .overlay ul { list-style: none; padding: 0; margin: 0; font-size: 14px; opacity: .85; line-height: 1.8; }
@@ -92,7 +97,7 @@ body { user-select: none; }
 
 /* ---- toast + interact hint */
 .toast {
-  position: absolute; top: 18%; left: 50%; transform: translateX(-50%);
+  position: absolute; top: 34%; left: 50%; transform: translateX(-50%);
   padding: 8px 16px; border-radius: 6px; background: var(--hud-panel);
   font-weight: 700; font-size: 15px; color: var(--hud-accent);
 }
@@ -191,3 +196,29 @@ body { user-select: none; }
 .scope::before { width: 2px; height: 64vh; }
 .scope::after { height: 2px; width: 64vh; }
 .ammo.reloading .mag { color: var(--hud-accent); animation: pulse .5s ease-in-out infinite; }
+
+/* ---- death screen */
+.death {
+  position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
+  background: radial-gradient(circle at center, rgba(60,0,0,.35), rgba(20,0,0,.8));
+  animation: fadein .6s ease-out;
+}
+@keyframes fadein { from { opacity: 0 } }
+.death h1 { margin: 0; font-size: 64px; font-weight: 900; color: #ff4a3a; text-shadow: 0 6px 0 #3a0a0a, 0 0 30px rgba(255,74,58,.5); letter-spacing: 2px; }
+.death .respawn { margin: 10px 0 0; font-size: 22px; }
+.death .respawn b { color: var(--hud-accent); font-size: 30px; }
+.death .sub { margin: 14px 0 0; font-size: 14px; opacity: .75; }
+
+/* ---- scoreboard (Tab, or on the pause screen) */
+.scoreboard {
+  position: absolute; top: 120px; left: 50%; transform: translateX(-50%);
+  min-width: 520px; border-collapse: collapse; background: var(--hud-panel); border-radius: 8px; overflow: hidden;
+  font-size: 14px;
+}
+.scoreboard th, .scoreboard td { padding: 8px 14px; text-align: right; }
+.scoreboard th:first-child, .scoreboard td:first-child { text-align: left; }
+.scoreboard thead th { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; opacity: .6; border-bottom: 1px solid rgba(255,255,255,.12); }
+.scoreboard tbody td { font-weight: 700; font-family: ui-monospace, Consolas, monospace; }
+.scoreboard tbody td:first-child { font-family: inherit; color: var(--hud-accent); }
+.scoreboard tfoot td { font-size: 11px; opacity: .55; text-align: center; border-top: 1px solid rgba(255,255,255,.12); }
+.scoreboard { z-index: 2; }
