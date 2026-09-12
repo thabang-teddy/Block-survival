@@ -6,7 +6,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Sky, Stats } from '@react-three/drei'
 import * as THREE from 'three'
 import { Game } from '../game/Game'
-import { Survivor } from './Survivor'
+import { PlayerBody } from './PlayerBody'
 
 const SKY_COLOUR = '#87b4d8'
 const SUN_POSITION: [number, number, number] = [60, 80, 30]
@@ -31,10 +31,13 @@ function GameLoop() {
   if (!game) return null
   return (
     <>
+      {/* the camera must be in the scene graph for the first-person view-model (its child) to render */}
+      <primitive object={camera} />
       <primitive object={game.chunks.group} />
+      <primitive object={game.drops.group} />
       <primitive object={game.highlight} />
       <Suspense fallback={null}>
-        <Survivor position={[3.5, 3, 0.5]} />
+        <PlayerBody game={game} />
       </Suspense>
     </>
   )

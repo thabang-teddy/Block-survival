@@ -12,9 +12,19 @@ export type InputEvent =
   | { type: 'secondary' }
   | { type: 'hotbar'; slot: number }
   | { type: 'jump' }
+  | { type: 'toggleCamera' }
+  | { type: 'drop' }
+  | { type: 'reload' }
+
+const KEY_EVENTS: Readonly<Record<string, InputEvent>> = {
+  KeyV: { type: 'toggleCamera' },
+  KeyQ: { type: 'drop' },
+  KeyR: { type: 'reload' },
+}
 
 export class Input {
   private readonly keys = new Set<string>()
+  private readonly buttons = new Set<number>()
   private readonly look: MouseLook = { dx: 0, dy: 0 }
   private queue: InputEvent[] = []
   private readonly canvas: HTMLElement
@@ -26,6 +36,7 @@ export class Input {
     document.addEventListener('pointerlockchange', this.onLockChange)
     document.addEventListener('mousemove', this.onMouseMove)
     document.addEventListener('mousedown', this.onMouseDown)
+    document.addEventListener('mouseup', this.onMouseUp)
     document.addEventListener('keydown', this.onKeyDown)
     document.addEventListener('keyup', this.onKeyUp)
     document.addEventListener('contextmenu', this.onContextMenu)
@@ -36,6 +47,7 @@ export class Input {
     document.removeEventListener('pointerlockchange', this.onLockChange)
     document.removeEventListener('mousemove', this.onMouseMove)
     document.removeEventListener('mousedown', this.onMouseDown)
+    document.removeEventListener('mouseup', this.onMouseUp)
     document.removeEventListener('keydown', this.onKeyDown)
     document.removeEventListener('keyup', this.onKeyUp)
     document.removeEventListener('contextmenu', this.onContextMenu)
@@ -43,6 +55,11 @@ export class Input {
 
   isDown(code: string): boolean {
     return this.keys.has(code)
+  }
+
+  /** 0 = left, 2 = right */
+  isButtonDown(button: number): boolean {
+    return this.buttons.has(button)
   }
 
   /** Accumulated mouse delta since the last call; resets to zero. */
@@ -65,7 +82,10 @@ export class Input {
 
   private onLockChange = (): void => {
     this.locked = document.pointerLockElement === this.canvas
-    if (!this.locked) this.keys.clear()
+    if (!this.locked) {
+      this.keys.clear()
+      this.buttons.clear()
+    }
   }
 
   private onMouseMove = (e: MouseEvent): void => {
@@ -76,8 +96,13 @@ export class Input {
 
   private onMouseDown = (e: MouseEvent): void => {
     if (!this.locked) return
+    this.buttons.add(e.button)
     if (e.button === 0) this.queue.push({ type: 'primary' })
     if (e.button === 2) this.queue.push({ type: 'secondary' })
+  }
+
+  private onMouseUp = (e: MouseEvent): void => {
+    this.buttons.delete(e.button)
   }
 
   private onKeyDown = (e: KeyboardEvent): void => {
@@ -92,6 +117,8 @@ export class Input {
       this.queue.push({ type: 'jump' })
       e.preventDefault()
     }
+    const mapped = KEY_EVENTS[e.code]
+    if (mapped) this.queue.push(mapped)
   }
 
   private onKeyUp = (e: KeyboardEvent): void => {

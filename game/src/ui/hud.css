@@ -36,7 +36,32 @@ body { user-select: none; }
 }
 .crosshair::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
 .crosshair::after { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
+.break-ring {
+  position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; border-radius: 50%;
+  transform: translate(-50%, -50%); opacity: .85;
+  -webkit-mask: radial-gradient(circle, transparent 11px, #000 12px); mask: radial-gradient(circle, transparent 11px, #000 12px);
+}
 
+/* ---- vitals (bottom-left) */
+.vitals { position: absolute; left: 18px; bottom: 22px; display: grid; gap: 6px; width: 250px; }
+.bar { display: grid; grid-template-columns: 22px 1fr 34px; align-items: center; gap: 6px; }
+.bar-icon { font-size: 15px; text-align: center; text-shadow: 0 1px 2px #000; }
+.track { height: 16px; border-radius: 4px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.15); overflow: hidden; }
+.fill { height: 100%; transition: width .15s linear; }
+.health .fill { background: linear-gradient(#8bcf62, var(--hud-green)); }
+.stamina .fill { background: linear-gradient(#f3d27a, var(--hud-accent)); }
+.value { font: 700 12px ui-monospace, Consolas, monospace; text-align: right; text-shadow: 0 1px 2px #000; }
+
+/* ---- ammo (bottom-right) */
+.ammo {
+  position: absolute; right: 18px; bottom: 22px; display: flex; align-items: baseline; gap: 6px;
+  padding: 6px 12px; border-radius: 6px; background: var(--hud-panel);
+  font: 800 30px ui-monospace, Consolas, monospace;
+}
+.ammo .sep, .ammo .reserve { font-size: 18px; opacity: .7; }
+.ammo .mag-icon { font-size: 22px; color: var(--hud-accent); margin-left: 4px; }
+
+/* ---- hotbar */
 .hotbar {
   position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
   display: flex; gap: 6px; padding: 6px; border-radius: 8px; background: var(--hud-panel);
@@ -44,11 +69,17 @@ body { user-select: none; }
 .slot {
   width: 58px; height: 58px; border-radius: 6px; position: relative;
   background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.12);
-  display: grid; place-items: end center; padding-bottom: 5px; box-sizing: border-box;
+  display: grid; place-items: center; box-sizing: border-box;
 }
 .slot.active { border-color: var(--hud-accent); background: rgba(232,178,58,.18); }
 .slot .key { position: absolute; top: 3px; left: 5px; font-size: 11px; opacity: .7; }
-.slot .name { font-size: 11px; font-weight: 600; text-transform: capitalize; }
+.slot .count { position: absolute; bottom: 3px; right: 5px; font: 700 12px ui-monospace, Consolas, monospace; text-shadow: 0 1px 2px #000; }
+.slot .name {
+  position: absolute; bottom: 62px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+  font-size: 12px; font-weight: 700; text-transform: capitalize; text-shadow: 0 1px 3px #000;
+}
+.icon.block { width: 26px; height: 26px; border-radius: 3px; border: 2px solid; box-shadow: inset -4px -4px 0 rgba(0,0,0,.25); }
+.icon.glyph { font-size: 24px; line-height: 1; text-shadow: 0 1px 2px #000; }
 
 .overlay {
   position: absolute; inset: 0; display: grid; place-content: center; text-align: center;

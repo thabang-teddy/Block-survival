@@ -5,10 +5,10 @@ import { boxIntersectsSolid, moveBox, type Box } from '../aabb'
 import { PlayerController, PLAYER } from '../playerController'
 import type { Input } from '../../input/Input'
 
-/** flat 9×9 floor of stone at y = 0 */
+/** flat 41×41 floor of stone at y = 0 */
 function floorWorld(): World {
   const w = new World()
-  for (let x = -4; x <= 4; x++) for (let z = -4; z <= 4; z++) w.setBlock(x, 0, z, BLOCK.stone)
+  for (let x = -20; x <= 20; x++) for (let z = -20; z <= 20; z++) w.setBlock(x, 0, z, BLOCK.stone)
   return w
 }
 
@@ -93,6 +93,32 @@ describe('playerController', () => {
     expect(p.overlapsVoxel(0, 2, 0)).toBe(true)
     expect(p.overlapsVoxel(0, 3, 0)).toBe(false)
     expect(p.overlapsVoxel(2, 1, 0)).toBe(false)
+  })
+
+  test('sprinting drains stamina, stops at zero, and regenerates after a pause', () => {
+    const w = floorWorld()
+    const p = new PlayerController(w, { x: 0.5, y: 1, z: 0.5 })
+    p.update(1 / 60, fakeInput())
+    // sprint back and forth so we stay on the test floor
+    for (let i = 0; i < 60 * 7; i++) p.update(1 / 60, fakeInput([i % 240 < 120 ? 'KeyW' : 'KeyS', 'ShiftLeft']))
+    expect(p.state.stamina).toBe(0)
+    expect(p.state.sprinting).toBe(false)
+    expect(Math.hypot(p.state.vx, p.state.vz)).toBeCloseTo(PLAYER.walkSpeed, 1)
+    for (let i = 0; i < 60 * 3; i++) p.update(1 / 60, fakeInput())
+    expect(p.state.stamina).toBeGreaterThan(PLAYER.staminaRegen * 1.5)
+    expect(p.state.stamina).toBeLessThan(PLAYER.staminaRegen * 3.5)
+  })
+
+  test('damage lowers health and regeneration starts after the delay', () => {
+    const p = new PlayerController(floorWorld(), { x: 0.5, y: 1, z: 0.5 })
+    p.damage(30)
+    expect(p.state.health).toBe(70)
+    for (let i = 0; i < 60 * 7; i++) p.update(1 / 60, fakeInput())
+    expect(p.state.health).toBe(70)
+    for (let i = 0; i < 60 * 3; i++) p.update(1 / 60, fakeInput())
+    expect(p.state.health).toBeCloseTo(72, 0)
+    p.damage(999)
+    expect(p.state.health).toBe(0)
   })
 
   test('falling into the void respawns on the pad', () => {

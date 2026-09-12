@@ -15,13 +15,20 @@ npm run build
 src/
   world/     palette (from Design/blender_scripts/blocks.py), seeded noise, island generator
              (port of islands.py), 16³ chunk store, culled mesher with vertex colours + AO, DDA raycast
-  physics/   swept AABB vs voxels, first-person controller
+  physics/   swept AABB vs voxels, player controller (movement, stamina, health)
   input/     pointer-lock mouse + keyboard, edge-triggered event queue
-  render/    ChunkRenderer (imperative three.js), R3F Scene, Survivor model
+  items/     item registry (blocks, tools, weapons, break times, drops), 36-slot inventory
+  entities/  dropped items (physics, spin, pickup)
+  render/    ChunkRenderer, first-person ViewModel, third-person PlayerBody, GLB cache, R3F Scene
   game/      Game — the simulation, ticked once per frame; React never holds sim state
   state/     zustand UI store (HUD snapshot only)
   ui/        HUD (React DOM over the canvas)
 public/assets/  copies of Design/Characters and Design/Assets
 ```
+
+## Controls
+
+WASD move · Shift sprint · Space jump · **V** first/third person · mouse look ·
+hold **left** dig / swing · **right** place · **1–9** hotbar · **Q** drop · **R** reload · Esc release mouse.
 
 Dev builds expose `window.__game` and `window.__gl` for debugging in the console.

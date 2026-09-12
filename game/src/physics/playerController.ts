@@ -20,6 +20,13 @@ export const PLAYER = {
   mouseSensitivity: 0.0022,
   /** fall below this and you are respawned (Phase 1 stand-in for death) */
   voidY: -40,
+  maxHealth: 100,
+  maxStamina: 100,
+  staminaDrain: 15,
+  staminaRegen: 12,
+  staminaRegenDelay: 1.0,
+  healthRegen: 1,
+  healthRegenDelay: 8,
 } as const
 
 export interface PlayerState {
@@ -33,6 +40,13 @@ export interface PlayerState {
   yaw: number
   pitch: number
   onGround: boolean
+  health: number
+  stamina: number
+  /** true while actually sprinting this tick */
+  sprinting: boolean
+  /** seconds since the player last sprinted / took damage */
+  sinceSprint: number
+  sinceDamage: number
 }
 
 export class PlayerController {
@@ -45,7 +59,10 @@ export class PlayerController {
   constructor(world: World, spawn: { x: number; y: number; z: number }) {
     this.world = world
     this.spawn = { ...spawn }
-    this.state = { x: spawn.x, y: spawn.y, z: spawn.z, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, onGround: false }
+    this.state = {
+      x: spawn.x, y: spawn.y, z: spawn.z, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, onGround: false,
+      health: PLAYER.maxHealth, stamina: PLAYER.maxStamina, sprinting: false, sinceSprint: 99, sinceDamage: 99,
+    }
   }
 
   get box(): Box {
@@ -66,6 +83,26 @@ export class PlayerController {
 
   queueJump(): void {
     this.jumpQueued = true
+  }
+
+  damage(amount: number): void {
+    const s = this.state
+    s.health = Math.max(0, s.health - amount)
+    s.sinceDamage = 0
+  }
+
+  private updateVitals(dt: number, wantSprint: boolean, moving: boolean): void {
+    const s = this.state
+    s.sprinting = wantSprint && moving && s.stamina > 0 && s.onGround
+    if (s.sprinting) {
+      s.stamina = Math.max(0, s.stamina - PLAYER.staminaDrain * dt)
+      s.sinceSprint = 0
+    } else {
+      s.sinceSprint += dt
+      if (s.sinceSprint > PLAYER.staminaRegenDelay) s.stamina = Math.min(PLAYER.maxStamina, s.stamina + PLAYER.staminaRegen * dt)
+    }
+    s.sinceDamage += dt
+    if (s.sinceDamage > PLAYER.healthRegenDelay) s.health = Math.min(PLAYER.maxHealth, s.health + PLAYER.healthRegen * dt)
   }
 
   look(dx: number, dy: number): void {
@@ -92,7 +129,8 @@ export class PlayerController {
     const cosY = Math.cos(s.yaw)
     const wishX = -sinY * fwd + cosY * side
     const wishZ = -cosY * fwd - sinY * side
-    const speed = input.isDown('ShiftLeft') ? PLAYER.sprintSpeed : PLAYER.walkSpeed
+    this.updateVitals(dt, input.isDown('ShiftLeft'), fwd !== 0 || side !== 0)
+    const speed = s.sprinting ? PLAYER.sprintSpeed : PLAYER.walkSpeed
     const accel = (s.onGround ? PLAYER.groundAccel : PLAYER.airAccel) * dt
     s.vx += Math.max(-accel, Math.min(accel, wishX * speed - s.vx))
     s.vz += Math.max(-accel, Math.min(accel, wishZ * speed - s.vz))
