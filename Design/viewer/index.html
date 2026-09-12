@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Block Survival asset viewer</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #87b4d8; font-family: system-ui, sans-serif; }
+  #ui { position: fixed; top: 10px; left: 10px; background: rgba(20, 24, 28, .85); color: #eee;
+        padding: 10px 12px; border-radius: 8px; font-size: 13px; display: grid; gap: 6px; max-height: 95vh; overflow: auto; }
+  select, button { font: inherit; }
+  #clips button { margin: 2px; }
+  #status { color: #9fd; }
+</style>
+</head>
+<body>
+<div id="ui">
+  <label>Model <select id="model"></select></label>
+  <div id="clips"></div>
+  <div id="status">loading…</div>
+</div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const MODELS = {
+  'Characters/Survivor.glb': 3.5, 'Characters/Zombie_Basic.glb': 3.5, 'Characters/Zombie_Worker.glb': 3.5,
+  'Characters/Zombie_Soldier.glb': 3.5, 'Characters/Zombie_Toxic.glb': 3.5,
+  'Assets/Rifle.glb': 1.5, 'Assets/Sword.glb': 1.5, 'Assets/Pickaxe.glb': 1.5, 'Assets/Torch.glb': 1.5,
+  'Assets/Crate.glb': 1.5, 'Assets/Workbench.glb': 1.5, 'Assets/Bed.glb': 2, 'Assets/Tree_Oak.glb': 8,
+  'Assets/Tree_Tall.glb': 10, 'Assets/Block_grass.glb': 1.5, 'Assets/Block_glass.glb': 1.5, 'Assets/Block_water.glb': 1.5,
+  'Islands/Island_Small.glb': 24, 'Islands/Island_Medium.glb': 45, 'Islands/Island_Large.glb': 75,
+};
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87b4d8);
+scene.fog = new THREE.Fog(0x87b4d8, 60, 200);
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 500);
+const controls = new OrbitControls(camera, renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xdfefff, 0x6a5a3a, 1.2));
+const sun = new THREE.DirectionalLight(0xfff2d0, 2.5);
+sun.position.set(20, 40, 15);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0005;
+sun.shadow.normalBias = 0.02;
+Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, far: 150 });
+scene.add(sun);
+scene.add(new THREE.GridHelper(40, 40, 0x557755, 0x88aa88));
+
+const loader = new GLTFLoader();
+let current, mixer, actions = {};
+const clock = new THREE.Clock();
+const status = document.getElementById('status');
+const clipsDiv = document.getElementById('clips');
+const select = document.getElementById('model');
+for (const name of Object.keys(MODELS)) select.add(new Option(name, name));
+
+async function show(name) {
+  if (current) scene.remove(current);
+  actions = {}; mixer = null; clipsDiv.innerHTML = '';
+  select.value = name;
+  status.textContent = 'loading ' + name;
+  const gltf = await loader.loadAsync('../' + name);
+  current = gltf.scene;
+  current.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  scene.add(current);
+  const dist = MODELS[name];
+  const box = new THREE.Box3().setFromObject(current);
+  const c = box.getCenter(new THREE.Vector3());
+  camera.position.set(c.x + dist * 0.7, c.y + dist * 0.5, c.z + dist * 0.9);
+  controls.target.copy(c); controls.update();
+  status.textContent = `${name} — ${gltf.animations.length} clips, bones: ${countBones(current)}`;
+  if (gltf.animations.length) {
+    mixer = new THREE.AnimationMixer(current);
+    for (const clip of gltf.animations) {
+      actions[clip.name] = mixer.clipAction(clip);
+      const b = document.createElement('button');
+      b.textContent = clip.name;
+      b.onclick = () => play(clip.name);
+      clipsDiv.appendChild(b);
+    }
+    play(gltf.animations[0].name);
+  }
+}
+function countBones(root) { let n = 0; root.traverse(o => { if (o.isBone) n++; }); return n; }
+function play(name) {
+  for (const [k, a] of Object.entries(actions)) k === name ? a.reset().fadeIn(0.15).play() : a.fadeOut(0.15);
+}
+select.onchange = () => show(select.value);
+show(select.value);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+renderer.setAnimationLoop(() => {
+  if (mixer) mixer.update(clock.getDelta());
+  renderer.render(scene, camera);
+});
+window.__viewer = { scene, show, play, get actions() { return actions; } };
+</script>
+</body>
+</html>
