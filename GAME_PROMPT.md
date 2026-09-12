@@ -1,0 +1,201 @@
+# Block Survival — build prompt
+
+> Paste everything below this line into Claude Code (or another coding agent) from the
+> repository root. Work phase by phase; do not skip ahead.
+
+---
+
+You are building **Block Survival**, a voxel zombie-survival game (Minecraft-style) that runs
+in the browser. The repo already contains finished 3D assets and concept art under `Design/`.
+Read `Design/README.md` and `Design/blender_scripts/*.py` **before writing any code** — they
+define the asset conventions, the block colour palette and the island generator you will port.
+
+## 1. Non-negotiable constraints
+
+1. **Stack:** Vite + React 18 + TypeScript, three.js via **React Three Fiber** (`@react-three/fiber`)
+   and `@react-three/drei`, `zustand` for UI state. Laravel 11 is a **separate JSON API only**
+   (Phase 7) — never render the game through Blade.
+2. **One island, not an infinite world.** The world is a single floating island generated in JS
+   by porting `Design/blender_scripts/islands.py` (`generate_island`, `add_tree`, `n2`) using the
+   `Island_Large` parameters: `size=56, seed=11, max_height=9, depth=16, pad_radius=8, lake=True`.
+   Use a seeded PRNG and a 2-D simplex/perlin noise so the shape is deterministic per seed.
+   `Design/Islands/*.glb` are reference/set-dressing only — **do not** use them as the playable
+   terrain (they are not editable).
+3. **Never place thousands of `Block_*.glb` instances.** Build chunk meshes in JS:
+   - Voxel storage: `Uint8Array` per chunk, chunk = 16×16×16, world = Map keyed `"cx,cy,cz"`.
+   - Culled meshing (only exposed faces — same rule as `add_voxels` in `blocks.py`), one
+     `BufferGeometry` per chunk, **vertex colours** from `BLOCK_COLOURS` in `blocks.py`
+     (top / side / bottom colour per block type). One opaque mesh + one transparent mesh
+     (water, glass, leaves) per chunk. Re-mesh only the dirty chunk (and neighbours on a border)
+     when a block changes; mesh on a Web Worker if a chunk rebuild takes > 4 ms.
+   - Water top face is lowered by 0.15 m; glass/water/leaves are `SEE_THROUGH` for culling.
+4. **Assets are used as-is.** All GLBs are Y-up metres, flat-shaded `MeshStandardMaterial`.
+   Characters face **+Z**, are 2 m tall, origin between the feet; blocks are 1 m with origin at
+   the min corner; weapons have their origin at the grip; rifle points +Z, sword/torch/pickaxe
+   point +Y. Attach held items to the `Hand_R` bone. Animation clip names are exactly as listed
+   in `Design/README.md`.
+5. **Physics is hand-rolled AABB-vs-voxel** (player box 0.6×1.8 m, swept per axis, step-up
+   0.5 m, gravity, jump). Do **not** add Rapier/Cannon — a voxel grid is its own collider.
+6. Target **60 fps on a mid laptop** with the whole 56 m island loaded. Use `renderer.info` and
+   the drei `<Stats>` overlay while developing; keep draw calls < 300.
+
+## 2. Camera & controls
+
+- **First-person by default**; press **V** to toggle to **over-the-shoulder third-person**
+  (camera 3.5 m behind, 0.6 m right, 1.6 m up, pulled toward the player when a block is in the
+  way). In FP hide the Survivor body and show a held-item view-model; in TP show the full
+  `Survivor.glb` playing `Idle / Walk / Run / Aim / Swing`.
+- Pointer-lock mouse look. WASD move, Shift sprint (drains stamina), Space jump,
+  1–9 hotbar, E inventory/crafting, F interact (workbench / bed), Q drop, Tab scoreboard.
+- Left mouse: use held item (dig with pickaxe, swing sword, fire rifle). Right mouse: place
+  block / aim-down-sights (rifle → scope overlay like the concept art, FOV 50 → 20).
+- Block targeting: DDA voxel raycast from the camera, max 5 m, draw a wireframe highlight on the
+  targeted block; placement goes on the hit face.
+
+## 3. HUD (match `Design/*.jpeg`)
+
+Top-left logo. Top-right **countdown timer** (`MM:SS`, turns red and pulses at `0:00`).
+Bottom-left **health bar** (green, 100 max) and **stamina bar** (yellow). Bottom-right
+**ammo** `mag / reserve` (e.g. `30 / 120`) with a magazine icon. Centre crosshair; hotbar of 9
+slots along the bottom centre. Damage vignette on hit. All HUD is React DOM over the canvas.
+
+## 4. Game loop: day / night and zombies
+
+- A full cycle is **10 minutes**: **5 min day → sunset → 5 min night → dawn**. The HUD timer
+  counts down to the next transition. The first game day is a safe preparation phase — **the
+  first zombies appear at the 5:00 mark (first sunset)** and never before.
+- Sun is a `DirectionalLight` that orbits with the clock; sky colour and hemisphere light lerp
+  through day / sunset / night palettes taken from the concept art. Night is dark enough that
+  torches matter.
+- **Night N** spawns `8 + 6·(N−1)` zombies over the night in groups of 3–6 at grass cells on the
+  island rim ≥ 20 m from any player. Cap live zombies at 40. Zombies remaining at dawn burn away
+  over 10 s.
+- Variants (all from `Design/Characters/`):
+
+  | Zombie | HP | Speed | Damage | Special |
+  |---|---|---|---|---|
+  | `Zombie_Basic` | 30 | 2.0 m/s | 8 | — |
+  | `Zombie_Worker` | 50 | 1.8 m/s | 10 | breaks blocks 3× faster |
+  | `Zombie_Soldier` | 80 | 2.2 m/s | 14 | takes 50 % less rifle damage |
+  | `Zombie_Toxic` | 25 | 3.2 m/s | 6 | hit applies 5 s poison (2 HP/s) |
+
+  Mix: night 1 Basic only; Worker from night 2; Soldier from night 3; Toxic from night 4.
+- **AI:** target the nearest player; move along a path from a flow-field / A* over walkable
+  voxels recomputed every 0.5 s per zombie (budget: ≤ 2 ms per frame total). If the path is
+  blocked, attack the blocking block. Zombie eyes are emissive — add a light `UnrealBloomPass`.
+- **Block HP** (zombie hits to destroy): dirt/sand/gravel/leaves 3, planks/glass 5, log 8,
+  cobble/stone 15, **reinforced wall** immune. Players dig at pickaxe speed instead.
+
+## 5. Inventory, resources and crafting
+
+Inventory: 9 hotbar + 27 backpack slots, stack size 64. Pick up by walking over dropped items.
+
+**Gathering:** punching a log with an empty hand takes 3 s; wooden/stone/iron pickaxe speeds are
+1.5× / 2.5× / 4×. Stone, ore and cobble **require a pickaxe**. Leaves drop leaves. Sand digs by
+hand. Water and bedrock-level stone (lowest 2 layers) are indestructible.
+
+**Recipes** (hand = anywhere; bench = must be within 3 m of a placed Workbench, press F):
+
+| Result | Ingredients | Where |
+|---|---|---|
+| Planks ×4 | Log ×1 | hand |
+| Sticks ×4 | Planks ×2 | hand |
+| Workbench | Planks ×4 | hand |
+| Torch ×4 (light) | Stick ×1 + Coal ×1 | hand |
+| Wooden Pickaxe | Planks ×3 + Stick ×2 | hand |
+| Stone Pickaxe | Cobble ×3 + Stick ×2 | bench |
+| Iron Pickaxe | Iron ×3 + Stick ×2 | bench |
+| Sword | Iron ×2 + Stick ×1 | bench |
+| Glass ×4 | Sand ×4 + Coal ×1 | bench |
+| Stone Wall ×4 (cobble block) | Stone ×4 | bench |
+| Reinforced Wall ×4 | Cobble ×4 + Iron ×1 | bench |
+| Bed | Planks ×3 + Leaves ×3 | bench |
+| Rifle | Iron ×8 + Planks ×2 + Coal ×2 | bench |
+| Rifle Ammo ×30 | Iron ×1 + Coal ×1 | bench |
+
+Crafting UI is a React panel: recipe list on the left (greyed if ingredients are missing),
+ingredient requirements on the right, click to craft. Item icons are the GLB models rendered
+once at startup with an offscreen renderer (SVG fallbacks are fine for the MVP).
+
+**Weapons:** Sword 20 dmg, 0.5 s swing (plays `Swing`), 2.5 m reach, 60° arc, knockback.
+Rifle 12 dmg/shot (headshot ×2 — head-bone hit test), 30-round mag, 0.12 s between shots,
+2 s reload (R), hitscan raycast, muzzle-flash light, tracer line, screen kick.
+A placed Torch emits a warm `PointLight` (distance 8); **limit real lights to the 12 nearest the
+camera** — further torches use the emissive flame only.
+
+## 6. Player, death, respawn
+
+Health 100, regenerates 1 HP/s after 8 s without damage. Stamina 100, sprint drains 15/s.
+Falling off the island = death. **On death:** drop the inventory as a loot crate (`Crate.glb`) at
+the death point, respawn after 5 s at the player's **Bed** (or the build pad if no bed is
+placed). Sleeping is not a mechanic; the bed only sets the respawn point. Score =
+nights survived × 100 + kills × 5, shown on the Tab scoreboard.
+
+## 7. Multiplayer — peer-to-peer, host authoritative
+
+- **2–4 players.** Host clicks *Create game* and gets a 6-letter **room code**; friends type it
+  to join. Use **WebRTC DataChannels via PeerJS** (`peerjs` npm). For the MVP use the public
+  PeerJS signalling server; Phase 7 moves signalling to Laravel.
+- The **host browser runs the authoritative simulation**: island seed, block edits, zombies,
+  day/night clock, item drops, damage. Clients run local movement prediction for their own
+  player and render everything else from host snapshots.
+- Messages (binary via `msgpackr` or a hand-packed `ArrayBuffer`): `join` (→ full block diff +
+  clock), `input` (client → host, 30 Hz), `snapshot` (host → clients, 20 Hz: player + zombie
+  transforms, animation state, health), `blockEdit`, `craft`, `chat`. Interpolate remote entities
+  100 ms behind.
+- Host leaving ends the match for everyone with a clear message (accepted trade-off).
+- Design the game so single-player is simply "host with zero peers" — no separate code path.
+
+## 8. Laravel backend (Phase 7, last)
+
+Laravel 11 API on `/api`, Sanctum tokens, in a `server/` folder:
+`POST /auth/register|login`, `POST /rooms` (creates code → host peer id, TTL 2 h),
+`GET /rooms/{code}` (resolve peer id), `POST /scores` + `GET /leaderboard`,
+`PUT /saves/{id}` (host uploads gzipped block diff + player inventories; `GET` restores).
+Rate-limit everything. Later: Laravel Reverb as the WebRTC signalling channel.
+
+## 9. Project layout
+
+```
+game/
+  src/
+    world/      island generator (port of islands.py), chunk store, mesher, raycast, palette.ts
+    physics/    aabb.ts, playerController.ts
+    entities/   player, zombie, zombieAI (flow field), item drops
+    items/      registry (blocks, tools, weapons), recipes.ts
+    net/        peer host/client, messages, snapshot interpolation
+    render/     R3F scene, lights, day/night, view-model, bloom
+    ui/         HUD, inventory, crafting, menus, lobby
+    state/      zustand stores (UI only — sim state lives in plain classes)
+  public/assets/  → copy of Design/Characters and Design/Assets (GLBs)
+server/           Laravel (Phase 7)
+```
+
+Keep files < 400 lines; keep the simulation in plain TypeScript classes ticked from one
+`useFrame` — React must never re-render per frame.
+
+## 10. Build order — finish and demo each phase before the next
+
+0. **Scaffold:** Vite + React + TS + R3F, load `Survivor.glb` and play `Idle`, drei `<Stats>`.
+1. **World:** port the island generator, chunk store, culled mesher with vertex colours, sky
+   and sun. First-person controller with AABB collision, DDA raycast, dig and place blocks
+   (any block for now). Done when you can walk the whole island at 60 fps and dig a tunnel.
+2. **Player:** third-person toggle with the Survivor model + animations, view-model hands
+   holding Pickaxe/Sword/Torch/Rifle, HUD bars and hotbar, item drops and pickup.
+3. **Crafting:** inventory UI, all recipes above, Workbench and Bed placement, torches with
+   lights, glass and walls. Done when you can go from bare hands to a rifle without cheats.
+4. **Zombies & night:** 10-minute cycle, spawning schedule, four variants with AI, block
+   breaking, sword and rifle combat, headshots, bloom eyes. Done when night 3 is survivable
+   only with a walled base.
+5. **Death & score:** respawn at bed, loot crate, scoreboard, game-over/restart flow.
+6. **Multiplayer:** PeerJS room codes, host-authoritative sync, 4 players on one island.
+7. **Laravel:** accounts, rooms, leaderboard, cloud saves.
+
+After each phase: run the game in the browser, check the console is clean, take a screenshot,
+and commit with a `feat:` message. If an asset or convention in `Design/README.md` contradicts
+this prompt, follow the README and tell me.
+
+## 11. Out of scope (do not build)
+
+Infinite terrain, biomes, other mobs, hunger, furnaces/smelting, mobile touch controls,
+public matchmaking, anti-cheat, voice chat.
