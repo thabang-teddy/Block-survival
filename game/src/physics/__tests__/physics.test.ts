@@ -109,16 +109,14 @@ describe('playerController', () => {
     expect(p.state.stamina).toBeLessThan(PLAYER.staminaRegen * 3.5)
   })
 
-  test('damage lowers health and regeneration starts after the delay', () => {
-    const p = new PlayerController(floorWorld(), { x: 0.5, y: 1, z: 0.5 })
-    p.damage(30)
-    expect(p.state.health).toBe(70)
-    for (let i = 0; i < 60 * 7; i++) p.update(1 / 60, fakeInput())
-    expect(p.state.health).toBe(70)
-    for (let i = 0; i < 60 * 3; i++) p.update(1 / 60, fakeInput())
-    expect(p.state.health).toBeCloseTo(72, 0)
-    p.damage(999)
-    expect(p.state.health).toBe(0)
+  test('frozen input ignores keys and jumps but keeps gravity', () => {
+    const p = new PlayerController(floorWorld(), { x: 0.5, y: 3, z: 0.5 })
+    p.queueJump()
+    for (let i = 0; i < 90; i++) p.update(1 / 60, fakeInput(['KeyW', 'ShiftLeft']), true)
+    expect(p.state.x).toBe(0.5)
+    expect(p.state.z).toBe(0.5)
+    expect(p.state.y).toBeCloseTo(1, 2)
+    expect(p.state.stamina).toBe(PLAYER.maxStamina)
   })
 
   test('falling into the void respawns on the pad', () => {

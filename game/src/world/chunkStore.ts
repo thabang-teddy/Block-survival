@@ -51,6 +51,9 @@ export class World {
   /** prop block metadata keyed by blockKey; bumps `propsVersion` on change */
   readonly props = new Map<string, PropMeta>()
   propsVersion = 0
+  /** when true, every block change is recorded in `edits` (enable after generation) */
+  trackEdits = false
+  readonly edits = new Map<string, { x: number; y: number; z: number; id: number }>()
   /** inclusive block-space bounds of everything ever written */
   readonly bounds = { minX: 0, minY: 0, minZ: 0, maxX: 0, maxY: 0, maxZ: 0, empty: true }
 
@@ -101,6 +104,7 @@ export class World {
     c[i] = id
     const pk = blockKey(x, y, z)
     if (this.props.delete(pk)) this.propsVersion++
+    if (this.trackEdits) this.edits.set(pk, { x, y, z, id })
     this.dirty.add(key)
     this.markNeighbourChunks(x, y, z, cx, cy, cz)
     this.growBounds(x, y, z)

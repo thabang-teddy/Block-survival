@@ -82,6 +82,12 @@ export class Inventory {
     return true
   }
 
+  /** Replace every slot (client mirror of the host's copy). */
+  replace(slots: readonly (ItemStack | null)[]): void {
+    for (let i = 0; i < INVENTORY_SIZE; i++) this.slots[i] = slots[i] ? { ...slots[i]! } : null
+    this.version++
+  }
+
   swap(a: number, b: number): void {
     const tmp = this.slots[a]
     this.slots[a] = this.slots[b]

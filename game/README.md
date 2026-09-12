@@ -20,7 +20,9 @@ src/
   items/     item registry (blocks, tools, weapons, break times, drops), recipes + crafting, 36-slot inventory
   entities/  dropped items; loot crates; A* pathfinding over standing cells; zombie sim
              (variants, night spawning, chase/attack AI, block breaking)
-  game/      Game (the simulation), the DayNight clock, score
+  game/      Game (the simulation, host-authoritative), Avatar (per-player state), DayNight clock, score
+  net/       protocol (msgpackr messages, room codes), PeerJS transport, HostSession / ClientSession,
+             SnapshotBuffer (100 ms interpolation)
   render/    ChunkRenderer, PropRenderer (torch/workbench/bed GLBs + torch light pool),
              ZombieRenderer (skinned clones), Lighting (day/night palettes), Effects (bloom),
              CombatFx, first-person ViewModel, third-person PlayerBody, GLB cache, R3F Scene
@@ -39,6 +41,14 @@ rifle to aim · **Tab** scoreboard · Esc pause (resume by clicking, or Restart)
 
 Dying leaves your inventory in a crate where you fell and respawns you after 5 s at your bed
 (or the build pad). Score = nights survived × 100 + kills × 5; the best score is kept in localStorage.
+
+## Multiplayer
+
+Up to 4 players, peer-to-peer over WebRTC (PeerJS DataChannels, public PeerJS signalling for now).
+**Host a game** registers a 6-letter room code; friends **Join** with it. The host's browser runs the
+authoritative world (edits, zombies, drops, crates, clock, damage, inventories); clients move their
+own player locally and send inputs at 30 Hz, everything else comes from 20 Hz snapshots rendered
+100 ms behind. Solo play is just a host with no peers. If the host leaves, the match ends.
 
 Dev console helpers: `__game.dayNight.time = 299` jumps to the first sunset.
 

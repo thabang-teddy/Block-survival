@@ -4,8 +4,24 @@
  */
 import { create } from 'zustand'
 import type { ItemStack } from '../items/inventory'
-import type { CameraMode, Game, Panel } from '../game/Game'
+import type { CameraMode, Game, Panel, Role } from '../game/Game'
 import type { Phase } from '../game/DayNight'
+import type { HostSession } from '../net/HostSession'
+import type { ClientSession } from '../net/ClientSession'
+
+export interface ScoreRow {
+  id: string
+  name: string
+  score: number
+  kills: number
+  deaths: number
+  you: boolean
+}
+
+/** how the current run was started; null = main menu */
+export type Launch =
+  | { role: 'host'; name: string; session: HostSession }
+  | { role: 'client'; name: string; session: ClientSession }
 
 export interface UiSnapshot {
   locked: boolean
@@ -48,6 +64,10 @@ export interface UiSnapshot {
   timeAlive: number
   /** Tab held */
   scoreboard: boolean
+  players: ScoreRow[]
+  /** shown in the HUD while hosting online or joined */
+  roomCode: string
+  role: Role
 }
 
 interface UiState extends UiSnapshot {
@@ -55,7 +75,15 @@ interface UiState extends UiSnapshot {
   game: Game | null
   /** bumps to tear the Game down and start a fresh one */
   run: number
+  launch: Launch | null
+  /** 'host-left' / 'error' overlays for clients */
+  netStatus: string
+  netError: string
   setGame(game: Game | null): void
+  /** start a run (solo/host/client); the Scene builds the Game from it */
+  start(launch: Launch): void
+  setNetStatus(status: string, error?: string): void
+  /** back to the main menu (tears the Game down) */
   restart(): void
   sync(next: UiSnapshot): void
 }
@@ -63,6 +91,11 @@ interface UiState extends UiSnapshot {
 const roundPos = (p: [number, number, number]): [number, number, number] =>
   [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10, Math.round(p[2] * 10) / 10]
 const q = (v: number, step: number): number => Math.round(v / step) * step
+const sameRows = (a: ScoreRow[], b: ScoreRow[]): boolean =>
+  a.length === b.length && a.every((r, i) => {
+    const o = b[i]
+    return r.id === o.id && r.name === o.name && r.score === o.score && r.kills === o.kills && r.deaths === o.deaths
+  })
 
 export const useUiStore = create<UiState>((set, get) => ({
   locked: false,
@@ -98,10 +131,18 @@ export const useUiStore = create<UiState>((set, get) => ({
   deaths: 0,
   timeAlive: 0,
   scoreboard: false,
+  players: [],
+  roomCode: '',
+  role: 'host',
   game: null,
   run: 0,
+  launch: null,
+  netStatus: '',
+  netError: '',
   setGame: game => set({ game }),
-  restart: () => set(state => ({ run: state.run + 1 })),
+  start: launch => set(state => ({ launch, run: state.run + 1, netStatus: '', netError: '' })),
+  setNetStatus: (netStatus, netError = '') => set({ netStatus, netError }),
+  restart: () => set(state => ({ launch: null, run: state.run + 1, netStatus: '', netError: '' })),
   sync(next) {
     const cur = get()
     const pos = roundPos(next.position)
@@ -128,6 +169,7 @@ export const useUiStore = create<UiState>((set, get) => ({
       cur.dead === next.dead && cur.respawnIn === respawnIn && cur.score === next.score &&
       cur.bestScore === next.bestScore && cur.nightsSurvived === next.nightsSurvived &&
       cur.deaths === next.deaths && cur.scoreboard === next.scoreboard &&
+      cur.roomCode === next.roomCode && cur.role === next.role && sameRows(cur.players, next.players) &&
       (cur.timeAlive === timeAlive || !(next.scoreboard || !next.locked)) &&
       cur.position[0] === pos[0] && cur.position[1] === pos[1] && cur.position[2] === pos[2]
     ) return
@@ -164,6 +206,9 @@ export const useUiStore = create<UiState>((set, get) => ({
       deaths: next.deaths,
       timeAlive,
       scoreboard: next.scoreboard,
+      players: next.players,
+      roomCode: next.roomCode,
+      role: next.role,
     })
   },
 }))

@@ -60,8 +60,8 @@ export class DropManager {
     return drop
   }
 
-  /** Simulate and try to pick up into `inv` for a player whose feet are at (px,py,pz). */
-  update(dt: number, px: number, py: number, pz: number, inv: Inventory): void {
+  /** Simulate and try to pick up into the inventory of any collector standing over a drop. */
+  update(dt: number, collectors: readonly { x: number; y: number; z: number; inv: Inventory }[]): void {
     this.time += dt
     for (const d of this.drops.slice()) {
       d.age += dt
@@ -76,10 +76,15 @@ export class DropManager {
       if (r.hitY) d.vy = 0
       if (d.y < -60) { this.remove(d); continue }
 
-      if (d.age > PICKUP_DELAY && canPickUp(d, px, py, pz)) {
-        const left = inv.add(d.item, d.count)
-        if (left === 0) { this.remove(d); continue }
-        d.count = left
+      if (d.age > PICKUP_DELAY) {
+        let gone = false
+        for (const c of collectors) {
+          if (!canPickUp(d, c.x, c.y, c.z)) continue
+          const left = c.inv.add(d.item, d.count)
+          if (left === 0) { this.remove(d); gone = true; break }
+          d.count = left
+        }
+        if (gone) continue
       }
       const m = this.meshes.get(d.id)
       if (m) {
@@ -93,6 +98,27 @@ export class DropManager {
     for (const d of this.drops.slice()) this.remove(d)
     this.cube.dispose()
     for (const m of this.blockMats.values()) m.dispose()
+  }
+
+  /** Client side: mirror the host's drop list (no physics, no pickup). */
+  applySnapshot(list: readonly { id: number; item: string; x: number; y: number; z: number }[], time: number): void {
+    const seen = new Set<number>()
+    for (const s of list) {
+      seen.add(s.id)
+      let d = this.drops.find(x => x.id === s.id)
+      if (!d) {
+        d = { id: s.id, item: s.item, count: 1, x: s.x, y: s.y, z: s.z, vx: 0, vy: 0, vz: 0, age: 1 }
+        this.drops.push(d)
+        this.buildMesh(d)
+      }
+      d.x = s.x; d.y = s.y; d.z = s.z
+      const m = this.meshes.get(d.id)
+      if (m) {
+        m.position.set(d.x, d.y + 0.05 + Math.sin(time * 2 + d.id) * 0.04, d.z)
+        m.rotation.y = time * SPIN + d.id
+      }
+    }
+    for (const d of this.drops.slice()) if (!seen.has(d.id)) this.remove(d)
   }
 
   private remove(d: Drop): void {

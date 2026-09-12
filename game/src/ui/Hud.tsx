@@ -8,6 +8,7 @@ import { getItem } from '../items/registry'
 import type { ItemStack } from '../items/inventory'
 import { ItemIcon } from './ItemIcon'
 import { CraftingPanel } from './CraftingPanel'
+import { MainMenu } from './MainMenu'
 import { formatTime } from '../game/score'
 import './hud.css'
 
@@ -62,11 +63,18 @@ export function Hud() {
   const score = useUiStore(s => s.score)
   const bestScore = useUiStore(s => s.bestScore)
   const nightsSurvived = useUiStore(s => s.nightsSurvived)
-  const deaths = useUiStore(s => s.deaths)
   const timeAlive = useUiStore(s => s.timeAlive)
   const scoreboard = useUiStore(s => s.scoreboard)
   const restart = useUiStore(s => s.restart)
   const game = useUiStore(s => s.game)
+  const launch = useUiStore(s => s.launch)
+  const players = useUiStore(s => s.players)
+  const roomCode = useUiStore(s => s.roomCode)
+  const role = useUiStore(s => s.role)
+  const netStatus = useUiStore(s => s.netStatus)
+  const netError = useUiStore(s => s.netError)
+
+  if (!launch) return <MainMenu />
 
   return (
     <div className={`hud${poisoned ? ' poisoned' : ''}`}>
@@ -75,6 +83,13 @@ export function Hud() {
       {aiming && <div className="scope" aria-hidden />}
 
       <div className="logo">BLOCK<span>SURVIVAL</span></div>
+      {roomCode && (
+        <div className="room">
+          <span className="room-label">{role === 'host' ? 'room code' : 'joined'}</span>
+          <span className="room-code">{roomCode}</span>
+          <span className="room-players">{players.length} / 4</span>
+        </div>
+      )}
       <div className={`timer ${phase}`}>
         <span className="clock">{timer}</span>
         <span className="label">{phase === 'night' ? `night ${night} · ${zombies} out there` : night ? `day ${night + 1}` : 'sunset in'}</span>
@@ -130,7 +145,11 @@ export function Hud() {
             <tr><th>Player</th><th>Score</th><th>Nights</th><th>Kills</th><th>Deaths</th><th>Time</th></tr>
           </thead>
           <tbody>
-            <tr><td>You</td><td>{score}</td><td>{nightsSurvived}</td><td>{kills}</td><td>{deaths}</td><td>{formatTime(timeAlive)}</td></tr>
+            {players.map(p => (
+              <tr key={p.id} className={p.you ? 'you' : ''}>
+                <td>{p.name}{p.you ? ' (you)' : ''}</td><td>{p.score}</td><td>{nightsSurvived}</td><td>{p.kills}</td><td>{p.deaths}</td><td>{formatTime(timeAlive)}</td>
+              </tr>
+            ))}
           </tbody>
           <tfoot>
             <tr><td colSpan={6}>best {bestScore} · nights × 100 + kills × 5</td></tr>
@@ -138,7 +157,15 @@ export function Hud() {
         </table>
       )}
 
-      {!locked && panel === 'none' && !dead && (
+      {netStatus && (
+        <div className="overlay netdown">
+          <h1>{netStatus === 'host-left' ? 'The host left' : 'Connection lost'}</h1>
+          <p>{netStatus === 'host-left' ? 'The match is over: the host was running the world.' : netError || 'The connection to the host dropped.'}</p>
+          <button className="restart" onClick={() => restart()}>Back to menu</button>
+        </div>
+      )}
+
+      {!locked && panel === 'none' && !dead && !netStatus && (
         <div className="overlay" onClick={() => game?.input.requestLock()}>
           <h1>Block Survival</h1>
           <p>Click to {timeAlive > 2 ? 'resume' : 'play'}</p>
@@ -149,8 +176,11 @@ export function Hud() {
           </ul>
           {timeAlive > 2 && (
             <button className="restart" onClick={e => { e.stopPropagation(); restart() }}>
-              Restart
+              {role === 'client' ? 'Leave game' : 'Back to menu'}
             </button>
+          )}
+          {role === 'host' && !roomCode && (
+            <p className="fine">Hosting online? Start from the menu with <b>Host a game</b> to get a room code.</p>
           )}
         </div>
       )}

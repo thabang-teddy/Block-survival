@@ -17,12 +17,12 @@ describe('drops', () => {
     const inv = new Inventory()
     dm.spawn('dirt', 3, 0.5, 4, 0.5, 0, 0, 0)
     // far away: no pickup, it lands on the block top (y = 1)
-    for (let i = 0; i < 120; i++) dm.update(1 / 60, 10, 1, 10, inv)
+    for (let i = 0; i < 120; i++) dm.update(1 / 60, [{ x: 10, y: 1, z: 10, inv }])
     expect(dm.drops).toHaveLength(1)
     expect(dm.drops[0].y).toBeCloseTo(1, 2)
     expect(inv.count('dirt')).toBe(0)
     // walk over it
-    dm.update(1 / 60, 0.5, 1, 0.5, inv)
+    dm.update(1 / 60, [{ x: 0.5, y: 1, z: 0.5, inv }])
     expect(dm.drops).toHaveLength(0)
     expect(inv.count('dirt')).toBe(3)
     expect(dm.group.children).toHaveLength(0)
@@ -32,9 +32,9 @@ describe('drops', () => {
     const dm = new DropManager(floorWorld())
     const inv = new Inventory()
     dm.spawn('planks', 1, 0.5, 1.2, 0.5)
-    for (let i = 0; i < 20; i++) dm.update(1 / 60, 0.5, 1, 0.5, inv) // 0.33 s < delay
+    for (let i = 0; i < 20; i++) dm.update(1 / 60, [{ x: 0.5, y: 1, z: 0.5, inv }]) // 0.33 s < delay
     expect(inv.count('planks')).toBe(0)
-    for (let i = 0; i < 30; i++) dm.update(1 / 60, 0.5, 1, 0.5, inv)
+    for (let i = 0; i < 30; i++) dm.update(1 / 60, [{ x: 0.5, y: 1, z: 0.5, inv }])
     expect(inv.count('planks')).toBe(1)
   })
 
@@ -45,7 +45,7 @@ describe('drops', () => {
     inv.takeFromSlot(0, 1)
     inv.add('dirt', 60)
     dm.spawn('dirt', 10, 0.5, 1.2, 0.5)
-    for (let i = 0; i < 60; i++) dm.update(1 / 60, 0.5, 1, 0.5, inv)
+    for (let i = 0; i < 60; i++) dm.update(1 / 60, [{ x: 0.5, y: 1, z: 0.5, inv }])
     expect(inv.count('dirt')).toBe(64)
     expect(dm.drops[0].count).toBe(6)
   })

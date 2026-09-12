@@ -15,6 +15,8 @@ export interface LootCrate {
   y: number
   z: number
   items: ItemStack[]
+  /** number of stacks inside (mirrored crates on clients only know the count) */
+  count: number
 }
 
 const CRATE_URL = '/assets/Assets/Crate.glb'
@@ -57,7 +59,7 @@ export class CrateManager {
     })
     if (!items.length) return null
     const p = settle(this.world, x, y, z)
-    const crate: LootCrate = { id: this.nextId++, ...p, items }
+    const crate: LootCrate = { id: this.nextId++, ...p, items, count: items.length }
     this.crates.push(crate)
     this.buildMesh(crate)
     return crate
@@ -89,8 +91,25 @@ export class CrateManager {
       taken += stack.count - left
       return left > 0 ? [{ id: stack.id, count: left }] : []
     })
+    crate.count = crate.items.length
     if (!crate.items.length) this.remove(crate)
     return taken
+  }
+
+  /** Client side: mirror the host's crates. */
+  applySnapshot(list: readonly { id: number; x: number; y: number; z: number; items: number }[]): void {
+    const seen = new Set<number>()
+    for (const s of list) {
+      seen.add(s.id)
+      let c = this.crates.find(x => x.id === s.id)
+      if (!c) {
+        c = { id: s.id, x: s.x, y: s.y, z: s.z, items: [], count: s.items }
+        this.crates.push(c)
+        this.buildMesh(c)
+      }
+      c.count = s.items
+    }
+    for (const c of this.crates.slice()) if (!seen.has(c.id)) this.remove(c)
   }
 
   update(time: number): void {
