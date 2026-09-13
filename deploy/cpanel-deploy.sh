@@ -203,11 +203,9 @@ backup_sqlite_before_migrate() {
 
 # `migrate:status --pending=1` exits 1 when migrations are pending; it also exits
 # non-zero on a fresh database with no migrations table. Both mean "migrate".
-set +e
-PENDING_OUT="$(artisan migrate:status --pending=1 --no-ansi 2>&1)"
-PENDING_RC=$?
-set -e
-if [ "$PENDING_RC" -eq 0 ]; then
+# It runs as an `if` condition: `set +e` alone is not enough, because the ERR
+# trap fires regardless of errexit and would abort the deploy here.
+if PENDING_OUT="$(trap - ERR; artisan migrate:status --pending=1 --no-ansi 2>&1)"; then
   log "no pending migrations"
 else
   log "pending migrations:"
