@@ -65,11 +65,9 @@ export interface GameOptions {
   role: Role
   name: string
   session: HostSession | ClientSession
-  /** host only: continue from a cloud save */
+  /** host only: continue the player's saved world */
   restore?: SaveData
 }
-
-export const CLOUD_SLOT = 'main'
 
 type Ray = { ox: number; oy: number; oz: number; dx: number; dy: number; dz: number }
 
@@ -709,12 +707,12 @@ export class Game {
     }
   }
 
-  /** upload the world (block diff, clock, the host's inventory) to the account's cloud slot */
+  /** upload the world (block diff, clock, the host's inventory) as the account's one world */
   async saveToCloud(): Promise<void> {
     if (!this.isHost) throw new Error('Only the host can save')
-    if (!api.loggedIn) throw new Error('Log in to save to the cloud')
-    await api.saveGame(CLOUD_SLOT, this.buildSave(), this.dayNight.night)
-    this.showMessage('Saved to the cloud')
+    if (!api.loggedIn) throw new Error('Log in to save your world')
+    await api.saveWorld(this.buildSave(), this.dayNight.night)
+    this.showMessage('World saved')
   }
 
   // ---------------------------------------------------------------- messages

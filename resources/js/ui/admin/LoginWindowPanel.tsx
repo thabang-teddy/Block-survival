@@ -19,7 +19,7 @@ export function LoginWindowPanel({ initial, timezones }: Props) {
         <h2 id="hours-heading">Operating hours</h2>
         <p>Outside these hours players cannot sign in, and anyone signed in is logged out. Admins are exempt.</p>
       </header>
-      <form className="hours" onSubmit={e => { e.preventDefault(); form.put('/admin/login-window', { preserveScroll: true }) }}>
+      <form className="hours" onSubmit={e => { e.preventDefault(); form.put('/admin/hours', { preserveScroll: true }) }}>
         <label className="switch">
           <input type="checkbox" checked={form.data.enabled} onChange={e => form.setData('enabled', e.target.checked)} />
           <span>Limit sign-in to these hours</span>

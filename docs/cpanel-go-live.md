@@ -226,12 +226,14 @@ Copy `deploy/.env.cpanel.example` to `~/<env>/app/.env`, `chmod 600`, fill in:
 
 Everything else in the example file is a fixed decision, not a secret.
 
-The admin section (`/admin`) gates every other sign-in: a new browser waits
-for an admin to approve it, and the admin can limit sign-in to operating hours.
-`ADMIN_EMAIL` is always an admin, even before `admin:sync` has run, so the
-account can never lock itself out; `php artisan admin:sync` (step 7b of the
-deploy script) creates it and resets its password to `ADMIN_PASSWORD`. To
-promote a player who registered normally: `php artisan user:make-admin <email>`.
+The admin section (`/admin`) gates every other sign-in: there is no
+self-registration or password reset — the admin creates every player account
+(any password is accepted) — a new browser waits for an admin to approve it,
+and the admin can limit sign-in to operating hours. `ADMIN_EMAIL` is always an
+admin, even before `admin:sync` has run, so the account can never lock itself
+out; `php artisan admin:sync` (step 7b of the deploy script) creates it and
+resets its password to `ADMIN_PASSWORD`. To promote an existing player from the
+shell: `php artisan user:make-admin <email>`.
 
 ---
 
@@ -359,7 +361,7 @@ None required now. When §8 backups are set up, one line:
 Checks the dev setup never needed:
 
 - S.1 `https://staging.<domain>/` renders the menu (Inertia page, no console errors)
-- S.2 Register + login + logout round-trip; cookie is `Secure`, `SameSite=Lax`
+- S.2 Login + logout round-trip (an account created in `/admin/users`); cookie is `Secure`, `SameSite=Lax`
 - S.3 `/api/leaderboard` returns JSON, not HTML (docroot and `.htaccess` correct)
 - S.4 Post a score, save and continue a cloud save (writes to the SQLite file)
 - S.5 **Host a game on one browser, join from another** — proves §3.1 on the host's PHP/LiteSpeed (passed locally 2026-09-13)

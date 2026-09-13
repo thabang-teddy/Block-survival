@@ -1,18 +1,18 @@
 /**
- * Lobby for the signed-in player: Join a game (pick an open room, or type its
- * code) / Host a game / Play solo, plus the cloud save and leaderboard. The user,
- * the leaderboard and the cloud-save summary are Inertia props from PlayController;
- * the open-rooms list is polled from /api/rooms.
+ * Lobby for the signed-in player: Join a game (pick an open room) / Host a game /
+ * Play solo, plus the leaderboard. Every player has one world: solo and hosted
+ * games continue it, and "start over" wipes it. The user, the leaderboard and
+ * the world summary are Inertia props from PlayController; the open-rooms list
+ * is polled from /api/rooms.
  */
 import { useEffect, useState } from 'react'
 import { router, usePage } from '@inertiajs/react'
 import { useUiStore } from '../state/uiStore'
 import { HostSession } from '../net/HostSession'
 import { ClientSession } from '../net/ClientSession'
-import { isRoomCode, normalizeRoomCode } from '../net/protocol'
-import { api } from '../net/api'
+import { isRoomCode } from '../net/protocol'
+import { api, type SaveData } from '../net/api'
 import type { PlayProps } from '../net/pageProps'
-import { CLOUD_SLOT } from '../game/Game'
 import { formatTime } from '../game/score'
 import { useOpenRooms } from './useOpenRooms'
 import { seatsText } from './openGames'
@@ -20,46 +20,57 @@ import { seatsText } from './openGames'
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
 export function MainMenu() {
-  const { auth, leaderboard, cloudSave } = usePage<PlayProps>().props
+  const { auth, leaderboard, world } = usePage<PlayProps>().props
   const user = auth.user
   const start = useUiStore(s => s.start)
   const setNetStatus = useUiStore(s => s.setNetStatus)
-  const [code, setCode] = useState('')
-  const [busy, setBusy] = useState<'' | 'host' | 'join' | 'load'>('')
+  const [joining, setJoining] = useState('')
+  const [busy, setBusy] = useState<'' | 'host' | 'join' | 'solo' | 'reset'>('')
   const [error, setError] = useState('')
   const openRooms = useOpenRooms(!busy)
 
-  // the leaderboard and cloud save change while a run is in progress (dawn autosave,
+  // the leaderboard and the world change while a run is in progress (dawn autosave,
   // scores); pull fresh copies whenever the menu comes back
   useEffect(() => {
-    router.reload({ only: ['leaderboard', 'cloudSave'] })
+    router.reload({ only: ['leaderboard', 'world'] })
   }, [])
 
   const playerName = user.name
 
-  const solo = () => start({ role: 'host', name: playerName, session: new HostSession() })
+  /** the saved world, if there is one; the host's game continues from it */
+  const restore = async (): Promise<SaveData | undefined> => (world ? (await api.loadWorld()) ?? undefined : undefined)
 
-  const host = async () => {
-    setBusy('host')
+  const solo = async () => {
+    setBusy('solo')
     setError('')
-    const session = new HostSession()
     try {
-      await session.listen(playerName)
-      start({ role: 'host', name: playerName, session })
+      start({ role: 'host', name: playerName, session: new HostSession(), restore: await restore() })
     } catch (e) {
       setError(errorText(e))
       setBusy('')
     }
   }
 
-  /** join by a code from the list or the input box */
-  const join = async (raw: string) => {
-    const c = normalizeRoomCode(raw)
-    if (!isRoomCode(c)) { setError('Enter the 6-letter room code'); return }
-    setCode(c)
+  const host = async () => {
+    setBusy('host')
+    setError('')
+    const session = new HostSession()
+    try {
+      const saved = await restore()
+      await session.listen(playerName)
+      start({ role: 'host', name: playerName, session, restore: saved })
+    } catch (e) {
+      setError(errorText(e))
+      setBusy('')
+    }
+  }
+
+  const join = async (code: string) => {
+    if (!isRoomCode(code)) { setError('That room is gone'); return }
+    setJoining(code)
     setBusy('join')
     setError('')
-    const session = new ClientSession(c, playerName)
+    const session = new ClientSession(code, playerName)
     session.onStatus = st => {
       if (st === 'host-left') setNetStatus('host-left')
       else if (st === 'error') setNetStatus('error', session.error)
@@ -74,16 +85,17 @@ export function MainMenu() {
     }
   }
 
-  const continueSave = async () => {
-    setBusy('load')
+  const startOver = async () => {
+    if (!confirm('Delete your world and start from a fresh island? This cannot be undone.')) return
+    setBusy('reset')
     setError('')
     try {
-      const restore = await api.loadGame(CLOUD_SLOT)
-      start({ role: 'host', name: playerName, session: new HostSession(), restore })
+      await api.resetWorld()
+      router.reload({ only: ['world'] })
     } catch (e) {
       setError(errorText(e))
-      setBusy('')
     }
+    setBusy('')
   }
 
   return (
@@ -101,14 +113,14 @@ export function MainMenu() {
         <div className="lobby">
           <section className="option">
             <h3>Join a game</h3>
-            <p>Pick an open game, or enter the room code your host shares.</p>
+            <p>Pick a game someone is hosting right now.</p>
             <ul className="open-games" aria-label="Open games">
               {openRooms.rooms.map(r => (
                 <li key={r.code}>
                   <span className="host">{r.host_name}</span>
                   <span className="seats">{seatsText(r)}</span>
                   <button onClick={() => void join(r.code)} disabled={!!busy}>
-                    {busy === 'join' && code === r.code ? 'Joining…' : 'Join'}
+                    {busy === 'join' && joining === r.code ? 'Joining…' : 'Join'}
                   </button>
                 </li>
               ))}
@@ -116,33 +128,21 @@ export function MainMenu() {
                 <li className="empty">{openRooms.error ? `Could not load games: ${openRooms.error}` : 'No open games right now'}</li>
               )}
             </ul>
-            <div className="join">
-              <input
-                value={code}
-                placeholder="ROOM CODE"
-                maxLength={6}
-                aria-label="Room code"
-                onChange={e => setCode(normalizeRoomCode(e.target.value))}
-                onKeyDown={e => { if (e.key === 'Enter') void join(code) }}
-              />
-              <button onClick={() => void join(code)} disabled={!!busy || code.length < 6}>{busy === 'join' ? 'Joining…' : 'Join'}</button>
-            </div>
           </section>
 
           <section className="option">
-            <h3>Host a game</h3>
-            <p>Open a room and share its code with up to 3 friends.</p>
-            <button className="wide" onClick={host} disabled={!!busy}>{busy === 'host' ? 'Opening room…' : 'Host a game'}</button>
-          </section>
-
-          <section className="option">
-            <h3>Play solo</h3>
-            <p>Just you against the night.</p>
-            <button className="wide primary" onClick={solo} disabled={!!busy}>Play solo</button>
-            {cloudSave && (
-              <button className="wide" onClick={continueSave} disabled={!!busy}>
-                {busy === 'load' ? 'Loading…' : `Continue cloud save · night ${cloudSave.night} · ${formatTime(cloudSave.seconds)}`}
-              </button>
+            <h3>Your world</h3>
+            <p>
+              {world
+                ? `Night ${world.night} · ${formatTime(world.seconds)} survived. Solo and hosted games continue it.`
+                : 'A fresh island — it is saved at every dawn and whenever you press Save.'}
+            </p>
+            <button className="wide primary" onClick={solo} disabled={!!busy}>{busy === 'solo' ? 'Loading…' : 'Play solo'}</button>
+            <button className="wide" onClick={host} disabled={!!busy}>{busy === 'host' ? 'Opening room…' : 'Host a game for up to 3 friends'}</button>
+            {world && (
+              <p className="fine">
+                <button className="link" onClick={startOver} disabled={!!busy}>{busy === 'reset' ? 'Resetting…' : 'Start over with a new island'}</button>
+              </p>
             )}
           </section>
         </div>

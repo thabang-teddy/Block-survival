@@ -51,15 +51,18 @@ Score = nights survived × 100 + kills × 5.
 ## Multiplayer
 
 **Host a game** registers a 6-letter room code (the WebRTC handshake goes through a polled
-mailbox at `/api/rooms/{code}/signal[s]` — plain HTTP, no socket server — then a direct DataChannel); friends **Join** with the code. The host's browser runs the authoritative world;
+mailbox at `/api/rooms/{code}/signal[s]` — plain HTTP, no socket server — then a direct DataChannel); friends pick it from the lobby's **Join a game** list. The host's browser runs the authoritative world;
 clients move locally and mirror everything else from 20 Hz snapshots interpolated 100 ms behind.
 Up to 4 players. If the host leaves, the match ends.
 
 ## Accounts
 
-Sign in from the menu for the leaderboard and cloud saves: the host's score is posted at every dawn
-and on death, the world autosaves at dawn (or from the pause screen), and **Continue cloud save**
-restores block edits, props, clock, inventory and respawn point.
+The app is sign-in only: an admin creates every account in `/admin/users` (there is no
+registration or password reset, and any password is accepted), approves each new PC the first time
+it signs in, and can limit sign-in to operating hours. Every player has **one world**: the host's
+score is posted at every dawn and on death, the world autosaves at dawn (or from the pause screen),
+and both **Play solo** and **Host a game** continue it — block edits, props, clock, inventory and
+respawn point. **Start over** in the lobby (or the admin's **Reset world**) wipes it.
 
 ## Game source layout (`resources/js`)
 

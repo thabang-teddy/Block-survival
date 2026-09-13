@@ -20,10 +20,14 @@ class RoomController extends Controller
 
     private const LIST_SIZE = 50;
 
-    /** open rooms a player can join from the lobby; the host's peer id stays private until they pick one */
-    public function index(): JsonResponse
+    /**
+     * Open rooms a player can join from the lobby, minus their own (a host cannot
+     * join themselves); the host's peer id stays private until they pick one.
+     */
+    public function index(Request $request): JsonResponse
     {
         $rooms = Room::query()->live()->where('players', '<', self::MAX_PLAYERS)
+            ->where(fn ($q) => $q->whereNull('user_id')->orWhere('user_id', '!=', $request->user()->id))
             ->latest()->limit(self::LIST_SIZE)->get()
             ->map(fn (Room $room) => [
                 'code' => $room->code,

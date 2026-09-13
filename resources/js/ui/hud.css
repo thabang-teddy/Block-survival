@@ -268,14 +268,14 @@ body { user-select: none; }
 .menu .option p { margin: 2px 0 10px; font-size: 12px; opacity: .6; }
 .menu .option .wide { margin-top: 0; }
 .menu .option .wide + .wide { margin-top: 8px; }
-.menu .open-games { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 4px; max-height: 150px; overflow-y: auto; }
+.menu .option .fine { margin: 10px 0 0; text-align: center; }
+.menu .option .fine .link { font-size: 12px; opacity: .8; }
+.menu .open-games { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 150px; overflow-y: auto; }
 .menu .open-games li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 6px; background: rgba(0,0,0,.25); font-size: 13px; }
 .menu .open-games .host { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu .open-games .seats { font: 700 12px ui-monospace, Consolas, monospace; color: var(--hud-accent); }
 .menu .open-games button { padding: 5px 12px; font-size: 12px; }
 .menu .open-games .empty { display: block; text-align: center; font-size: 12px; opacity: .55; background: none; }
-.menu .join { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
-.menu .join input { font: 800 18px ui-monospace, Consolas, monospace; letter-spacing: 4px; text-transform: uppercase; text-align: center; }
 .menu .error { margin: 12px 0 0; color: #ff8a7a; font-size: 13px; }
 
 /* ---- pause actions / account / leaderboard */
@@ -286,9 +286,6 @@ body { user-select: none; }
 .menu .link { background: none; border: 0; padding: 0; color: var(--hud-accent); cursor: pointer; font: 600 13px inherit; text-decoration: underline; }
 .menu .account-line { margin: 12px 0 0; font-size: 13px; opacity: .9; }
 .menu .account { display: grid; gap: 8px; margin-top: 12px; padding: 12px; border-radius: 8px; background: rgba(255,255,255,.04); }
-.menu .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.menu .tabs button { padding: 7px; font-size: 13px; }
-.menu .tabs button.on { background: rgba(232,178,58,.2); border-color: var(--hud-accent); }
 .menu .board { margin-top: 16px; text-align: left; }
 .menu .board h3 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; opacity: .6; }
 .menu .board ol { margin: 0; padding: 0 0 0 20px; font-size: 13px; columns: 2; column-gap: 18px; }

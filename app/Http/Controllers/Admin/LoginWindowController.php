@@ -4,15 +4,26 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
+use App\Support\LoginWindow;
 use DateTimeZone;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
+use Inertia\Response;
 
-/** Admin form for the operating hours (see App\Support\LoginWindow). */
+/** Admin page for the operating hours (see App\Support\LoginWindow). */
 class LoginWindowController extends Controller
 {
     private const TIME_RULE = 'regex:/^([01]\d|2[0-3]):[0-5]\d$/';
+
+    public function show(): Response
+    {
+        return Inertia::render('Admin/Hours', [
+            'loginWindow' => LoginWindow::fromSettings()->toArray(),
+            'timezones' => DateTimeZone::listIdentifiers(),
+        ]);
+    }
 
     public function update(Request $request): RedirectResponse
     {

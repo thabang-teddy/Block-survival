@@ -6,10 +6,25 @@ use App\Http\Controllers\Controller;
 use App\Models\Room;
 use App\Models\RoomSignal;
 use Illuminate\Http\RedirectResponse;
+use Inertia\Inertia;
+use Inertia\Response;
 
-/** Force-close a room: what the host's own close does, minus the host_peer_id check. */
+/** Live rooms, with a force-close: what the host's own close does, minus the host_peer_id check. */
 class RoomController extends Controller
 {
+    public function index(): Response
+    {
+        return Inertia::render('Admin/Rooms', [
+            'rooms' => Room::query()->live()->latest()->get()
+                ->map(fn (Room $r) => [
+                    'code' => $r->code,
+                    'host_name' => $r->host_name,
+                    'players' => $r->players,
+                    'expires_at' => $r->expires_at->toIso8601String(),
+                ])->all(),
+        ]);
+    }
+
     public function destroy(string $code): RedirectResponse
     {
         $code = strtoupper($code);

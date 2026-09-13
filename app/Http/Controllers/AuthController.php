@@ -7,17 +7,17 @@ use App\Support\AccessPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
  * Session auth for the Inertia app. The app is login-only: guests see the Login
- * page, and a successful sign-in / registration lands on the game page (or the
- * page they were sent to /login from) — unless the AccessPolicy says otherwise:
- * a closed login window or a disabled account is refused, and a browser no
- * admin has approved yet is parked on /pending-approval.
+ * page, and a successful sign-in lands on the game page (or the page they were
+ * sent to /login from) — unless the AccessPolicy says otherwise: a closed login
+ * window or a disabled account is refused, and a browser no admin has approved
+ * yet is parked on /pending-approval. Accounts are created by an admin; there
+ * is no registration or password reset.
  */
 class AuthController extends Controller
 {
@@ -26,17 +26,6 @@ class AuthController extends Controller
     public function show(): Response
     {
         return Inertia::render('Login');
-    }
-
-    public function register(Request $request): RedirectResponse
-    {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'min:2', 'max:16', 'regex:/^[\pL\pN _-]+$/u', 'unique:users,name'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', Password::min(8)],
-        ]);
-
-        return $this->admit($request, User::create($data));
     }
 
     public function login(Request $request): RedirectResponse

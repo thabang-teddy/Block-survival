@@ -28,15 +28,15 @@ export interface LeaderboardRow {
   score: number
 }
 
-export interface SaveMeta {
-  slot: string
+/** summary of the player's one world, as the lobby and the admin show it */
+export interface WorldMeta {
   size: number
   night: number
   seconds: number
   updated_at: string
 }
 
-/** what a cloud save contains (gzipped JSON) */
+/** what a saved world contains (gzipped JSON) */
 export interface SaveData {
   version: 1
   seed: number
@@ -125,20 +125,29 @@ export const api = {
   leaderboard: async (): Promise<LeaderboardRow[]> =>
     (await request<{ leaderboard: LeaderboardRow[] }>('GET', '/leaderboard')).leaderboard,
 
-  listSaves: async (): Promise<SaveMeta[]> => (await request<{ saves: SaveMeta[] }>('GET', '/saves')).saves,
-  async saveGame(slot: string, data: SaveData, night: number): Promise<SaveMeta> {
+  /** every player has exactly one world; saving replaces it */
+  async saveWorld(data: SaveData, night: number): Promise<WorldMeta> {
     const bytes = await gzip(JSON.stringify(data))
     const q = `?night=${night}&seconds=${Math.floor(data.time)}`
     const body = new Blob([bytes as BlobPart], { type: 'application/gzip' })
-    return (await request<{ save: SaveMeta }>('PUT', `/saves/${slot}${q}`, undefined, body, { 'Content-Type': 'application/gzip' })).save
+    return (await request<{ world: WorldMeta }>('PUT', `/world${q}`, undefined, body, { 'Content-Type': 'application/gzip' })).world
   },
-  async loadGame(slot: string): Promise<SaveData> {
-    const res = await request<Response>('GET', `/saves/${slot}`)
+  /** the saved world, or null when the player has not saved one yet */
+  async loadWorld(): Promise<SaveData | null> {
+    let res: Response
+    try {
+      res = await request<Response>('GET', '/world')
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) return null
+      throw e
+    }
     const text = await gunzip(await res.arrayBuffer())
     const data = JSON.parse(text) as SaveData
     if (data.version !== 1 || !Array.isArray(data.edits)) throw new ApiError(422, 'Unreadable save')
     return data
   },
+  /** start over: forget the saved world */
+  resetWorld: () => request<{ ok: boolean }>('DELETE', '/world').then(() => undefined),
 }
 
 async function gzip(text: string): Promise<Uint8Array> {

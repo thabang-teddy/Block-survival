@@ -27,6 +27,8 @@ export interface AdminUser {
   is_env_admin: boolean
   is_disabled: boolean
   devices_count: number
+  /** the player's one world, or null before their first save */
+  world: { size: number; night: number; seconds: number; updated_at: string } | null
   last_login_at: string | null
   created_at: string | null
 }
@@ -36,14 +38,6 @@ export interface AdminRoom {
   host_name: string
   players: number
   expires_at: string
-}
-
-export interface AdminData {
-  loginWindow: LoginWindowForm
-  timezones: string[]
-  devices: AdminDevice[]
-  users: AdminUser[]
-  rooms: AdminRoom[]
 }
 
 export const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const

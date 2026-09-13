@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Room;
 use App\Models\RoomSignal;
-use App\Models\Save;
 use App\Models\User;
+use App\Models\World;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -47,25 +47,19 @@ class ApiTest extends TestCase
     public function test_the_game_page_renders_with_lobby_props_for_the_signed_in_user(): void
     {
         $user = $this->user();
-        Save::create(['user_id' => $user->id, 'slot' => 'main', 'payload' => base64_encode(gzencode('{}')), 'size' => 22, 'night' => 3, 'seconds' => 1800]);
+        World::create(['user_id' => $user->id, 'payload' => base64_encode(gzencode('{}')), 'size' => 22, 'night' => 3, 'seconds' => 1800]);
 
         $this->actingAs($user)->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('Play')
             ->where('auth.user.name', 'Teddy')
             ->has('leaderboard', 0)
-            ->where('cloudSave.night', 3));
+            ->where('world.night', 3));
     }
 
     // ------------------------------------------------------------ session auth
-    public function test_register_login_and_logout_through_the_session(): void
+    public function test_login_and_logout_through_the_session(): void
     {
-        // a brand-new browser is parked until an admin approves it (DeviceApprovalTest covers that)
-        $this->post('/register', ['name' => 'Teddy', 'email' => 'teddy@example.com', 'password' => 'correct-horse'])
-            ->assertRedirect('/pending-approval');
-        $this->assertGuest();
-        $this->assertSame('Teddy', User::first()->name);
-
-        $this->device(User::first());
+        $this->user();
         $this->post('/login', ['email' => 'teddy@example.com', 'password' => 'correct-horse'])->assertRedirect('/');
         $this->assertAuthenticated();
 
@@ -87,13 +81,15 @@ class ApiTest extends TestCase
             ->assertRedirectContains('/?room=ABCDEF');
     }
 
-    public function test_register_rejects_bad_input_and_duplicates(): void
+    public function test_there_is_no_self_registration_and_short_passwords_sign_in(): void
     {
-        $this->user();
-        $this->post('/register', ['name' => 'Teddy', 'email' => 'other@example.com', 'password' => 'correct-horse'])
-            ->assertSessionHasErrors(['name']);
-        $this->post('/register', ['name' => 'X', 'email' => 'nope', 'password' => 'short'])
-            ->assertSessionHasErrors(['name', 'email', 'password']);
+        $this->post('/register', ['name' => 'Teddy', 'email' => 'teddy@example.com', 'password' => 'correct-horse'])->assertNotFound();
+
+        // insecure passwords are allowed on purpose: accounts are handed out by the admin
+        $user = User::factory()->create(['email' => 'short@example.com', 'password' => '1']);
+        $this->device($user);
+        $this->post('/login', ['email' => 'short@example.com', 'password' => '1'])->assertRedirect('/');
+        $this->assertAuthenticated();
     }
 
     public function test_every_api_route_needs_a_session_and_never_redirects(): void
@@ -104,7 +100,7 @@ class ApiTest extends TestCase
         $this->getJson('/api/rooms/ABCDEF')->assertUnauthorized();
         $this->postJson('/api/rooms/ABCDEF/signal', [])->assertUnauthorized();
         $this->getJson('/api/rooms/ABCDEF/signals')->assertUnauthorized();
-        $this->getJson('/api/saves')->assertUnauthorized();
+        $this->getJson('/api/world')->assertUnauthorized();
         $this->postJson('/api/scores', [])->assertUnauthorized();
     }
 
@@ -147,10 +143,12 @@ class ApiTest extends TestCase
         $this->assertSame($user->id, Room::first()->user_id);
     }
 
-    public function test_the_lobby_lists_open_rooms_without_their_peer_ids(): void
+    public function test_the_lobby_lists_other_peoples_open_rooms_without_their_peer_ids(): void
     {
-        $this->actingAs($this->user());
+        $me = $this->user();
+        $this->actingAs($me);
         Room::create(['code' => 'OPENAA', 'host_peer_id' => 'p1', 'host_name' => 'Ana', 'players' => 2, 'expires_at' => now()->addHour()]);
+        Room::create(['code' => 'MINEDD', 'host_peer_id' => 'p4', 'host_name' => 'Teddy', 'players' => 1, 'user_id' => $me->id, 'expires_at' => now()->addHour()]);
         Room::create(['code' => 'FULLBB', 'host_peer_id' => 'p2', 'host_name' => 'Ben', 'players' => 4, 'expires_at' => now()->addHour()]);
         Room::create(['code' => 'GONECC', 'host_peer_id' => 'p3', 'host_name' => 'Cat', 'players' => 1, 'expires_at' => now()->subMinute()]);
 
@@ -262,34 +260,35 @@ class ApiTest extends TestCase
             ->assertUnprocessable();
     }
 
-    // ------------------------------------------------------------ saves
-    public function test_saves_round_trip_as_gzip_and_are_private_per_user(): void
+    // ------------------------------------------------------------ the player's world
+    public function test_each_player_has_one_private_world_that_round_trips_as_gzip(): void
     {
         $a = $this->user('Alice', 'a@example.com');
         $b = $this->user('Bob', 'b@example.com');
         $payload = gzencode(json_encode(['seed' => 11, 'edits' => [[1, 2, 3, 4]]]));
 
-        $this->putGzip($a, '/api/saves/main?night=2&seconds=700', $payload)
-            ->assertOk()->assertJsonPath('save.slot', 'main')->assertJsonPath('save.night', 2);
+        $this->putGzip($a, '/api/world?night=2&seconds=700', $payload)
+            ->assertOk()->assertJsonPath('world.night', 2)->assertJsonPath('world.seconds', 700);
 
-        $res = $this->actingAs($a)->get('/api/saves/main')->assertOk()
+        $res = $this->actingAs($a)->get('/api/world')->assertOk()
             ->assertHeader('Content-Type', 'application/gzip')
             ->assertHeader('X-Save-Night', '2');
         $this->assertSame($payload, $res->getContent());
 
-        $this->actingAs($a)->getJson('/api/saves')->assertOk()->assertJsonCount(1, 'saves')->assertJsonPath('saves.0.slot', 'main');
-        $this->actingAs($b)->getJson('/api/saves/main')->assertNotFound();
-        $this->actingAs($b)->getJson('/api/saves')->assertOk()->assertJsonCount(0, 'saves');
+        // saving again replaces the one world rather than adding a second
+        $this->putGzip($a, '/api/world?night=5&seconds=900', $payload)->assertOk()->assertJsonPath('world.night', 5);
+        $this->assertSame(1, World::query()->where('user_id', $a->id)->count());
+        $this->actingAs($b)->getJson('/api/world')->assertNotFound();
 
-        $this->actingAs($a)->deleteJson('/api/saves/main')->assertOk();
-        $this->actingAs($a)->getJson('/api/saves/main')->assertNotFound();
+        $this->actingAs($a)->deleteJson('/api/world')->assertOk();
+        $this->actingAs($a)->getJson('/api/world')->assertNotFound();
+        $this->actingAs($a)->deleteJson('/api/world')->assertOk(); // idempotent
     }
 
-    public function test_saves_reject_non_gzip_bad_slots_and_oversized_bodies(): void
+    public function test_the_world_rejects_non_gzip_and_oversized_bodies(): void
     {
         $a = $this->user();
-        $this->putGzip($a, '/api/saves/main', 'not gzip')->assertUnprocessable();
-        $this->putGzip($a, '/api/saves/BadSlot!', gzencode('{}'))->assertUnprocessable();
-        $this->putGzip($a, '/api/saves/main', '')->assertStatus(413);
+        $this->putGzip($a, '/api/world', 'not gzip')->assertUnprocessable();
+        $this->putGzip($a, '/api/world', '')->assertStatus(413);
     }
 }

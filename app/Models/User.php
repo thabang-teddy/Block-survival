@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -50,10 +51,10 @@ class User extends Authenticatable
         return $this->hasMany(Score::class);
     }
 
-    /** @return HasMany<Save, $this> */
-    public function saves(): HasMany
+    /** @return HasOne<World, $this> */
+    public function world(): HasOne
     {
-        return $this->hasMany(Save::class);
+        return $this->hasOne(World::class);
     }
 
     /** @return HasMany<Device, $this> */
