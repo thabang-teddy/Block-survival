@@ -12,7 +12,7 @@ Written 2026-09-13 against commit `027b9a2`. Host: **not yet measured** (§2.0).
 
 | The design assumes | cPanel shared hosting gives | Consequence |
 |---|---|---|
-| **Laravel Reverb** WebSocket server (`php artisan reverb:start`) for WebRTC signalling | No process supervisor, no custom listening ports; PHP only runs per-request under LiteSpeed/Apache | Signalling must not need a socket. **§3.1**: HTTP polling through the database. |
+| ~~Laravel Reverb WebSocket server for WebRTC signalling~~ (removed, §3.1) | No process supervisor, no custom listening ports; PHP only runs per-request under LiteSpeed/Apache | Signalling is a polled mailbox in the database. **§3.1** |
 | `DB_CONNECTION=sqlite` at `database/database.sqlite` (dev default) | Any file the account can write. cPanel backups cover `$HOME`, not "the database" | SQLite file kept **outside the git tree** at `$HOME/<env>/data/block-survival.sqlite`. **§4.4** |
 | `SESSION_DRIVER`, `CACHE_STORE`, `QUEUE_CONNECTION` = `database` | Works unchanged on SQLite | Nothing dispatches jobs (`grep ShouldQueue app/` is empty; `RoomSignal` is `ShouldBroadcastNow`) → **no queue worker**. |
 | `php ^8.3` in composer.json, PHP 8.4.20 locally | PHP Selector per account; user has chosen **8.4** | CI builds vendor on 8.4; deploy script refuses anything older (`MIN_PHP_ID=80400`). |
@@ -84,35 +84,58 @@ echo "sqlite lib: $(php -r 'echo (new PDO("sqlite::memory:"))->query("select sql
 
 ### §3.1 — Signalling: Reverb → HTTP polling through the database
 
-**Status: NOT DONE.** Without it, single-player, accounts, leaderboard and
-cloud saves work on cPanel; **Host / Join a game does not** (the client waits
-`CONNECT_TIMEOUT_MS` for a Reverb subscription that can never open).
+**Done 2026-09-13** (on `dev`). What changed:
 
-What changes:
+- Table `room_signals` (`id`, `room_code`, `from_peer`, `to_peer`, `type`,
+  `data` JSON, `created_at`), indexed on (`room_code`, `to_peer`, `id`) — one
+  migration, so **the first deploy after this runs `migrate`** (§6.1 step 7).
+- `POST /api/rooms/{code}/signal` **inserts a row** (201 + `id`);
+  `GET /api/rooms/{code}/signals?to={peer}&after={id}` returns that peer's
+  rows past the cursor, oldest first, 50 per page. Both under `throttle:signal`,
+  raised from 240 to **600/min per IP** (a host and a joiner behind one NAT
+  both polling at 500 ms is ~240/min on its own).
+- `resources/js/net/transport.ts` `Signaller` polls with an id cursor:
+  **500 ms while a handshake is in flight** (any signal in the last 10 s),
+  **1.5 s idle** — the host polls for the whole match to accept late joiners;
+  a joining client polls at 500 ms and stops the moment its DataChannel opens.
+  Errors back off 1 s → 5 s; a 404 (room gone) stops the poller and surfaces
+  "The game is no longer open." `echo.ts` deleted.
+- Stale rows (older than `Room::TTL_HOURS`) are swept whenever any room is
+  opened; a room's rows go when it is closed — no cron.
+- Removed `laravel/reverb`, `laravel-echo`, `pusher-js`, `config/reverb.php`,
+  `config/broadcasting.php`, `routes/channels.php`, `app/Events/RoomSignal.php`,
+  every `REVERB_*` / `VITE_REVERB_*` / `BROADCAST_CONNECTION` env line.
 
-- New table `room_signals` (`id`, `room_code`, `from`, `to`, `type`, `data` JSON,
-  `created_at`). One migration.
-- `SignalController::store` **inserts a row** instead of `broadcast(...)`.
-- New `GET /api/rooms/{code}/signals?to={peer}&after={id}` returning rows for
-  that peer with `id > after`, ordered by id, capped at 50. Same `throttle:signal`.
-- `resources/js/net/transport.ts` `Signaller` polls that endpoint every
-  ~700 ms **only while a peer connection is being negotiated**, and stops
-  once the DataChannel opens or on `leave()`. `echo.ts` is deleted.
-- Rows older than `Room::TTL_HOURS` are deleted opportunistically in
-  `RoomController::store` (`where created_at < now()-2h`) — no cron.
-- Remove `laravel/reverb`, `laravel-echo`, `pusher-js`, `config/reverb.php`,
-  the `REVERB_*` / `VITE_REVERB_*` env vars, and set
-  `BROADCAST_CONNECTION=null`.
+Three things the browser run found that unit tests could not, each already
+paid for once:
 
-Cost: joining a room takes ~0.5–1.5 s longer than over a socket; the
-`room_signals` table gets a few dozen rows per join. Gameplay traffic is still
-peer-to-peer and unaffected.
+- **`TrimStrings` ate the SDP's trailing CRLF** and Chrome rejected the offer
+  (`Invalid SDP line` on the last line). `bootstrap/app.php` exempts
+  `data.sdp`; `ApiTest` asserts the round trip byte-for-byte.
+- **The signal routes must sit outside the `/api` group's `throttle:60,1`** —
+  middleware stacks, and a poller at 500 ms is 120/min alone. They are in
+  their own group with only `throttle:signal`.
+- **`database is locked` under two browsers**, from the rate limiter's cache
+  increment: a DEFERRED SQLite transaction that reads then writes gets
+  `SQLITE_BUSY_SNAPSHOT`, which `busy_timeout` never waits on. §3.2 now sets
+  `transaction_mode = IMMEDIATE`. `Signaller.send()` also retries a 5xx or
+  network failure twice (300 ms, 600 ms), since a lost offer is a failed join.
+
+Measured locally (Herd, two tabs, same machine): host → join → world synced in
+~3 s. Cost as designed: a join is ~3–4 s instead of ~1 s (offer → host poll
+≤ 0.5 s → answer → client poll ≤ 0.5 s → candidates trickle a hop or two
+each). A hosting browser costs the server ~40 requests/min idle, ~120/min
+during a join; each is a full Laravel boot, so on the first `database is
+locked` or CPU throttle from the host the idle cadence (`POLL_IDLE_MS`) is the
+knob. Gameplay traffic is still peer-to-peer and unaffected.
 
 ### §3.2 — SQLite connection tuned for concurrent writers
 
 **Done 2026-09-13.** `config/database.php` sqlite connection:
-`busy_timeout` 5000 ms, `journal_mode` wal, `synchronous` normal (all
-overridable via `DB_BUSY_TIMEOUT` / `DB_JOURNAL_MODE` / `DB_SYNCHRONOUS`).
+`busy_timeout` 5000 ms, `journal_mode` wal, `synchronous` normal,
+`transaction_mode` **IMMEDIATE** (all overridable via `DB_BUSY_TIMEOUT` /
+`DB_JOURNAL_MODE` / `DB_SYNCHRONOUS` / `DB_TRANSACTION_MODE`). IMMEDIATE is
+what makes the busy timeout apply to read-then-write transactions (§3.1).
 Cost: WAL keeps `-wal`/`-shm` sidecar files next to the DB; backups must
 checkpoint first (the deploy script and §8 do).
 
@@ -329,7 +352,7 @@ Checks the dev setup never needed:
 - S.2 Register + login + logout round-trip; cookie is `Secure`, `SameSite=Lax`
 - S.3 `/api/leaderboard` returns JSON, not HTML (docroot and `.htaccess` correct)
 - S.4 Post a score, save and continue a cloud save (writes to the SQLite file)
-- S.5 **Host a game on one browser, join from another** — proves §3.1
+- S.5 **Host a game on one browser, join from another** — proves §3.1 on the host's PHP/LiteSpeed (passed locally 2026-09-13)
 - S.6 `storage/logs/laravel.log` has no `database is locked` after S.5
 - S.7 Run the deploy script a second time with no changes: "no pending migrations", `up` OK
 - S.8 A deliberately empty `APP_KEY` → script refuses before touching the tree
@@ -383,7 +406,7 @@ since — otherwise roll forward.
 **Stage A — repo (no host needed)**
 1. Commit this plan, `ci.yml`, `deploy/cpanel-deploy.sh`, `deploy/.env.cpanel.example`. ← *this session*
 2. Create `staging` from `master`, push both; confirm `test` and `build` are green and `deploy/staging`, `deploy/production` exist.
-3. **§3.1 signalling rewrite** on a branch → PR → merge to `staging`.
+3. ~~**§3.1 signalling rewrite**~~ done on `dev` 2026-09-13 → promote `dev` → `staging`.
 
 **Stage B — measure (needs SSH)**
 4. Run the §2.0 probe; fill §2.0; answer the §10 opens (domain, plan).

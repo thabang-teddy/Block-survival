@@ -2,12 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Events\RoomSignal;
 use App\Models\Room;
+use App\Models\RoomSignal;
 use App\Models\Save;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Event;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -116,23 +115,73 @@ class ApiTest extends TestCase
     }
 
     // ------------------------------------------------------------ signalling
-    public function test_signals_are_relayed_on_the_room_channel(): void
+    public function test_signals_are_stored_and_polled_per_recipient_after_a_cursor(): void
     {
-        Event::fake([RoomSignal::class]);
         Room::create(['code' => 'ABCDEF', 'host_peer_id' => 'hostAAAAAAAA', 'host_name' => 'x', 'expires_at' => now()->addHour()]);
 
+        $offer = ['from' => 'clientBBBBBB', 'to' => 'hostAAAAAAAA', 'type' => 'offer', 'data' => ['type' => 'offer', 'sdp' => 'v=0']];
+        $first = $this->postJson('/api/rooms/abcdef/signal', $offer)->assertCreated()->json('id');
+        $this->postJson('/api/rooms/ABCDEF/signal', [...$offer, 'type' => 'candidate', 'data' => ['candidate' => 'c1']])->assertCreated();
+        // addressed to someone else: never returned to the host
+        $this->postJson('/api/rooms/ABCDEF/signal', [...$offer, 'to' => 'clientBBBBBB', 'from' => 'hostAAAAAAAA', 'type' => 'answer'])->assertCreated();
+
+        $res = $this->getJson('/api/rooms/abcdef/signals?to=hostAAAAAAAA&after=0')->assertOk();
+        $signals = $res->json('signals');
+        $this->assertCount(2, $signals);
+        $this->assertSame(['offer', 'candidate'], array_column($signals, 'type'));
+        $this->assertSame('clientBBBBBB', $signals[0]['from']);
+        $this->assertSame('v=0', $signals[0]['data']['sdp']);
+        $this->assertSame($first, $signals[0]['id']);
+
+        // the cursor skips what was already delivered
+        $this->getJson("/api/rooms/ABCDEF/signals?to=hostAAAAAAAA&after={$first}")
+            ->assertOk()->assertJsonCount(1, 'signals')->assertJsonPath('signals.0.type', 'candidate');
+        $this->getJson('/api/rooms/ABCDEF/signals?to=clientBBBBBB&after=0')
+            ->assertOk()->assertJsonCount(1, 'signals')->assertJsonPath('signals.0.type', 'answer');
+    }
+
+    public function test_signal_endpoints_validate_and_reject_unknown_rooms(): void
+    {
+        Room::create(['code' => 'ABCDEF', 'host_peer_id' => 'hostAAAAAAAA', 'host_name' => 'x', 'expires_at' => now()->addHour()]);
         $msg = ['from' => 'clientBBBBBB', 'to' => 'hostAAAAAAAA', 'type' => 'offer', 'data' => ['type' => 'offer', 'sdp' => 'v=0']];
-        $this->postJson('/api/rooms/abcdef/signal', $msg)->assertOk();
-        Event::assertDispatched(RoomSignal::class, fn (RoomSignal $e) => $e->code === 'ABCDEF'
-            && $e->to === 'hostAAAAAAAA'
-            && $e->broadcastOn()->name === 'room.ABCDEF'
-            && $e->broadcastAs() === 'signal'
-            && $e->broadcastWith()['data']['sdp'] === 'v=0');
 
         $this->postJson('/api/rooms/NOPENO/signal', $msg)->assertNotFound();
         $this->postJson('/api/rooms/ABCDEF/signal', [...$msg, 'type' => 'hack'])->assertUnprocessable();
         $this->postJson('/api/rooms/ABCDEF/signal', [...$msg, 'from' => 'x'])->assertUnprocessable();
         $this->postJson('/api/rooms/ABCDEF/signal', [...$msg, 'data' => ['sdp' => str_repeat('a', 20000)]])->assertStatus(413);
+
+        $this->getJson('/api/rooms/NOPENO/signals?to=hostAAAAAAAA&after=0')->assertNotFound();
+        $this->getJson('/api/rooms/ABCDEF/signals?to=x&after=0')->assertUnprocessable();
+        $this->getJson('/api/rooms/ABCDEF/signals?to=hostAAAAAAAA&after=-1')->assertUnprocessable();
+        $this->getJson('/api/rooms/ABCDEF/signals?to=hostAAAAAAAA')->assertOk()->assertJsonCount(0, 'signals');
+    }
+
+    public function test_an_sdp_keeps_its_trailing_crlf_through_the_mailbox(): void
+    {
+        Room::create(['code' => 'ABCDEF', 'host_peer_id' => 'hostAAAAAAAA', 'host_name' => 'x', 'expires_at' => now()->addHour()]);
+        $sdp = "v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\na=max-message-size:262144\r\n";
+        $this->postJson('/api/rooms/ABCDEF/signal', ['from' => 'clientBBBBBB', 'to' => 'hostAAAAAAAA', 'type' => 'offer', 'data' => ['type' => 'offer', 'sdp' => $sdp]])
+            ->assertCreated();
+
+        $this->assertSame($sdp, $this->getJson('/api/rooms/ABCDEF/signals?to=hostAAAAAAAA')->json('signals.0.data.sdp'));
+    }
+
+    public function test_signals_are_pruned_with_their_room(): void
+    {
+        Room::create(['code' => 'ABCDEF', 'host_peer_id' => 'hostAAAAAAAA', 'host_name' => 'x', 'expires_at' => now()->addHour()]);
+        $msg = ['from' => 'clientBBBBBB', 'to' => 'hostAAAAAAAA', 'type' => 'offer', 'data' => ['type' => 'offer', 'sdp' => 'v=0']];
+        $this->postJson('/api/rooms/ABCDEF/signal', $msg)->assertCreated();
+        RoomSignal::query()->update(['created_at' => now()->subHours(Room::TTL_HOURS + 1)]);
+        $this->postJson('/api/rooms/ABCDEF/signal', $msg)->assertCreated();
+        $this->assertSame(2, RoomSignal::count());
+
+        // opening any room sweeps stale signals from every room
+        $this->postJson('/api/rooms', ['code' => 'HGFEDC', 'host_peer_id' => 'p', 'host_name' => 'Teddy'])->assertCreated();
+        $this->assertSame(1, RoomSignal::count());
+
+        // closing the room drops what is left for it
+        $this->deleteJson('/api/rooms/ABCDEF', ['host_peer_id' => 'hostAAAAAAAA'])->assertOk();
+        $this->assertSame(0, RoomSignal::count());
     }
 
     // ------------------------------------------------------------ scores

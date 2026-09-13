@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Room;
+use App\Models\RoomSignal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -27,6 +28,9 @@ class RoomController extends Controller
         if ($existing && $existing->expires_at->isFuture() && $existing->host_peer_id !== $data['host_peer_id']) {
             return response()->json(['message' => 'That room code is in use.'], 409);
         }
+
+        // no scheduler on shared hosting: opening a room is when stale mail is swept
+        RoomSignal::pruneStale();
 
         $room = Room::query()->updateOrCreate(
             ['code' => $data['code']],
@@ -73,7 +77,10 @@ class RoomController extends Controller
     public function destroy(Request $request, string $code): JsonResponse
     {
         $data = $request->validate(['host_peer_id' => ['required', 'string', 'max:128']]);
-        Room::query()->where('code', strtoupper($code))->where('host_peer_id', $data['host_peer_id'])->delete();
+        $deleted = Room::query()->where('code', strtoupper($code))->where('host_peer_id', $data['host_peer_id'])->delete();
+        if ($deleted) {
+            RoomSignal::query()->where('room_code', strtoupper($code))->delete();
+        }
 
         return response()->json(['ok' => true]);
     }

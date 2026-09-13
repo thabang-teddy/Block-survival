@@ -38,6 +38,13 @@ export interface SaveData {
   deaths: number
 }
 
+export interface SignalRow {
+  id: number
+  from: string
+  type: 'offer' | 'answer' | 'candidate'
+  data: Record<string, unknown>
+}
+
 export class ApiError extends Error {
   readonly status: number
   constructor(status: number, message: string) {
@@ -94,9 +101,12 @@ export const api = {
     request<{ ok: boolean }>('DELETE', `/rooms/${code}`, { host_peer_id: hostPeerId }),
   resolveRoom: (code: string) =>
     request<{ room: { code: string; host_peer_id: string; host_name: string; players: number } }>('GET', `/rooms/${code}`),
-  /** relay one WebRTC signalling message to the room; X-Socket-ID keeps it from echoing back to us */
-  signal: (code: string, msg: { from: string; to: string; type: string; data: Record<string, unknown> }, socketId?: string) =>
-    request<{ ok: boolean }>('POST', `/rooms/${code}/signal`, msg, undefined, { 'X-Socket-ID': socketId ?? '' }).then(() => undefined),
+  /** drop one WebRTC signalling message into the room's mailbox */
+  signal: (code: string, msg: { from: string; to: string; type: string; data: Record<string, unknown> }) =>
+    request<{ id: number }>('POST', `/rooms/${code}/signal`, msg).then(() => undefined),
+  /** everything addressed to `to` with an id past `after`, oldest first */
+  signals: (code: string, to: string, after: number) =>
+    request<{ signals: SignalRow[] }>('GET', `/rooms/${code}/signals?to=${encodeURIComponent(to)}&after=${after}`),
 
   postScore: (nights: number, kills: number, deaths: number, seconds: number) =>
     request<{ score: number; best: number }>('POST', '/scores', { nights, kills, deaths, seconds }),
