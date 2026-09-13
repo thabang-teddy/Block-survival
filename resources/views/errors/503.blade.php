@@ -27,19 +27,15 @@
         * { box-sizing: border-box; }
         html, body { margin: 0; min-height: 100%; }
         body {
-            display: grid;
-            place-items: center;
-            padding: 32px 16px;
             background: var(--backdrop);
             color: var(--ink);
             font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             -webkit-font-smoothing: antialiased;
         }
         .card {
-            width: 100%;
-            max-width: 690px;
+            min-height: 100vh;
+            min-height: 100dvh;
             background: var(--card);
-            box-shadow: 0 18px 45px rgba(30, 45, 65, .10);
             display: flex;
             flex-direction: column;
         }
@@ -54,7 +50,15 @@
             letter-spacing: -.01em;
         }
         .brand svg { width: 26px; height: 26px; }
-        main { padding: 64px 24px 0; text-align: center; }
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 40px 24px;
+            text-align: center;
+            overflow: hidden; /* cables overshoot the scene to reach the page edges */
+        }
         h1 {
             margin: 0 auto 14px;
             max-width: 420px;
@@ -64,9 +68,8 @@
             letter-spacing: -.02em;
         }
         p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--muted); }
-        .scene { display: block; width: 100%; height: auto; margin: 44px 0 48px; }
+        .scene { display: block; width: 100%; max-width: 690px; height: auto; margin: 44px auto 0; overflow: visible; }
         footer {
-            margin-top: auto;
             border-top: 1px solid var(--rule);
             padding: 16px 24px 20px;
             display: flex;
@@ -95,12 +98,12 @@
             {{-- two unplugged connectors: blue plug on the left, green socket on the right --}}
             <svg class="scene" viewBox="0 0 690 120" role="img" aria-label="An unplugged cable">
                 <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="18">
-                    <path d="M0 20 H150 C170 20 170 62 190 62 H226" stroke="var(--blue-light)"/>
-                    <path d="M690 20 H540 C520 20 520 62 500 62 H464" stroke="var(--green)"/>
+                    <path d="M-2000 20 H150 C170 20 170 62 190 62 H226" stroke="var(--blue-light)"/>
+                    <path d="M2690 20 H540 C520 20 520 62 500 62 H464" stroke="var(--green)"/>
                 </g>
                 <g fill="none" stroke-linecap="round" stroke-width="5">
-                    <path d="M0 14 H150 C166 14 168 30 172 40" stroke="var(--blue-mid)"/>
-                    <path d="M690 14 H540 C524 14 522 30 518 40" stroke="var(--green-light)"/>
+                    <path d="M-2000 14 H150 C166 14 168 30 172 40" stroke="var(--blue-mid)"/>
+                    <path d="M2690 14 H540 C524 14 522 30 518 40" stroke="var(--green-light)"/>
                 </g>
 
                 {{-- blue plug --}}
