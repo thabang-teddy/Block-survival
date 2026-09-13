@@ -222,8 +222,16 @@ Copy `deploy/.env.cpanel.example` to `~/<env>/app/.env`, `chmod 600`, fill in:
 | `DB_DATABASE` | absolute path from §4.1 | yes |
 | `APP_ENV` | `staging` / `production` | yes |
 | `APP_DEBUG` | `false` | yes — `true` leaks `.env` on any error page |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | the one account that can open `/admin` (issue #1) | yes — without an admin nobody can approve a PC, and no player can sign in |
 
 Everything else in the example file is a fixed decision, not a secret.
+
+The admin section (`/admin`) gates every other sign-in: a new browser waits
+for an admin to approve it, and the admin can limit sign-in to operating hours.
+`ADMIN_EMAIL` is always an admin, even before `admin:sync` has run, so the
+account can never lock itself out; `php artisan admin:sync` (step 7b of the
+deploy script) creates it and resets its password to `ADMIN_PASSWORD`. To
+promote a player who registered normally: `php artisan user:make-admin <email>`.
 
 ---
 
@@ -328,6 +336,8 @@ Runs on the server. In order:
    are listed, copy the SQLite file to `<data>/backups/pre-migrate-<ts>.sqlite`
    first, then `php artisan migrate --force`. Otherwise print "no pending
    migrations" and skip.
+   7b. `php artisan admin:sync` — creates/updates the `ADMIN_EMAIL` account
+   (idempotent; only warns when the variable is empty).
 8. `php artisan optimize:clear` then `config:cache`, `route:cache`,
    `view:cache`, `event:cache` (safe: §3.3).
 9. `php artisan up`. `git gc --auto`. Append one line to `~/logs/deploy.log`.

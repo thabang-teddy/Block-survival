@@ -15,7 +15,7 @@ class MaintenanceToggleTest extends TestCase
         config(['app.maintenance.enabled' => false]);
 
         $this->get('/login')->assertOk();
-        $this->actingAs(User::factory()->create())->getJson('/api/leaderboard')->assertOk();
+        $this->signIn(User::factory()->create())->getJson('/api/leaderboard')->assertOk();
     }
 
     public function test_toggle_returns_503_for_pages_and_json(): void

@@ -11,6 +11,16 @@ export interface ApiUser {
   id: number
   name: string
   email: string
+  is_admin: boolean
+}
+
+/** a room the lobby can join in one click; the host's peer id is only revealed by resolveRoom */
+export interface OpenRoom {
+  code: string
+  host_name: string
+  players: number
+  max_players: number
+  expires_at: string
 }
 
 export interface LeaderboardRow {
@@ -93,6 +103,8 @@ export const api = {
   /** the page tells us who is signed in (Inertia shared prop) */
   setUser(user: ApiUser | null): void { currentUser = user },
 
+  /** open (live, not full) rooms, newest first */
+  listRooms: () => request<{ rooms: OpenRoom[] }>('GET', '/rooms').then(r => r.rooms),
   createRoom: (code: string, hostPeerId: string, hostName: string) =>
     request<{ room: unknown }>('POST', '/rooms', { code, host_peer_id: hostPeerId, host_name: hostName }),
   refreshRoom: (code: string, hostPeerId: string, players: number) =>

@@ -268,6 +268,12 @@ body { user-select: none; }
 .menu .option p { margin: 2px 0 10px; font-size: 12px; opacity: .6; }
 .menu .option .wide { margin-top: 0; }
 .menu .option .wide + .wide { margin-top: 8px; }
+.menu .open-games { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 4px; max-height: 150px; overflow-y: auto; }
+.menu .open-games li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 6px; background: rgba(0,0,0,.25); font-size: 13px; }
+.menu .open-games .host { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu .open-games .seats { font: 700 12px ui-monospace, Consolas, monospace; color: var(--hud-accent); }
+.menu .open-games button { padding: 5px 12px; font-size: 12px; }
+.menu .open-games .empty { display: block; text-align: center; font-size: 12px; opacity: .55; background: none; }
 .menu .join { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
 .menu .join input { font: 800 18px ui-monospace, Consolas, monospace; letter-spacing: 4px; text-transform: uppercase; text-align: center; }
 .menu .error { margin: 12px 0 0; color: #ff8a7a; font-size: 13px; }

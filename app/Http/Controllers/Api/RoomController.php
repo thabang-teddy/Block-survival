@@ -16,6 +16,26 @@ class RoomController extends Controller
 {
     private const CODE_RULE = 'regex:/^[ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/';
 
+    public const MAX_PLAYERS = 4;
+
+    private const LIST_SIZE = 50;
+
+    /** open rooms a player can join from the lobby; the host's peer id stays private until they pick one */
+    public function index(): JsonResponse
+    {
+        $rooms = Room::query()->live()->where('players', '<', self::MAX_PLAYERS)
+            ->latest()->limit(self::LIST_SIZE)->get()
+            ->map(fn (Room $room) => [
+                'code' => $room->code,
+                'host_name' => $room->host_name,
+                'players' => $room->players,
+                'max_players' => self::MAX_PLAYERS,
+                'expires_at' => $room->expires_at->toIso8601String(),
+            ]);
+
+        return response()->json(['rooms' => $rooms]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -61,7 +81,7 @@ class RoomController extends Controller
     {
         $data = $request->validate([
             'host_peer_id' => ['required', 'string', 'max:128'],
-            'players' => ['required', 'integer', 'min:1', 'max:4'],
+            'players' => ['required', 'integer', 'min:1', 'max:'.self::MAX_PLAYERS],
         ]);
 
         $room = Room::query()->where('code', strtoupper($code))->where('host_peer_id', $data['host_peer_id'])->first();

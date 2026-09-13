@@ -14,15 +14,19 @@ class ApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** a player whose browser an admin has already approved */
     private function user(string $name = 'Teddy', string $email = 'teddy@example.com'): User
     {
-        return User::factory()->create(['name' => $name, 'email' => $email, 'password' => 'correct-horse']);
+        $user = User::factory()->create(['name' => $name, 'email' => $email, 'password' => 'correct-horse']);
+        $this->device($user);
+
+        return $user;
     }
 
     /** raw PUT with a gzip body (the JSON helpers cannot send binary) */
     private function putGzip(User $user, string $uri, string $body)
     {
-        return $this->actingAs($user)->call('PUT', $uri, [], [], [], [
+        return $this->actingAs($user)->call('PUT', $uri, [], $this->prepareCookiesForRequest(), [], [
             'CONTENT_TYPE' => 'application/gzip',
             'HTTP_ACCEPT' => 'application/json',
         ], $body);
@@ -55,10 +59,15 @@ class ApiTest extends TestCase
     // ------------------------------------------------------------ session auth
     public function test_register_login_and_logout_through_the_session(): void
     {
+        // a brand-new browser is parked until an admin approves it (DeviceApprovalTest covers that)
         $this->post('/register', ['name' => 'Teddy', 'email' => 'teddy@example.com', 'password' => 'correct-horse'])
-            ->assertRedirect('/');
-        $this->assertAuthenticated();
+            ->assertRedirect('/pending-approval');
+        $this->assertGuest();
         $this->assertSame('Teddy', User::first()->name);
+
+        $this->device(User::first());
+        $this->post('/login', ['email' => 'teddy@example.com', 'password' => 'correct-horse'])->assertRedirect('/');
+        $this->assertAuthenticated();
 
         $this->post('/logout')->assertRedirect('/login');
         $this->assertGuest();
@@ -90,6 +99,7 @@ class ApiTest extends TestCase
     public function test_every_api_route_needs_a_session_and_never_redirects(): void
     {
         $this->getJson('/api/leaderboard')->assertUnauthorized();
+        $this->getJson('/api/rooms')->assertUnauthorized();
         $this->postJson('/api/rooms', [])->assertUnauthorized();
         $this->getJson('/api/rooms/ABCDEF')->assertUnauthorized();
         $this->postJson('/api/rooms/ABCDEF/signal', [])->assertUnauthorized();
@@ -135,6 +145,23 @@ class ApiTest extends TestCase
             ->postJson('/api/rooms', ['code' => 'HGFEDC', 'host_peer_id' => 'p', 'host_name' => 'Teddy'])
             ->assertCreated();
         $this->assertSame($user->id, Room::first()->user_id);
+    }
+
+    public function test_the_lobby_lists_open_rooms_without_their_peer_ids(): void
+    {
+        $this->actingAs($this->user());
+        Room::create(['code' => 'OPENAA', 'host_peer_id' => 'p1', 'host_name' => 'Ana', 'players' => 2, 'expires_at' => now()->addHour()]);
+        Room::create(['code' => 'FULLBB', 'host_peer_id' => 'p2', 'host_name' => 'Ben', 'players' => 4, 'expires_at' => now()->addHour()]);
+        Room::create(['code' => 'GONECC', 'host_peer_id' => 'p3', 'host_name' => 'Cat', 'players' => 1, 'expires_at' => now()->subMinute()]);
+
+        $this->getJson('/api/rooms')->assertOk()
+            ->assertJsonCount(1, 'rooms')
+            ->assertJsonPath('rooms.0.code', 'OPENAA')
+            ->assertJsonPath('rooms.0.host_name', 'Ana')
+            ->assertJsonPath('rooms.0.players', 2)
+            ->assertJsonPath('rooms.0.max_players', 4)
+            ->assertJsonMissingPath('rooms.0.host_peer_id')
+            ->assertJsonMissingPath('rooms.0.user_id');
     }
 
     // ------------------------------------------------------------ signalling

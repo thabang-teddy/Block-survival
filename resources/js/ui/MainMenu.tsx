@@ -1,7 +1,8 @@
 /**
- * Lobby for the signed-in player: Join a game (room code) / Host a game / Play
- * solo, plus the cloud save and leaderboard. The user, the leaderboard and the
- * cloud-save summary are Inertia props from PlayController.
+ * Lobby for the signed-in player: Join a game (pick an open room, or type its
+ * code) / Host a game / Play solo, plus the cloud save and leaderboard. The user,
+ * the leaderboard and the cloud-save summary are Inertia props from PlayController;
+ * the open-rooms list is polled from /api/rooms.
  */
 import { useEffect, useState } from 'react'
 import { router, usePage } from '@inertiajs/react'
@@ -13,6 +14,8 @@ import { api } from '../net/api'
 import type { PlayProps } from '../net/pageProps'
 import { CLOUD_SLOT } from '../game/Game'
 import { formatTime } from '../game/score'
+import { useOpenRooms } from './useOpenRooms'
+import { seatsText } from './openGames'
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
@@ -24,6 +27,7 @@ export function MainMenu() {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState<'' | 'host' | 'join' | 'load'>('')
   const [error, setError] = useState('')
+  const openRooms = useOpenRooms(!busy)
 
   // the leaderboard and cloud save change while a run is in progress (dawn autosave,
   // scores); pull fresh copies whenever the menu comes back
@@ -48,9 +52,11 @@ export function MainMenu() {
     }
   }
 
-  const join = async () => {
-    const c = normalizeRoomCode(code)
+  /** join by a code from the list or the input box */
+  const join = async (raw: string) => {
+    const c = normalizeRoomCode(raw)
     if (!isRoomCode(c)) { setError('Enter the 6-letter room code'); return }
+    setCode(c)
     setBusy('join')
     setError('')
     const session = new ClientSession(c, playerName)
@@ -88,13 +94,28 @@ export function MainMenu() {
 
         <p className="account-line">
           Signed in as <b>{user.name}</b> ·{' '}
+          {user.is_admin && <><a className="link" href="/admin">admin</a> ·{' '}</>}
           <button className="link" onClick={() => router.post('/logout')}>sign out</button>
         </p>
 
         <div className="lobby">
           <section className="option">
             <h3>Join a game</h3>
-            <p>Enter the room code your host shares.</p>
+            <p>Pick an open game, or enter the room code your host shares.</p>
+            <ul className="open-games" aria-label="Open games">
+              {openRooms.rooms.map(r => (
+                <li key={r.code}>
+                  <span className="host">{r.host_name}</span>
+                  <span className="seats">{seatsText(r)}</span>
+                  <button onClick={() => void join(r.code)} disabled={!!busy}>
+                    {busy === 'join' && code === r.code ? 'Joining…' : 'Join'}
+                  </button>
+                </li>
+              ))}
+              {openRooms.loaded && openRooms.rooms.length === 0 && (
+                <li className="empty">{openRooms.error ? `Could not load games: ${openRooms.error}` : 'No open games right now'}</li>
+              )}
+            </ul>
             <div className="join">
               <input
                 value={code}
@@ -102,9 +123,9 @@ export function MainMenu() {
                 maxLength={6}
                 aria-label="Room code"
                 onChange={e => setCode(normalizeRoomCode(e.target.value))}
-                onKeyDown={e => { if (e.key === 'Enter') void join() }}
+                onKeyDown={e => { if (e.key === 'Enter') void join(code) }}
               />
-              <button onClick={join} disabled={!!busy || code.length < 6}>{busy === 'join' ? 'Joining…' : 'Join'}</button>
+              <button onClick={() => void join(code)} disabled={!!busy || code.length < 6}>{busy === 'join' ? 'Joining…' : 'Join'}</button>
             </div>
           </section>
 
