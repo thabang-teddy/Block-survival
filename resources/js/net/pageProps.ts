@@ -7,7 +7,9 @@ export interface SharedProps extends InertiaPageProps {
   flash: { status: string | null }
 }
 
+/** the game page sits behind `auth`, so the user is never null there */
 export interface PlayProps extends SharedProps {
+  auth: { user: ApiUser }
   leaderboard: LeaderboardRow[]
   cloudSave: SaveMeta | null
 }

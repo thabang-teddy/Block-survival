@@ -1,6 +1,7 @@
 /**
- * The game page. Menu data (signed-in user, leaderboard, cloud save) comes from the
- * PlayController as Inertia props; the running game talks to /api with the same session.
+ * The game page (login-only). Menu data (signed-in user, leaderboard, cloud save)
+ * comes from the PlayController as Inertia props; the running game talks to /api
+ * with the same session.
  */
 import { useEffect } from 'react'
 import { usePage } from '@inertiajs/react'

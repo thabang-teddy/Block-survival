@@ -1,11 +1,10 @@
 /**
- * Main menu: name, then Play solo / Host a game (room code) / Join with a code,
- * plus the optional account (leaderboard + cloud saves). The signed-in user, the
- * leaderboard and the cloud-save summary are Inertia props from PlayController;
- * sign-in / register / sign-out are Inertia form posts to the session routes.
+ * Lobby for the signed-in player: Join a game (room code) / Host a game / Play
+ * solo, plus the cloud save and leaderboard. The user, the leaderboard and the
+ * cloud-save summary are Inertia props from PlayController.
  */
 import { useEffect, useState } from 'react'
-import { router, useForm, usePage } from '@inertiajs/react'
+import { router, usePage } from '@inertiajs/react'
 import { useUiStore } from '../state/uiStore'
 import { HostSession } from '../net/HostSession'
 import { ClientSession } from '../net/ClientSession'
@@ -15,12 +14,6 @@ import type { PlayProps } from '../net/pageProps'
 import { CLOUD_SLOT } from '../game/Game'
 import { formatTime } from '../game/score'
 
-const NAME_KEY = 'block-survival:name'
-
-function loadName(): string {
-  try { return localStorage.getItem(NAME_KEY) ?? '' } catch { return '' }
-}
-
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
 export function MainMenu() {
@@ -28,15 +21,9 @@ export function MainMenu() {
   const user = auth.user
   const start = useUiStore(s => s.start)
   const setNetStatus = useUiStore(s => s.setNetStatus)
-  const [name, setName] = useState(loadName)
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState<'' | 'host' | 'join' | 'load'>('')
   const [error, setError] = useState('')
-  const [accountOpen, setAccountOpen] = useState(false)
-
-  useEffect(() => {
-    try { localStorage.setItem(NAME_KEY, name) } catch { /* private mode */ }
-  }, [name])
 
   // the leaderboard and cloud save change while a run is in progress (dawn autosave,
   // scores); pull fresh copies whenever the menu comes back
@@ -44,7 +31,7 @@ export function MainMenu() {
     router.reload({ only: ['leaderboard', 'cloudSave'] })
   }, [])
 
-  const playerName = (user?.name ?? name).trim() || 'Survivor'
+  const playerName = user.name
 
   const solo = () => start({ role: 'host', name: playerName, session: new HostSession() })
 
@@ -99,48 +86,46 @@ export function MainMenu() {
         <h1>Block Survival</h1>
         <p className="tagline">Build by day. Hold the line by night.</p>
 
-        {user ? (
-          <p className="account-line">
-            Signed in as <b>{user.name}</b> ·{' '}
-            <button className="link" onClick={() => router.post('/logout')}>sign out</button>
-          </p>
-        ) : (
-          <label className="field">
-            <span>Your name</span>
-            <input value={name} maxLength={16} placeholder="Survivor" onChange={e => setName(e.target.value)} />
-          </label>
-        )}
+        <p className="account-line">
+          Signed in as <b>{user.name}</b> ·{' '}
+          <button className="link" onClick={() => router.post('/logout')}>sign out</button>
+        </p>
 
-        <div className="menu-actions">
-          <button className="primary" onClick={solo} disabled={!!busy}>Play solo</button>
-          <button onClick={host} disabled={!!busy}>{busy === 'host' ? 'Opening room…' : 'Host a game'}</button>
-        </div>
-        {user && cloudSave && (
-          <button className="wide" onClick={continueSave} disabled={!!busy}>
-            {busy === 'load' ? 'Loading…' : `Continue cloud save · night ${cloudSave.night} · ${formatTime(cloudSave.seconds)}`}
-          </button>
-        )}
-        <div className="join">
-          <input
-            value={code}
-            placeholder="ROOM CODE"
-            maxLength={6}
-            onChange={e => setCode(normalizeRoomCode(e.target.value))}
-            onKeyDown={e => { if (e.key === 'Enter') void join() }}
-          />
-          <button onClick={join} disabled={!!busy || code.length < 6}>{busy === 'join' ? 'Joining…' : 'Join'}</button>
+        <div className="lobby">
+          <section className="option">
+            <h3>Join a game</h3>
+            <p>Enter the room code your host shares.</p>
+            <div className="join">
+              <input
+                value={code}
+                placeholder="ROOM CODE"
+                maxLength={6}
+                aria-label="Room code"
+                onChange={e => setCode(normalizeRoomCode(e.target.value))}
+                onKeyDown={e => { if (e.key === 'Enter') void join() }}
+              />
+              <button onClick={join} disabled={!!busy || code.length < 6}>{busy === 'join' ? 'Joining…' : 'Join'}</button>
+            </div>
+          </section>
+
+          <section className="option">
+            <h3>Host a game</h3>
+            <p>Open a room and share its code with up to 3 friends.</p>
+            <button className="wide" onClick={host} disabled={!!busy}>{busy === 'host' ? 'Opening room…' : 'Host a game'}</button>
+          </section>
+
+          <section className="option">
+            <h3>Play solo</h3>
+            <p>Just you against the night.</p>
+            <button className="wide primary" onClick={solo} disabled={!!busy}>Play solo</button>
+            {cloudSave && (
+              <button className="wide" onClick={continueSave} disabled={!!busy}>
+                {busy === 'load' ? 'Loading…' : `Continue cloud save · night ${cloudSave.night} · ${formatTime(cloudSave.seconds)}`}
+              </button>
+            )}
+          </section>
         </div>
         {error && <p className="error">{error}</p>}
-
-        {!user && (
-          <p className="account-line">
-            <button className="link" onClick={() => setAccountOpen(o => !o)}>
-              {accountOpen ? 'Hide account' : 'Sign in or register'}
-            </button>{' '}
-            <span className="fine-inline">for the leaderboard and cloud saves</span>
-          </p>
-        )}
-        {!user && accountOpen && <AccountForm defaultName={name} />}
 
         {leaderboard.length > 0 && (
           <div className="board">
@@ -152,37 +137,8 @@ export function MainMenu() {
             </ol>
           </div>
         )}
-        <p className="fine">Up to 4 players. The host's browser runs the world — if the host leaves, the match ends.</p>
+        <p className="fine">Up to 4 players. The host&apos;s browser runs the world — if the host leaves, the match ends.</p>
       </div>
     </div>
-  )
-}
-
-function AccountForm({ defaultName }: { defaultName: string }) {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
-  const form = useForm({ name: defaultName, email: '', password: '' })
-  const error = form.errors.email ?? form.errors.password ?? form.errors.name
-
-  const submit = () => {
-    form.clearErrors()
-    form.post(mode === 'login' ? '/login' : '/register', { preserveScroll: true })
-  }
-
-  return (
-    <form className="account" onSubmit={e => { e.preventDefault(); submit() }}>
-      <div className="tabs">
-        <button type="button" className={mode === 'login' ? 'on' : ''} onClick={() => setMode('login')}>Sign in</button>
-        <button type="button" className={mode === 'register' ? 'on' : ''} onClick={() => setMode('register')}>Register</button>
-      </div>
-      {mode === 'register' && (
-        <input value={form.data.name} maxLength={16} placeholder="Player name" autoComplete="username" onChange={e => form.setData('name', e.target.value)} />
-      )}
-      <input type="email" value={form.data.email} placeholder="Email" autoComplete="email" onChange={e => form.setData('email', e.target.value)} />
-      <input type="password" value={form.data.password} placeholder="Password (8+)" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} onChange={e => form.setData('password', e.target.value)} />
-      <button type="submit" className="primary" disabled={form.processing || !form.data.email || form.data.password.length < 8}>
-        {form.processing ? '…' : mode === 'login' ? 'Sign in' : 'Create account'}
-      </button>
-      {error && <p className="error">{error}</p>}
-    </form>
   )
 }

@@ -1,5 +1,5 @@
 /**
- * Inertia bootstrap. Pages live in resources/js/Pages; there is one — the game.
+ * Inertia bootstrap. Pages live in resources/js/Pages: Login and Play (the game).
  */
 import { createInertiaApp } from '@inertiajs/react'
 import { createRoot } from 'react-dom/client'

@@ -8,13 +8,21 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Inertia\Response;
 
 /**
- * Session auth for the Inertia app: the menu posts here, Laravel redirects back to
- * the game page with the shared `auth.user` prop updated (or validation errors).
+ * Session auth for the Inertia app. The app is login-only: guests see the Login
+ * page, and a successful sign-in / registration lands on the game page (or the
+ * page they were sent to /login from).
  */
 class AuthController extends Controller
 {
+    public function show(): Response
+    {
+        return Inertia::render('Login');
+    }
+
     public function register(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -27,7 +35,7 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect('/');
+        return redirect()->intended('/');
     }
 
     public function login(Request $request): RedirectResponse
@@ -42,7 +50,7 @@ class AuthController extends Controller
         }
         $request->session()->regenerate();
 
-        return redirect('/');
+        return redirect()->intended('/');
     }
 
     public function logout(Request $request): RedirectResponse
@@ -51,6 +59,6 @@ class AuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/');
+        return redirect('/login');
     }
 }

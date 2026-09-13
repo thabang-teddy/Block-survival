@@ -18,7 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // an SDP must keep its trailing CRLF: Chrome rejects the last line without it
         $middleware->trimStrings(except: ['data.sdp']);
         // the JSON endpoints under /api share the session; unauthenticated calls get a 401, never a redirect
-        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : '/');
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : '/login');
+        // a signed-in user has no business on the sign-in page
+        $middleware->redirectUsersTo('/');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

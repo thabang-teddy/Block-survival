@@ -28,19 +28,27 @@ class ApiTest extends TestCase
         ], $body);
     }
 
-    // ------------------------------------------------------------ page
-    public function test_the_game_page_renders_with_menu_props(): void
+    // ------------------------------------------------------------ pages
+    public function test_the_app_is_login_only(): void
     {
-        $this->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('Play')
-            ->where('auth.user', null)
-            ->has('leaderboard', 0)
-            ->where('cloudSave', null));
+        $this->get('/')->assertRedirect('/login');
+        $this->get('/login')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Login')
+            ->where('auth.user', null));
 
+        // a signed-in user is sent straight to the game, never back to the sign-in page
+        $this->actingAs($this->user())->get('/login')->assertRedirect('/');
+    }
+
+    public function test_the_game_page_renders_with_lobby_props_for_the_signed_in_user(): void
+    {
         $user = $this->user();
         Save::create(['user_id' => $user->id, 'slot' => 'main', 'payload' => base64_encode(gzencode('{}')), 'size' => 22, 'night' => 3, 'seconds' => 1800]);
-        $this->actingAs($user)->get('/')->assertInertia(fn (Assert $page) => $page
+
+        $this->actingAs($user)->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Play')
             ->where('auth.user.name', 'Teddy')
+            ->has('leaderboard', 0)
             ->where('cloudSave.night', 3));
     }
 
@@ -52,7 +60,7 @@ class ApiTest extends TestCase
         $this->assertAuthenticated();
         $this->assertSame('Teddy', User::first()->name);
 
-        $this->post('/logout')->assertRedirect('/');
+        $this->post('/logout')->assertRedirect('/login');
         $this->assertGuest();
 
         $this->post('/login', ['email' => 'teddy@example.com', 'password' => 'wrong'])
@@ -60,6 +68,14 @@ class ApiTest extends TestCase
         $this->assertGuest();
         $this->post('/login', ['email' => 'teddy@example.com', 'password' => 'correct-horse'])->assertRedirect('/');
         $this->assertAuthenticated();
+    }
+
+    public function test_login_returns_the_user_to_the_page_they_were_bounced_from(): void
+    {
+        $this->user();
+        $this->get('/?room=ABCDEF')->assertRedirect('/login');
+        $this->post('/login', ['email' => 'teddy@example.com', 'password' => 'correct-horse'])
+            ->assertRedirectContains('/?room=ABCDEF');
     }
 
     public function test_register_rejects_bad_input_and_duplicates(): void
@@ -71,15 +87,21 @@ class ApiTest extends TestCase
             ->assertSessionHasErrors(['name', 'email', 'password']);
     }
 
-    public function test_protected_api_routes_need_a_session(): void
+    public function test_every_api_route_needs_a_session_and_never_redirects(): void
     {
+        $this->getJson('/api/leaderboard')->assertUnauthorized();
+        $this->postJson('/api/rooms', [])->assertUnauthorized();
+        $this->getJson('/api/rooms/ABCDEF')->assertUnauthorized();
+        $this->postJson('/api/rooms/ABCDEF/signal', [])->assertUnauthorized();
+        $this->getJson('/api/rooms/ABCDEF/signals')->assertUnauthorized();
         $this->getJson('/api/saves')->assertUnauthorized();
         $this->postJson('/api/scores', [])->assertUnauthorized();
     }
 
     // ------------------------------------------------------------ rooms
-    public function test_rooms_can_be_created_resolved_refreshed_and_closed_by_guests(): void
+    public function test_rooms_can_be_created_resolved_refreshed_and_closed(): void
     {
+        $this->actingAs($this->user());
         $room = ['code' => 'ABCDEF', 'host_peer_id' => 'block-survival-ABCDEF', 'host_name' => 'Teddy'];
         $this->postJson('/api/rooms', $room)->assertCreated()->assertJsonPath('room.code', 'ABCDEF');
         $this->getJson('/api/rooms/abcdef')->assertOk()
@@ -99,13 +121,14 @@ class ApiTest extends TestCase
 
     public function test_expired_rooms_are_not_resolvable_and_codes_are_validated(): void
     {
+        $this->actingAs($this->user());
         Room::create(['code' => 'QQQQQQ', 'host_peer_id' => 'p', 'host_name' => 'x', 'expires_at' => now()->subMinute()]);
         $this->getJson('/api/rooms/QQQQQQ')->assertNotFound();
         $this->postJson('/api/rooms', ['code' => 'ABCDEI', 'host_peer_id' => 'p', 'host_name' => 'x'])
             ->assertUnprocessable(); // I is not in the alphabet
     }
 
-    public function test_room_is_linked_to_the_account_when_logged_in(): void
+    public function test_room_is_linked_to_the_hosting_account(): void
     {
         $user = $this->user();
         $this->actingAs($user)
@@ -117,6 +140,7 @@ class ApiTest extends TestCase
     // ------------------------------------------------------------ signalling
     public function test_signals_are_stored_and_polled_per_recipient_after_a_cursor(): void
     {
+        $this->actingAs($this->user());
         Room::create(['code' => 'ABCDEF', 'host_peer_id' => 'hostAAAAAAAA', 'host_name' => 'x', 'expires_at' => now()->addHour()]);
 
         $offer = ['from' => 'clientBBBBBB', 'to' => 'hostAAAAAAAA', 'type' => 'offer', 'data' => ['type' => 'offer', 'sdp' => 'v=0']];
@@ -142,6 +166,7 @@ class ApiTest extends TestCase
 
     public function test_signal_endpoints_validate_and_reject_unknown_rooms(): void
     {
+        $this->actingAs($this->user());
         Room::create(['code' => 'ABCDEF', 'host_peer_id' => 'hostAAAAAAAA', 'host_name' => 'x', 'expires_at' => now()->addHour()]);
         $msg = ['from' => 'clientBBBBBB', 'to' => 'hostAAAAAAAA', 'type' => 'offer', 'data' => ['type' => 'offer', 'sdp' => 'v=0']];
 
@@ -158,6 +183,7 @@ class ApiTest extends TestCase
 
     public function test_an_sdp_keeps_its_trailing_crlf_through_the_mailbox(): void
     {
+        $this->actingAs($this->user());
         Room::create(['code' => 'ABCDEF', 'host_peer_id' => 'hostAAAAAAAA', 'host_name' => 'x', 'expires_at' => now()->addHour()]);
         $sdp = "v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\na=max-message-size:262144\r\n";
         $this->postJson('/api/rooms/ABCDEF/signal', ['from' => 'clientBBBBBB', 'to' => 'hostAAAAAAAA', 'type' => 'offer', 'data' => ['type' => 'offer', 'sdp' => $sdp]])
@@ -168,6 +194,7 @@ class ApiTest extends TestCase
 
     public function test_signals_are_pruned_with_their_room(): void
     {
+        $this->actingAs($this->user());
         Room::create(['code' => 'ABCDEF', 'host_peer_id' => 'hostAAAAAAAA', 'host_name' => 'x', 'expires_at' => now()->addHour()]);
         $msg = ['from' => 'clientBBBBBB', 'to' => 'hostAAAAAAAA', 'type' => 'offer', 'data' => ['type' => 'offer', 'sdp' => 'v=0']];
         $this->postJson('/api/rooms/ABCDEF/signal', $msg)->assertCreated();
@@ -203,7 +230,7 @@ class ApiTest extends TestCase
                 ['name' => 'Alice', 'score' => 265],
             ],
         ]);
-        $this->get('/')->assertInertia(fn (Assert $page) => $page->has('leaderboard', 2)->where('leaderboard.0.name', 'Bob'));
+        $this->actingAs($a)->get('/')->assertInertia(fn (Assert $page) => $page->has('leaderboard', 2)->where('leaderboard.0.name', 'Bob'));
         $this->actingAs($a)->postJson('/api/scores', ['nights' => -1, 'kills' => 0, 'deaths' => 0, 'seconds' => 0])
             ->assertUnprocessable();
     }

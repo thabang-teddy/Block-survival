@@ -8,31 +8,34 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PlayController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', PlayController::class)->name('play');
-
-// session auth for the Inertia menu (rate-limited against brute force)
-Route::middleware('throttle:10,1')->group(function () {
-    Route::post('/register', [AuthController::class, 'register'])->name('register');
-    Route::post('/login', [AuthController::class, 'login'])->name('login');
-});
-Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
-
-// WebRTC signalling is polled at up to 2 Hz per browser, so it gets its own,
-// looser limit instead of the general 60/min below (the two would stack)
-Route::prefix('api')->middleware('throttle:signal')->group(function () {
-    Route::post('/rooms/{code}/signal', [SignalController::class, 'store']);
-    Route::get('/rooms/{code}/signals', [SignalController::class, 'index']);
+// The app is login-only: the sign-in page is the sole thing a guest can see.
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [AuthController::class, 'show'])->name('login');
+    // rate-limited against brute force
+    Route::middleware('throttle:10,1')->group(function () {
+        Route::post('/register', [AuthController::class, 'register'])->name('register');
+        Route::post('/login', [AuthController::class, 'login'])->name('login.store');
+    });
 });
 
-// JSON endpoints used by the running game; same session + CSRF as the page
-Route::prefix('api')->middleware('throttle:60,1')->group(function () {
-    Route::post('/rooms', [RoomController::class, 'store']);
-    Route::get('/rooms/{code}', [RoomController::class, 'show']);
-    Route::patch('/rooms/{code}', [RoomController::class, 'update']);
-    Route::delete('/rooms/{code}', [RoomController::class, 'destroy']);
-    Route::get('/leaderboard', [ScoreController::class, 'leaderboard']);
+Route::middleware('auth')->group(function () {
+    Route::get('/', PlayController::class)->name('play');
+    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-    Route::middleware('auth')->group(function () {
+    // WebRTC signalling is polled at up to 2 Hz per browser, so it gets its own,
+    // looser limit instead of the general 60/min below (the two would stack)
+    Route::prefix('api')->middleware('throttle:signal')->group(function () {
+        Route::post('/rooms/{code}/signal', [SignalController::class, 'store']);
+        Route::get('/rooms/{code}/signals', [SignalController::class, 'index']);
+    });
+
+    // JSON endpoints used by the running game; same session + CSRF as the page
+    Route::prefix('api')->middleware('throttle:60,1')->group(function () {
+        Route::post('/rooms', [RoomController::class, 'store']);
+        Route::get('/rooms/{code}', [RoomController::class, 'show']);
+        Route::patch('/rooms/{code}', [RoomController::class, 'update']);
+        Route::delete('/rooms/{code}', [RoomController::class, 'destroy']);
+        Route::get('/leaderboard', [ScoreController::class, 'leaderboard']);
         Route::post('/scores', [ScoreController::class, 'store']);
         Route::get('/saves', [SaveController::class, 'index']);
         Route::get('/saves/{slot}', [SaveController::class, 'show']);
