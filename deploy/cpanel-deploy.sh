@@ -3,8 +3,8 @@
 # deploy/cpanel-deploy.sh — deploy one environment ON the cPanel account.
 #
 #   ssh <user>@<host>
-#   ~/staging/app/deploy/cpanel-deploy.sh ~/staging/app
-#   PHP_BIN=/opt/alt/php84/usr/bin/php ~/production/app/deploy/cpanel-deploy.sh ~/production/app
+#   bash ~/staging/app/deploy/cpanel-deploy.sh ~/staging/app
+#   PHP_BIN=/opt/alt/php84/usr/bin/php bash ~/production/app/deploy/cpanel-deploy.sh ~/production/app
 #
 # <app-dir> must be a clone of an artefact branch (deploy/staging or
 # deploy/production) — CI builds those; see docs/cpanel-go-live.md §5–§6.
@@ -41,7 +41,15 @@ APP_DIR="$(cd "$1" && pwd -P)"
 # logging: everything to stdout AND the deploy log
 # ---------------------------------------------------------------------------
 mkdir -p "$(dirname "$LOG_FILE")"
-exec > >(tee -a "$LOG_FILE") 2>&1
+# cPanel's jailed shell has no /dev/fd, so `exec > >(tee ...)` fails with
+# "/dev/fd/62: No such file". Re-run ourselves through a plain pipe instead;
+# only the inner run does any work (and takes the lock).
+if [ -z "${CPANEL_DEPLOY_TEE:-}" ]; then
+  export CPANEL_DEPLOY_TEE=1
+  set +e
+  bash "$0" "$@" 2>&1 | tee -a "$LOG_FILE"
+  exit "${PIPESTATUS[0]}"
+fi
 
 log()  { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
 die()  { log "ERROR: $*"; exit 1; }

@@ -157,8 +157,8 @@ jobs:
             --exclude='tests/' \
             --exclude='Design/' \
             --exclude='game docs/' \
-            --exclude='.env' \
-            --exclude='.env.*' \
+            --exclude='/.env' \
+            --exclude='/.env.*' \
             --exclude='.phpunit.result.cache' \
             --exclude='storage/logs/*' \
             --exclude='storage/framework/cache/*' \
@@ -173,9 +173,10 @@ jobs:
           # the artefact tree tracks vendor/ and public/build/; only runtime
           # state stays untracked so `git reset --hard` on the server never
           # touches it
+          # anchored: deploy/.env.cpanel.example must ship with the artefact
           cat > "$ART/.gitignore" <<'EOF'
-          .env
-          .env.*
+          /.env
+          /.env.*
           .deploy.lock
           /storage/logs/*
           /storage/framework/cache/*
