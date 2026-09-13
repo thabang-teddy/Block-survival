@@ -66,6 +66,10 @@ jobs:
         run: npm run typecheck
 
       - name: Vitest
+        # laravel-vite-plugin aborts when CI=true and Vite is in serve mode,
+        # which is how Vitest loads vite.config.ts; this is its documented bypass
+        env:
+          LARAVEL_BYPASS_ENV_CHECK: '1'
         run: npm test
 
   build:
