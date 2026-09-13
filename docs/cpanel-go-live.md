@@ -13,7 +13,7 @@ Written 2026-09-13 against commit `027b9a2`. Host: **not yet measured** (§2.0).
 | The design assumes | cPanel shared hosting gives | Consequence |
 |---|---|---|
 | **Laravel Reverb** WebSocket server (`php artisan reverb:start`) for WebRTC signalling | No process supervisor, no custom listening ports; PHP only runs per-request under LiteSpeed/Apache | Signalling must not need a socket. **§3.1**: HTTP polling through the database. |
-| `DB_CONNECTION=sqlite` at `database/database.sqlite` (dev default) | Any file the account can write. cPanel backups cover `$HOME`, not "the database" | SQLite file kept **outside the git tree** at `$HOME/<env>/data/database.sqlite`. **§4.4** |
+| `DB_CONNECTION=sqlite` at `database/database.sqlite` (dev default) | Any file the account can write. cPanel backups cover `$HOME`, not "the database" | SQLite file kept **outside the git tree** at `$HOME/<env>/data/block-survival.sqlite`. **§4.4** |
 | `SESSION_DRIVER`, `CACHE_STORE`, `QUEUE_CONNECTION` = `database` | Works unchanged on SQLite | Nothing dispatches jobs (`grep ShouldQueue app/` is empty; `RoomSignal` is `ShouldBroadcastNow`) → **no queue worker**. |
 | `php ^8.3` in composer.json, PHP 8.4.20 locally | PHP Selector per account; user has chosen **8.4** | CI builds vendor on 8.4; deploy script refuses anything older (`MIN_PHP_ID=80400`). |
 | Docroot is `public/` | Primary domain docroot is `public_html/` and often cannot be changed; addon/sub-domains can point anywhere | **§4.3**: each environment is a (sub)domain whose docroot is `.../public`. |
@@ -131,8 +131,8 @@ Two environments, two hostnames, each a separate clone and separate database:
 
 | Env | Hostname | Clone path | DB file |
 |---|---|---|---|
-| staging | `staging.<domain>` (*open*) | `$HOME/staging/app` | `$HOME/staging/data/database.sqlite` |
-| production | `<domain>` (*open*) | `$HOME/production/app` | `$HOME/production/data/database.sqlite` |
+| staging | `staging.<domain>` (*open*) | `$HOME/staging/app` | `$HOME/staging/data/block-survival.sqlite` |
+| production | `<domain>` (*open*) | `$HOME/production/app` | `$HOME/production/data/block-survival.sqlite` |
 
 ### §4.2 — PHP
 
@@ -340,12 +340,12 @@ Checks the dev setup never needed:
 
 ## §8 — Backups and the restore drill
 
-`deploy/cpanel-backup.sh` (to write in Stage D): copies `data/database.sqlite`
+`deploy/cpanel-backup.sh` (to write in Stage D): copies `data/block-survival.sqlite`
 with `sqlite3 .backup` (consistent under WAL) to `data/backups/daily-<date>.sqlite`,
 keeps 14. Cost: disk = 14 × DB size, trivial.
 
 Restore drill, done once on staging before production has data: `artisan down`,
-copy a backup over `database.sqlite`, delete `-wal`/`-shm`, `artisan up`,
+copy a backup over `block-survival.sqlite`, delete `-wal`/`-shm`, `artisan up`,
 verify a known score is present. Record the date it was done here: *open*.
 
 ---
