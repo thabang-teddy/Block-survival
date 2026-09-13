@@ -1,0 +1,24 @@
+please help me write a prompt that will make the following game
+
+Minecraft clone : block survival 
+- Make it like FPS
+- don't an infinite world but a one Island
+- The zombies show after 5 minutes after game start
+- I like it to have crafting
+-- pick aces
+-- sward
+-- walls
+-- lights
+-- glass
+- make it use second person view
+- add gun crafting
+
+- For the game world, don't place thousands of Block_*.glb instances — build chunk meshes in JS using the palette in blocks.py. The islands are good as static set pieces or as a reference shape for your own chunk generator.
+
+I am planning to use 3js, react, and laravel ,but if there is another way like using epic game that will do this better please let me know
+
+please read a the files in this folder
+
+
+please make a this characters and save them in a folder for characters and assets and Islands
+C:\Users\Teddy\projects\Block survival\Design

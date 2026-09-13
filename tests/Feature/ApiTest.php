@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Events\RoomSignal;
 use App\Models\Room;
 use App\Models\Save;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -111,6 +113,26 @@ class ApiTest extends TestCase
             ->postJson('/api/rooms', ['code' => 'HGFEDC', 'host_peer_id' => 'p', 'host_name' => 'Teddy'])
             ->assertCreated();
         $this->assertSame($user->id, Room::first()->user_id);
+    }
+
+    // ------------------------------------------------------------ signalling
+    public function test_signals_are_relayed_on_the_room_channel(): void
+    {
+        Event::fake([RoomSignal::class]);
+        Room::create(['code' => 'ABCDEF', 'host_peer_id' => 'hostAAAAAAAA', 'host_name' => 'x', 'expires_at' => now()->addHour()]);
+
+        $msg = ['from' => 'clientBBBBBB', 'to' => 'hostAAAAAAAA', 'type' => 'offer', 'data' => ['type' => 'offer', 'sdp' => 'v=0']];
+        $this->postJson('/api/rooms/abcdef/signal', $msg)->assertOk();
+        Event::assertDispatched(RoomSignal::class, fn (RoomSignal $e) => $e->code === 'ABCDEF'
+            && $e->to === 'hostAAAAAAAA'
+            && $e->broadcastOn()->name === 'room.ABCDEF'
+            && $e->broadcastAs() === 'signal'
+            && $e->broadcastWith()['data']['sdp'] === 'v=0');
+
+        $this->postJson('/api/rooms/NOPENO/signal', $msg)->assertNotFound();
+        $this->postJson('/api/rooms/ABCDEF/signal', [...$msg, 'type' => 'hack'])->assertUnprocessable();
+        $this->postJson('/api/rooms/ABCDEF/signal', [...$msg, 'from' => 'x'])->assertUnprocessable();
+        $this->postJson('/api/rooms/ABCDEF/signal', [...$msg, 'data' => ['sdp' => str_repeat('a', 20000)]])->assertStatus(413);
     }
 
     // ------------------------------------------------------------ scores

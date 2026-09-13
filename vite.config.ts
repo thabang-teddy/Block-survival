@@ -28,6 +28,9 @@ export default defineConfig({
     ],
   },
   server: {
+    // bind to IPv4 loopback so the laravel plugin writes public/hot as
+    // http://127.0.0.1:5173 instead of http://[::1]:5173, which some browsers refuse
+    host: '127.0.0.1',
     watch: { ignored: ['**/storage/**', '**/vendor/**'] },
   },
   test: {

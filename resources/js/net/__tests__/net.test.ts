@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { decode, encode, isRoomCode, makeRoomCode, normalizeRoomCode, peerIdForRoom, type Snapshot, type ClientMessage } from '../protocol'
+import { decode, encode, isRoomCode, makeRoomCode, normalizeRoomCode, type Snapshot, type ClientMessage } from '../protocol'
 import { SnapshotBuffer } from '../SnapshotBuffer'
 
 const snap = (time: number, x: number, yaw = 0): Snapshot => ({
@@ -26,7 +26,6 @@ describe('protocol', () => {
     expect(normalizeRoomCode(' ab-cd ef ')).toBe('ABCDEF')
     expect(isRoomCode('ABCDEI')).toBe(false) // I is excluded
     expect(isRoomCode('ABC')).toBe(false)
-    expect(peerIdForRoom('ABCDEF')).toBe('block-survival-ABCDEF')
     const seen = new Set<string>()
     for (let i = 0; i < 200; i++) seen.add(makeRoomCode())
     expect(seen.size).toBeGreaterThan(190)

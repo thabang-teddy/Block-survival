@@ -6,7 +6,7 @@
 import type { Game } from '../game/Game'
 import { HostTransport, type Link } from './transport'
 import {
-  decode, encode, makeRoomCode, MAX_PLAYERS, peerIdForRoom, PROTOCOL_VERSION, SNAPSHOT_HZ,
+  decode, encode, makeRoomCode, MAX_PLAYERS, PROTOCOL_VERSION, SNAPSHOT_HZ,
   type ClientMessage, type HostMessage, type Welcome,
 } from './protocol'
 import { api } from './api'
@@ -41,7 +41,10 @@ export class HostSession {
     return this.transport !== null
   }
 
-  /** Register the room code with the signalling server so friends can join. */
+  /**
+   * Open the room: subscribe to its signalling channel and register the code → host id
+   * with the app so joiners can resolve it. Fails if the app cannot be reached.
+   */
   async listen(hostName = 'Survivor'): Promise<void> {
     if (this.transport) return
     const t = new HostTransport({
@@ -50,10 +53,8 @@ export class HostSession {
       onClose: link => this.onLeave(link),
     })
     await t.listen(this.code)
+    await api.createRoom(this.code, t.id, hostName)
     this.transport = t
-    // the API row records live rooms and the host's name; joining works without it
-    // because the code is also the PeerJS id
-    api.createRoom(this.code, peerIdForRoom(this.code), hostName).catch(() => {})
   }
 
   tick(dt: number): void {
@@ -62,7 +63,7 @@ export class HostSession {
     this.roomRefreshTimer += dt
     if (this.roomRefreshTimer >= ROOM_REFRESH_SECONDS) {
       this.roomRefreshTimer = 0
-      api.refreshRoom(this.code, peerIdForRoom(this.code), game.avatars.size).catch(() => {})
+      api.refreshRoom(this.code, this.transport.id, game.avatars.size).catch(() => {})
     }
     // block edits go out immediately, snapshots at a fixed rate, private state when dirty
     const edits = game.takeBlockEdits()
@@ -88,7 +89,7 @@ export class HostSession {
   dispose(): void {
     if (this.transport) {
       this.transport.broadcast(encode({ t: 'bye' }))
-      api.closeRoom(this.code, peerIdForRoom(this.code)).catch(() => {})
+      api.closeRoom(this.code, this.transport.id).catch(() => {})
     }
     this.transport?.dispose()
     this.transport = null

@@ -57,6 +57,7 @@ function csrfToken(): string {
 
 async function request<T>(method: string, path: string, body?: unknown, raw?: BodyInit, headers: Record<string, string> = {}): Promise<T> {
   const h: Record<string, string> = { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...headers }
+  for (const k of Object.keys(h)) if (h[k] === '') delete h[k]
   if (method !== 'GET') h['X-XSRF-TOKEN'] = csrfToken()
   let payload: BodyInit | undefined = raw
   if (body !== undefined) {
@@ -93,6 +94,9 @@ export const api = {
     request<{ ok: boolean }>('DELETE', `/rooms/${code}`, { host_peer_id: hostPeerId }),
   resolveRoom: (code: string) =>
     request<{ room: { code: string; host_peer_id: string; host_name: string; players: number } }>('GET', `/rooms/${code}`),
+  /** relay one WebRTC signalling message to the room; X-Socket-ID keeps it from echoing back to us */
+  signal: (code: string, msg: { from: string; to: string; type: string; data: Record<string, unknown> }, socketId?: string) =>
+    request<{ ok: boolean }>('POST', `/rooms/${code}/signal`, msg, undefined, { 'X-Socket-ID': socketId ?? '' }).then(() => undefined),
 
   postScore: (nights: number, kills: number, deaths: number, seconds: number) =>
     request<{ score: number; best: number }>('POST', '/scores', { nights, kills, deaths, seconds }),

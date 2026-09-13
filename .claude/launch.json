@@ -2,11 +2,8 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "app",
-      "runtimeExecutable": "php",
-      "runtimeArgs": ["artisan", "serve", "--host=127.0.0.1", "--port=8000"],
-      "port": 8000,
-      "url": "http://localhost:8000"
+      "name": "herd",
+      "url": "http://block-survival.test"
     },
     {
       "name": "vite",
@@ -15,10 +12,17 @@
       "port": 5173
     },
     {
-      "name": "design-viewer",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "Design"],
-      "port": 8765
+      "name": "reverb",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["artisan", "reverb:start", "--host=127.0.0.1", "--port=8080"],
+      "port": 8080
+    },
+    {
+      "name": "app",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["artisan", "serve", "--host=127.0.0.1", "--port=8000"],
+      "port": 8000,
+      "url": "http://localhost:8000"
     }
   ]
 }

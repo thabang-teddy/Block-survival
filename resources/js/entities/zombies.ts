@@ -23,10 +23,10 @@ export interface ZombieStats {
 }
 
 export const ZOMBIE_STATS: Readonly<Record<ZombieKind, ZombieStats>> = {
-  Basic: { hp: 30, speed: 2.0, damage: 8, blockDamage: 1, rifleResist: 1, poisons: false },
-  Worker: { hp: 50, speed: 1.8, damage: 10, blockDamage: 3, rifleResist: 1, poisons: false },
-  Soldier: { hp: 80, speed: 2.2, damage: 14, blockDamage: 1, rifleResist: 0.5, poisons: false },
-  Toxic: { hp: 25, speed: 3.2, damage: 6, blockDamage: 1, rifleResist: 1, poisons: true },
+  Basic: { hp: 30, speed: 2.0, damage: 4, blockDamage: 1, rifleResist: 1, poisons: false },
+  Worker: { hp: 50, speed: 1.8, damage: 5, blockDamage: 3, rifleResist: 1, poisons: false },
+  Soldier: { hp: 80, speed: 2.2, damage: 7, blockDamage: 1, rifleResist: 0.5, poisons: false },
+  Toxic: { hp: 25, speed: 3.2, damage: 3, blockDamage: 1, rifleResist: 1, poisons: true },
 }
 
 /** Hits a zombie needs to destroy a block; undefined = cannot. */

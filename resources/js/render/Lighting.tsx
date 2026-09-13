@@ -25,8 +25,8 @@ const SUNSET: Palette = {
   hemi: 0.55, sun: new THREE.Color('#ffa060'), sunIntensity: 1.3,
 }
 const NIGHT: Palette = {
-  sky: new THREE.Color('#0a1020'), hemiSky: new THREE.Color('#2a3a80'), hemiGround: new THREE.Color('#0c0c14'),
-  hemi: 0.16, sun: new THREE.Color('#8090c0'), sunIntensity: 0.12,
+  sky: new THREE.Color('#16223f'), hemiSky: new THREE.Color('#4a60b0'), hemiGround: new THREE.Color('#1a1a28'),
+  hemi: 0.32, sun: new THREE.Color('#a0b0e0'), sunIntensity: 0.24,
 }
 
 const SUN_DISTANCE = 120

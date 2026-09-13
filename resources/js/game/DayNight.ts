@@ -1,8 +1,8 @@
 /**
- * The 10-minute day/night clock: 5 min day → sunset → 5 min night → dawn.
- * The first sunset (t = 5:00) is when zombies first appear.
+ * The 20-minute day/night clock: 15 min day → sunset → 5 min night → dawn.
+ * The first sunset (t = 15:00) is when zombies first appear.
  */
-export const DAY_SECONDS = 300
+export const DAY_SECONDS = 900
 export const NIGHT_SECONDS = 300
 export const CYCLE_SECONDS = DAY_SECONDS + NIGHT_SECONDS
 
@@ -67,8 +67,12 @@ export class DayNight {
   }
 
   sky(): SkyState {
-    const frac = (this.time % CYCLE_SECONDS) / CYCLE_SECONDS
-    const angle = frac * Math.PI * 2 // 0 dawn, π/2 noon, π sunset, 3π/2 midnight
+    // the sun arcs 0..π over the day and π..2π over the (shorter) night, so
+    // the sun angle tracks the phase rather than the raw cycle fraction
+    const inCycle = this.time % CYCLE_SECONDS
+    const angle = inCycle < DAY_SECONDS
+      ? (inCycle / DAY_SECONDS) * Math.PI
+      : Math.PI + ((inCycle - DAY_SECONDS) / NIGHT_SECONDS) * Math.PI // 0 dawn, π/2 noon, π sunset, 3π/2 midnight
     const elevation = Math.sin(angle)
     const day = smoothstep(0.05, 0.3, elevation)
     const night = smoothstep(-0.05, -0.3, elevation)

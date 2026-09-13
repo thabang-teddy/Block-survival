@@ -149,5 +149,3 @@ export function makeRoomCode(random: () => number = Math.random): string {
 
 export const normalizeRoomCode = (input: string): string => input.toUpperCase().replace(/[^A-Z]/g, '').slice(0, ROOM_CODE_LENGTH)
 export const isRoomCode = (code: string): boolean => code.length === ROOM_CODE_LENGTH && [...code].every(c => CODE_ALPHABET.includes(c))
-/** PeerJS ids must be globally unique on the public broker; prefix keeps us out of other apps' namespaces */
-export const peerIdForRoom = (code: string): string => `block-survival-${code}`

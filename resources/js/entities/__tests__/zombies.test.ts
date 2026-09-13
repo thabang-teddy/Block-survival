@@ -14,11 +14,11 @@ function floor(R = 20): World {
 }
 
 describe('DayNight', () => {
-  test('5 min day, 5 min night, first zombies at the first sunset', () => {
+  test('15 min day, 5 min night, first zombies at the first sunset', () => {
     const d = new DayNight()
     expect(d.phase).toBe('day')
     expect(d.night).toBe(0)
-    expect(d.timerText).toBe('5:00')
+    expect(d.timerText).toBe('15:00')
     d.update(DAY_SECONDS - 1)
     expect(d.phase).toBe('day')
     expect(d.timerText).toBe('0:01')

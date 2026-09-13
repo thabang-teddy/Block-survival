@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\RoomController;
 use App\Http\Controllers\Api\SaveController;
+use App\Http\Controllers\Api\SignalController;
 use App\Http\Controllers\Api\ScoreController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PlayController;
@@ -22,6 +23,7 @@ Route::prefix('api')->middleware('throttle:60,1')->group(function () {
     Route::get('/rooms/{code}', [RoomController::class, 'show']);
     Route::patch('/rooms/{code}', [RoomController::class, 'update']);
     Route::delete('/rooms/{code}', [RoomController::class, 'destroy']);
+    Route::post('/rooms/{code}/signal', [SignalController::class, 'store'])->middleware('throttle:signal');
     Route::get('/leaderboard', [ScoreController::class, 'leaderboard']);
 
     Route::middleware('auth')->group(function () {
