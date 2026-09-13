@@ -1,0 +1,383 @@
+# Block Survival — cPanel go-live
+
+Source of truth for how this application is deployed to shared cPanel hosting.
+Every decision below states what it costs. Measurements are recorded as
+measured, not as conclusions. Unknowns are listed in §10, never invented.
+
+Written 2026-09-13 against commit `027b9a2`. Host: **not yet measured** (§2.0).
+
+---
+
+## §0 — What the code assumes vs what cPanel gives
+
+| The design assumes | cPanel shared hosting gives | Consequence |
+|---|---|---|
+| **Laravel Reverb** WebSocket server (`php artisan reverb:start`) for WebRTC signalling | No process supervisor, no custom listening ports; PHP only runs per-request under LiteSpeed/Apache | Signalling must not need a socket. **§3.1**: HTTP polling through the database. |
+| `DB_CONNECTION=sqlite` at `database/database.sqlite` (dev default) | Any file the account can write. cPanel backups cover `$HOME`, not "the database" | SQLite file kept **outside the git tree** at `$HOME/<env>/data/database.sqlite`. **§4.4** |
+| `SESSION_DRIVER`, `CACHE_STORE`, `QUEUE_CONNECTION` = `database` | Works unchanged on SQLite | Nothing dispatches jobs (`grep ShouldQueue app/` is empty; `RoomSignal` is `ShouldBroadcastNow`) → **no queue worker**. |
+| `php ^8.3` in composer.json, PHP 8.4.20 locally | PHP Selector per account; user has chosen **8.4** | CI builds vendor on 8.4; deploy script refuses anything older (`MIN_PHP_ID=80400`). |
+| Docroot is `public/` | Primary domain docroot is `public_html/` and often cannot be changed; addon/sub-domains can point anywhere | **§4.3**: each environment is a (sub)domain whose docroot is `.../public`. |
+| Vite build on the dev machine (`npm run build`) | No Node on most shared plans | CI builds the bundle and commits `public/build/` to the artefact branch. **§5** |
+| `composer install` on the server | Composer may exist but memory/time limits bite | CI runs `composer install --no-dev` and commits `vendor/` to the artefact branch. **§5** |
+| Mail: `MAIL_MAILER=log` | The app sends no mail (no `Mail::` in `app/`) | Stays `log`. Revisit if password reset is ever added. |
+| No scheduler entries (`routes/console.php` has only `inspire`) | cPanel cron available | No `schedule:run` cron needed. Expired rooms are filtered by `expires_at`, never pruned (§10). |
+| No file uploads (`Storage::` unused) | — | `storage/` holds only logs and compiled views. Still never deleted by a deploy. |
+| Single hostname | — | No second host needed. Reverb's `REVERB_HOST` becomes irrelevant after §3.1. |
+
+## §0.1 — Cost constraint
+
+**Nothing beyond the hosting plan.** No Pusher/Ably, no container host for
+Reverb, no error-reporting SaaS. That is why §3.1 is polling through the
+database rather than a hosted broadcaster, and why error reporting is
+`storage/logs/laravel.log` plus `LOG_LEVEL=warning`.
+
+---
+
+## §2 — Phase 0 checklist (re-run on any new host)
+
+1. SSH in. Run the probe in §2.0 verbatim. Paste the output into §2.0.
+2. In the cPanel UI record: subdomain limit, cron availability, whether
+   *Terminal* / *SSH Access* / *Git Version Control* / *MultiPHP Manager* (or
+   CloudLinux *Select PHP Version*) exist.
+3. Confirm `git` and a PHP ≥ 8.4 CLI binary exist and which path it is.
+4. Confirm the required extensions load under that binary (list in the probe).
+5. Confirm outbound `github.com:443` is open (needed for `git fetch` over HTTPS).
+
+## §2.0 — The measured host
+
+> **NOT YET MEASURED.** Run this on the account and paste the output here.
+> Nothing in §3–§9 that depends on a host fact may be executed before this
+> section is filled in.
+
+```bash
+echo "user: $(whoami)"; echo "home: $HOME"
+for p in /usr/local/bin/php /opt/alt/php8*/usr/bin/php /opt/cpanel/ea-php8*/root/usr/bin/php; do
+  [ -x "$p" ] && echo "  $p -> $($p -r 'echo PHP_VERSION;' 2>/dev/null)"
+done
+echo "default php: $(php -v | head -1)"
+echo "extensions missing:"; php -r 'foreach(["pdo_sqlite","sqlite3","mbstring","openssl","curl","fileinfo","tokenizer","xml","ctype","json","bcmath","intl"] as $e) if(!extension_loaded($e)) echo "  $e\n";'
+echo "memory_limit: $(php -r 'echo ini_get("memory_limit");')  max_execution_time: $(php -r 'echo ini_get("max_execution_time");')"
+echo "symlink: $(php -r 'echo function_exists("symlink")?"yes":"no";')  proc_open: $(php -r 'echo function_exists("proc_open")?"yes":"no";')"
+for t in git composer flock tar gzip curl sqlite3; do printf '%-10s %s\n' "$t" "$(command -v $t || echo MISSING)"; done
+timeout 5 bash -c 'exec 3<>/dev/tcp/github.com/443' 2>/dev/null && echo "github.com:443 OPEN" || echo "github.com:443 BLOCKED"
+df -h "$HOME" | tail -1
+echo "sqlite lib: $(php -r 'echo (new PDO("sqlite::memory:"))->query("select sqlite_version()")->fetchColumn();')"
+```
+
+| Fact | Value |
+|---|---|
+| Provider / plan | *open* |
+| Account user | *open* |
+| PHP CLI path for 8.4 | *open* |
+| PHP version reported | *open* |
+| Missing extensions | *open* |
+| `memory_limit` | *open* |
+| `git` path | *open* |
+| SQLite library version | *open* (Laravel 13 wants ≥ 3.26; ≥ 3.35 for `DROP COLUMN`) |
+| Subdomain limit | *open* |
+| SSH access | **assumed yes** (user chose manual-SSH deploys; confirm on the plan) |
+| Git Version Control UI | *open* — not required for the chosen pull method |
+
+---
+
+## §3 — Code changes required before any deploy
+
+### §3.1 — Signalling: Reverb → HTTP polling through the database
+
+**Status: NOT DONE.** Without it, single-player, accounts, leaderboard and
+cloud saves work on cPanel; **Host / Join a game does not** (the client waits
+`CONNECT_TIMEOUT_MS` for a Reverb subscription that can never open).
+
+What changes:
+
+- New table `room_signals` (`id`, `room_code`, `from`, `to`, `type`, `data` JSON,
+  `created_at`). One migration.
+- `SignalController::store` **inserts a row** instead of `broadcast(...)`.
+- New `GET /api/rooms/{code}/signals?to={peer}&after={id}` returning rows for
+  that peer with `id > after`, ordered by id, capped at 50. Same `throttle:signal`.
+- `resources/js/net/transport.ts` `Signaller` polls that endpoint every
+  ~700 ms **only while a peer connection is being negotiated**, and stops
+  once the DataChannel opens or on `leave()`. `echo.ts` is deleted.
+- Rows older than `Room::TTL_HOURS` are deleted opportunistically in
+  `RoomController::store` (`where created_at < now()-2h`) — no cron.
+- Remove `laravel/reverb`, `laravel-echo`, `pusher-js`, `config/reverb.php`,
+  the `REVERB_*` / `VITE_REVERB_*` env vars, and set
+  `BROADCAST_CONNECTION=null`.
+
+Cost: joining a room takes ~0.5–1.5 s longer than over a socket; the
+`room_signals` table gets a few dozen rows per join. Gameplay traffic is still
+peer-to-peer and unaffected.
+
+### §3.2 — SQLite connection tuned for concurrent writers
+
+**Done 2026-09-13.** `config/database.php` sqlite connection:
+`busy_timeout` 5000 ms, `journal_mode` wal, `synchronous` normal (all
+overridable via `DB_BUSY_TIMEOUT` / `DB_JOURNAL_MODE` / `DB_SYNCHRONOUS`).
+Cost: WAL keeps `-wal`/`-shm` sidecar files next to the DB; backups must
+checkpoint first (the deploy script and §8 do).
+
+### §3.3 — Nothing else
+
+No `env()` calls outside `config/`, so `config:cache` is safe and the deploy
+script uses it. No `Storage::`, no mail, no queue, no scheduler.
+
+---
+
+## §4 — cPanel setup
+
+### §4.1 — Domains
+
+Two environments, two hostnames, each a separate clone and separate database:
+
+| Env | Hostname | Clone path | DB file |
+|---|---|---|---|
+| staging | `staging.<domain>` (*open*) | `$HOME/staging/app` | `$HOME/staging/data/database.sqlite` |
+| production | `<domain>` (*open*) | `$HOME/production/app` | `$HOME/production/data/database.sqlite` |
+
+### §4.2 — PHP
+
+MultiPHP Manager (or CloudLinux PHP Selector) → set both hostnames to **8.4**.
+If `php` on `$PATH` is not 8.4, pass the CLI path from §2.0 as `PHP_BIN` when
+running the deploy script.
+
+### §4.3 — Docroot
+
+Create the subdomain (staging) with docroot `$HOME/staging/app/public`. For
+production, if the primary domain's docroot is locked to `public_html`, the
+two working options are:
+
+1. Point a subdomain (`play.<domain>`) at `$HOME/production/app/public` and
+   redirect the apex to it. Cost: the URL gains a subdomain.
+2. Replace `public_html` with a symlink to `$HOME/production/app/public`
+   (`rmdir public_html && ln -s production/app/public public_html`). Cost:
+   some cPanel tools refuse to work on a symlinked `public_html`, and
+   `symlink` must be allowed (§2.0).
+
+Decide after §2.0. Recorded here as *open*.
+
+### §4.4 — Database
+
+SQLite, file outside the repo. Chosen by the user; costs stated:
+
+- **No cPanel "database" backup** — the file is only covered by whole-account
+  backups; §8 adds a daily copy.
+- **Single writer.** SQLite serialises writes; with ≤ a few dozen concurrent
+  players and only rooms/scores/saves/sessions written, this is fine. If
+  `database is locked` appears in the log, migrate to MySQL (cPanel → MySQL
+  Databases, `DB_CONNECTION=mysql`) — the migrations are engine-neutral.
+- `config/database.php` now sets `journal_mode=wal`, `busy_timeout=5000`,
+  `synchronous=normal` for the sqlite connection (§3.2) — the stock config
+  left all three `null`, which is DELETE-journal with no wait and would lock
+  under two concurrent writers. The `data/` directory must be writable for
+  the `-wal`/`-shm` files.
+
+### §4.5 — Git on the server
+
+```bash
+mkdir -p ~/staging/data ~/production/data ~/logs
+git clone --branch deploy/staging    --single-branch https://github.com/thabang-teddy/Block-survival.git ~/staging/app
+git clone --branch deploy/production --single-branch https://github.com/thabang-teddy/Block-survival.git ~/production/app
+```
+
+The repo is public, so HTTPS needs no credential. If it ever goes private,
+add a **read-only deploy key** per environment in cPanel → SSH Access and
+switch the remote to `git@github.com:`.
+
+### §4.6 — SSL
+
+AutoSSL covers both hostnames once they resolve. `APP_URL` must be `https://`
+and `SESSION_SECURE_COOKIE=true`.
+
+### §4.7 — The `.env`
+
+Copy `deploy/.env.cpanel.example` to `~/<env>/app/.env`, `chmod 600`, fill in:
+
+| Value | Source | Blocking |
+|---|---|---|
+| `APP_KEY` | `php artisan key:generate` on the server (writes itself) | yes — app 500s without it |
+| `APP_URL` | the hostname from §4.1 | yes — Inertia asset URLs and CSRF |
+| `DB_DATABASE` | absolute path from §4.1 | yes |
+| `APP_ENV` | `staging` / `production` | yes |
+| `APP_DEBUG` | `false` | yes — `true` leaks `.env` on any error page |
+
+Everything else in the example file is a fixed decision, not a secret.
+
+---
+
+## §5 — The pipeline
+
+### §5.0 — Branches
+
+| Branch | Who writes it | What it is |
+|---|---|---|
+| `master` | you | production source |
+| `staging` | you | staging source (branch from master, merge forward) |
+| `deploy/staging` | **CI only** | built artefact of `staging` |
+| `deploy/production` | **CI only** | built artefact of `master` |
+
+Push to `staging` → `deploy/staging`. Push to `master` → `deploy/production`.
+Pull requests run tests only; they never build an artefact.
+
+### §5.1 — The workflow: `.github/workflows/ci.yml`
+
+Job `test` (every push and PR):
+- PHP 8.4 (`shivammathur/setup-php`), `composer install`, `php artisan test`
+- Node 24, `npm ci`, `npm run typecheck`, `npm test`
+
+Job `build` (push to `master`/`staging` only, needs `test`):
+- `composer install --no-dev --optimize-autoloader --classmap-authoritative` on PHP 8.4
+- `npm ci && npm run build`
+- Assemble a tree: source + `vendor/` + `public/build/`, minus `node_modules`,
+  `tests`, `Design`, `game docs`, `.github`, `.env*`, `storage/logs/*`
+- Commit it as a **single orphan commit** and force-push to `deploy/<env>`
+
+Why orphan + force: the artefact branch never accumulates history (a fresh
+`vendor/` per build would grow the repo by tens of MB each time). Cost: the
+server must `fetch` + `reset --hard`, never `pull` (§6.1 does this), and
+`.git` on the server needs an occasional `git gc` (§6.1 runs `gc --auto`).
+
+`concurrency: deploy-<ref>` with `cancel-in-progress` so two rapid pushes
+cannot race on the same artefact branch.
+
+### §5.2 — What reaches the server, and with what credential
+
+The server **pulls**; GitHub holds **no credential for the server**. The only
+secret in the pipeline is `GITHUB_TOKEN` (automatic, scoped to this repo,
+`contents: write` for the artefact push).
+
+### §5.3 — Pull method: manual SSH
+
+User's choice. After a green `build` run:
+
+```bash
+ssh <user>@<host>
+~/staging/app/deploy/cpanel-deploy.sh ~/staging/app          # or ~/production/app
+```
+
+Cost: nothing deploys until you run it — which is also the benefit. If this
+becomes tedious, a cron poller is the next step (§10).
+
+---
+
+## §6 — The deploy script and cron
+
+### §6.1 — `deploy/cpanel-deploy.sh <app-dir>`
+
+Runs on the server. In order:
+
+1. `flock` on `<app-dir>/.deploy.lock` — refuse to run twice at once.
+2. Find PHP: `$PHP_BIN` if set, else the first of `php`,
+   `/opt/alt/php84/usr/bin/php`, `/opt/cpanel/ea-php84/root/usr/bin/php`
+   reporting `PHP_VERSION_ID >= 80400`. Abort otherwise.
+3. Refuse if `.env` is missing or `APP_KEY` is empty (never writes `.env`).
+4. `php artisan down --retry=15`. An error trap decides what happens on
+   failure: if the tree has not been touched yet, `artisan up` restores the
+   old release; if `reset --hard` already ran, the site is **left in
+   maintenance** and the log says so — a half-deployed tree must not serve.
+5. `git fetch origin <branch>` then `git reset --hard origin/<branch>`.
+   `storage/` and `.env` are untracked/ignored so `reset --hard` leaves them;
+   **`git clean` is never used.** Tracked files edited on the server are
+   listed as a warning before they are discarded.
+6. Ensure `storage/{app,framework/{cache,sessions,views},logs}` exist and
+   `bootstrap/cache` is writable.
+7. **Migrations if needed**: `php artisan migrate:status --pending`; if any
+   are listed, copy the SQLite file to `<data>/backups/pre-migrate-<ts>.sqlite`
+   first, then `php artisan migrate --force`. Otherwise print "no pending
+   migrations" and skip.
+8. `php artisan optimize:clear` then `config:cache`, `route:cache`,
+   `view:cache`, `event:cache` (safe: §3.3).
+9. `php artisan up`. `git gc --auto`. Append one line to `~/logs/deploy.log`.
+
+Every step's output goes to stdout **and** `~/logs/deploy.log`.
+
+### §6.2 — Cron
+
+None required now. When §8 backups are set up, one line:
+
+```
+15 3 * * * /bin/bash $HOME/production/app/deploy/cpanel-backup.sh >> $HOME/logs/backup.log 2>&1
+```
+
+---
+
+## §7 — Validating on staging
+
+Checks the dev setup never needed:
+
+- S.1 `https://staging.<domain>/` renders the menu (Inertia page, no console errors)
+- S.2 Register + login + logout round-trip; cookie is `Secure`, `SameSite=Lax`
+- S.3 `/api/leaderboard` returns JSON, not HTML (docroot and `.htaccess` correct)
+- S.4 Post a score, save and continue a cloud save (writes to the SQLite file)
+- S.5 **Host a game on one browser, join from another** — proves §3.1
+- S.6 `storage/logs/laravel.log` has no `database is locked` after S.5
+- S.7 Run the deploy script a second time with no changes: "no pending migrations", `up` OK
+- S.8 A deliberately empty `APP_KEY` → script refuses before touching the tree
+- S.9 `php artisan migrate:status` matches the migrations in the branch
+- S.10 Response headers show no `X-Powered-By` PHP version (cPanel `expose_php` off — if on, add to §10)
+
+---
+
+## §8 — Backups and the restore drill
+
+`deploy/cpanel-backup.sh` (to write in Stage D): copies `data/database.sqlite`
+with `sqlite3 .backup` (consistent under WAL) to `data/backups/daily-<date>.sqlite`,
+keeps 14. Cost: disk = 14 × DB size, trivial.
+
+Restore drill, done once on staging before production has data: `artisan down`,
+copy a backup over `database.sqlite`, delete `-wal`/`-shm`, `artisan up`,
+verify a known score is present. Record the date it was done here: *open*.
+
+---
+
+## §9 — Cutover and rollback
+
+Cutover: DNS already points at the host (AutoSSL needs that), so cutover is
+"run the deploy script on production for the first time". Point of no return
+is the first real user registration.
+
+Rollback: `git reset --hard <previous-artefact-sha>` (the script logs each
+deployed SHA) + restore the pre-migrate SQLite copy the script made, then
+re-run steps 8–9 of §6.1. ~2 min. Only works if no user data was written
+since — otherwise roll forward.
+
+---
+
+## §10 — Accepted risks and open questions
+
+| Item | Why accepted / why open | Revisit when |
+|---|---|---|
+| Domain, provider, plan, DNS host | **open** — not asked yet | Before §4 |
+| Docroot method for the apex (§4.3) | depends on §2.0 | After the probe |
+| SQLite under concurrency | user's choice; few writers; engine-neutral migrations | first `database is locked` in the log |
+| Expired `rooms` rows never pruned | tiny table, filtered by `expires_at` | if the table passes ~100k rows |
+| No error reporting service | cost constraint §0.1 | if silent failures are suspected |
+| Manual deploys | user's choice | when it becomes a chore → cron poller |
+| `public_html` symlink may be refused by cPanel | some hosts | at §4.3 |
+| `expose_php` | unknown until S.10 | staging validation |
+
+---
+
+## §11 — Order of work
+
+**Stage A — repo (no host needed)**
+1. Commit this plan, `ci.yml`, `deploy/cpanel-deploy.sh`, `deploy/.env.cpanel.example`. ← *this session*
+2. Create `staging` from `master`, push both; confirm `test` and `build` are green and `deploy/staging`, `deploy/production` exist.
+3. **§3.1 signalling rewrite** on a branch → PR → merge to `staging`.
+
+**Stage B — measure (needs SSH)**
+4. Run the §2.0 probe; fill §2.0; answer the §10 opens (domain, plan).
+5. Decide §4.3 docroot.
+
+**Stage C — staging**
+6. Create subdomain, set PHP 8.4, clone `deploy/staging` (§4.5), write `.env` (§4.7).
+7. First deploy by hand: `deploy/cpanel-deploy.sh ~/staging/app`.
+8. Checks S.1–S.10.
+
+**Stage D — safety**
+9. Write and cron `cpanel-backup.sh`; do the restore drill; record its date in §8.
+
+**Stage E — production**
+10. Clone `deploy/production`, `.env`, deploy, S.1–S.6 again on the real hostname.
+11. Cutover (§9).
+
+Depends-on: 3 before 8 (S.5 cannot pass without it); 9 before 10.

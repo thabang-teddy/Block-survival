@@ -29,7 +29,9 @@ npm run dev                                          # Vite (HMR) — keep it ru
 php artisan serve --port=8000                        # open http://localhost:8000
 ```
 
-Production: `npm run build` then serve the Laravel app as usual (`public/build` holds the bundle).
+Production (cPanel, PHP 8.4): CI builds `deploy/staging` / `deploy/production` from `staging` /
+`master` (vendor + Vite bundle committed); on the server run `deploy/cpanel-deploy.sh <app-dir>`,
+which migrates only when something is pending. The full plan is [docs/cpanel-go-live.md](docs/cpanel-go-live.md).
 
 Tests: `php artisan test` (page, session auth, every /api endpoint) and `npm test` (70 vitest tests
 for the world, mesher, physics, items, zombies, crates, netcode).

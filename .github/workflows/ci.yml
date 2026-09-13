@@ -1,0 +1,186 @@
+# CI: test every push and PR; on a push to master/staging, build a deployable
+# tree (vendor/ + public/build/ committed) and force-push it as a single orphan
+# commit to deploy/production or deploy/staging. The cPanel account pulls that
+# branch — see docs/cpanel-go-live.md §5.
+name: CI
+
+on:
+  push:
+    branches: [master, staging]
+  pull_request:
+    branches: [master, staging]
+
+permissions:
+  contents: read
+
+env:
+  # must match the PHP Selector setting on the cPanel account (§4.2) and
+  # MIN_PHP_ID in deploy/cpanel-deploy.sh
+  CPANEL_PHP_VERSION: '8.4'
+  NODE_VERSION: '24'
+  PHP_EXTENSIONS: mbstring, xml, ctype, fileinfo, tokenizer, pdo_sqlite, sqlite3, bcmath, intl, curl, openssl, zip
+
+jobs:
+  test:
+    name: Test (PHPUnit + Vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP ${{ env.CPANEL_PHP_VERSION }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.CPANEL_PHP_VERSION }}
+          extensions: ${{ env.PHP_EXTENSIONS }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare test environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --no-interaction
+
+      - name: PHPUnit
+        run: php artisan test --no-interaction
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Vitest
+        run: npm test
+
+  build:
+    name: Build artefact → deploy/${{ github.ref_name == 'master' && 'production' || 'staging' }}
+    needs: test
+    # only real pushes to the two source branches produce an artefact; a PR
+    # must never deploy its own head
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/staging')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: deploy-${{ github.ref_name }}
+      cancel-in-progress: true
+    env:
+      DEPLOY_ENV: ${{ github.ref_name == 'master' && 'production' || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP ${{ env.CPANEL_PHP_VERSION }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.CPANEL_PHP_VERSION }}
+          extensions: ${{ env.PHP_EXTENSIONS }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install production PHP dependencies
+        run: composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader --classmap-authoritative
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build front-end bundle
+        run: npm run build
+
+      - name: Assemble deployable tree
+        run: |
+          set -euo pipefail
+          ART="$RUNNER_TEMP/artefact"
+          mkdir -p "$ART"
+          # everything the server needs, nothing it does not
+          rsync -a \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='.claude/' \
+            --exclude='node_modules/' \
+            --exclude='tests/' \
+            --exclude='Design/' \
+            --exclude='game docs/' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='.phpunit.result.cache' \
+            --exclude='storage/logs/*' \
+            --exclude='storage/framework/cache/*' \
+            --exclude='storage/framework/sessions/*' \
+            --exclude='storage/framework/views/*' \
+            --exclude='storage/framework/testing/' \
+            --exclude='database/*.sqlite' \
+            --exclude='database/*.sqlite-*' \
+            --exclude='public/hot' \
+            ./ "$ART/"
+
+          # the artefact tree tracks vendor/ and public/build/; only runtime
+          # state stays untracked so `git reset --hard` on the server never
+          # touches it
+          cat > "$ART/.gitignore" <<'EOF'
+          .env
+          .env.*
+          .deploy.lock
+          /storage/logs/*
+          /storage/framework/cache/*
+          /storage/framework/sessions/*
+          /storage/framework/views/*
+          /storage/framework/down
+          /bootstrap/cache/*.php
+          /database/*.sqlite
+          /database/*.sqlite-*
+          EOF
+
+          cat > "$ART/BUILD_INFO" <<EOF
+          env=$DEPLOY_ENV
+          source_branch=$GITHUB_REF_NAME
+          source_sha=$GITHUB_SHA
+          run=$GITHUB_RUN_NUMBER
+          built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          php=$CPANEL_PHP_VERSION
+          EOF
+
+          du -sh "$ART" "$ART/vendor" "$ART/public/build"
+
+      - name: Publish deploy/${{ env.DEPLOY_ENV }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/artefact"
+          git init -q -b "deploy/$DEPLOY_ENV"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "build($DEPLOY_ENV): ${GITHUB_SHA::7} from $GITHUB_REF_NAME (run #$GITHUB_RUN_NUMBER)"
+          # one orphan commit per build: the artefact branch carries no history
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/deploy/$DEPLOY_ENV"
+          echo "deploy/$DEPLOY_ENV = $(git rev-parse --short HEAD)  (source ${GITHUB_SHA::7})" >> "$GITHUB_STEP_SUMMARY"
