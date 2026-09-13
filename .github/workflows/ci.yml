@@ -2,13 +2,16 @@
 # tree (vendor/ + public/build/ committed) and force-push it as a single orphan
 # commit to deploy/production or deploy/staging. The cPanel account pulls that
 # branch — see docs/cpanel-go-live.md §5.
+#
+# Promotion order is dev -> staging -> master (§5.0). The `flow` job fails any
+# PR that skips a stage; branch protection on GitHub blocks direct pushes.
 name: CI
 
 on:
   push:
-    branches: [master, staging]
+    branches: [dev, staging, master]
   pull_request:
-    branches: [master, staging]
+    branches: [dev, staging, master]
 
 permissions:
   contents: read
@@ -21,6 +24,27 @@ env:
   PHP_EXTENSIONS: mbstring, xml, ctype, fileinfo, tokenizer, pdo_sqlite, sqlite3, bcmath, intl, curl, openssl, zip
 
 jobs:
+  flow:
+    name: Promotion order (dev -> staging -> master)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the PR comes from the previous stage
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+        run: |
+          case "$BASE" in
+            master)  want=staging ;;
+            staging) want=dev ;;
+            *)       echo "PR into $BASE from $HEAD: no ordering rule"; exit 0 ;;
+          esac
+          if [ "$HEAD" != "$want" ]; then
+            echo "::error::PRs into $BASE must come from $want, not $HEAD (docs/cpanel-go-live.md §5.0)"
+            exit 1
+          fi
+          echo "$HEAD -> $BASE: ok"
+
   test:
     name: Test (PHPUnit + Vitest)
     runs-on: ubuntu-latest

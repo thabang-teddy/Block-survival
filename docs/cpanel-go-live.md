@@ -210,21 +210,42 @@ Everything else in the example file is a fixed decision, not a secret.
 
 | Branch | Who writes it | What it is |
 |---|---|---|
-| `master` | you | production source |
-| `staging` | you | staging source (branch from master, merge forward) |
+| `dev` | you | integration branch — all work lands here first |
+| `staging` | PR from `dev` only | staging source |
+| `master` | PR from `staging` only | production source |
 | `deploy/staging` | **CI only** | built artefact of `staging` |
 | `deploy/production` | **CI only** | built artefact of `master` |
 
-Push to `staging` → `deploy/staging`. Push to `master` → `deploy/production`.
+**Promotion order: `dev` → `staging` → `master`.** Nothing skips a stage.
+
+1. Work on `dev` (directly, or on a feature branch merged into `dev`).
+2. Open a PR `dev` → `staging`; merge once CI is green. Push to `staging`
+   builds `deploy/staging`; validate on the staging subdomain (§7).
+3. Open a PR `staging` → `master`; merge. Push to `master` builds
+   `deploy/production`.
+
+Hotfixes follow the same path — the round trip is minutes, and it keeps
+`staging` a true preview of what production will get.
+
+Enforcement, two layers:
+- CI job `flow` (§5.1) fails any PR into `staging` whose head is not `dev`, and
+  any PR into `master` whose head is not `staging`.
+- GitHub branch protection on `staging` and `master` (set once, by hand:
+  *Settings → Branches → Add rule*): **require a pull request before merging**,
+  **require status checks** (`flow`, `Test (PHPUnit + Vitest)`), and leave
+  "allow force pushes" off. Without this, a direct `git push` bypasses `flow`.
+
 Pull requests run tests only; they never build an artefact.
 
 ### §5.1 — The workflow: `.github/workflows/ci.yml`
+
+Job `flow` (PRs only): the §5.0 promotion-order check. No checkout, no deps.
 
 Job `test` (every push and PR):
 - PHP 8.4 (`shivammathur/setup-php`), `composer install`, `php artisan test`
 - Node 24, `npm ci`, `npm run typecheck`, `npm test`
 
-Job `build` (push to `master`/`staging` only, needs `test`):
+Job `build` (push to `master`/`staging` only, needs `test`; a push to `dev` runs `test` and stops):
 - `composer install --no-dev --optimize-autoloader --classmap-authoritative` on PHP 8.4
 - `npm ci && npm run build`
 - Assemble a tree: source + `vendor/` + `public/build/`, minus `node_modules`,
