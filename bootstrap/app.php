@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnforceMaintenanceToggle;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -14,7 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->web(append: [HandleInertiaRequests::class]);
+        $middleware->web(prepend: [EnforceMaintenanceToggle::class], append: [HandleInertiaRequests::class]);
         // the JSON endpoints under /api share the session; unauthenticated calls get a 401, never a redirect
         $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : '/');
     })
