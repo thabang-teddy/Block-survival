@@ -123,6 +123,7 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
         // env toggle, independent of `artisan down` — see App\Http\Middleware\EnforceMaintenanceToggle
         'enabled' => (bool) env('APP_MAINTENANCE_MODE', false),
+        'support_email' => env('APP_SUPPORT_EMAIL'),
     ],
 
 ];

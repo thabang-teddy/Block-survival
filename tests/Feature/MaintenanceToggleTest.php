@@ -21,7 +21,7 @@ class MaintenanceToggleTest extends TestCase
     {
         config(['app.maintenance.enabled' => true]);
 
-        $this->get('/')->assertStatus(503);
+        $this->get('/')->assertStatus(503)->assertSee('The site is currently down')->assertSee(config('app.name'));
         $this->getJson('/api/leaderboard')->assertStatus(503)->assertJsonPath('message', 'Down for maintenance');
     }
 
