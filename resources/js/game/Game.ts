@@ -38,6 +38,10 @@ import type { HostSession } from '../net/HostSession'
 import type { ClientSession } from '../net/ClientSession'
 import type { BlockEdit, ClientMessage, PlayerSnap, PrivateState, Snapshot } from '../net/protocol'
 import { api, type SaveData } from '../net/api'
+import { Autosave } from './autosave'
+import { collectSave, restorePlayer, visitorsOf, zombiesToRestore } from './saveState'
+import { Visitors } from './visitors'
+import type { ItemStack } from '../items/inventory'
 import { useUiStore } from '../state/uiStore'
 
 export const REACH = 5
@@ -65,6 +69,8 @@ const ACTION_REACH = REACH + 1.5
 const HOST_ID = 'host'
 /** columns loaded synchronously around the spawn before the first frame */
 const INITIAL_LOAD_RADIUS = 2
+/** while dirty, the host re-packs the save this often so a sudden unload can beacon it */
+const BEACON_REFRESH_SECONDS = 10
 
 export interface GameOptions {
   role: Role
@@ -126,6 +132,15 @@ export class Game {
   private spawnTimes: number[] = []
   /** block edits since the last network flush (host) */
   private blockEdits: BlockEdit[] = []
+  // ---- saving (host, issue #13)
+  private readonly autosave = new Autosave(() => this.uploadWorld())
+  /** players who left (or have not reconnected since the load), by account id */
+  private readonly visitors = new Visitors()
+  /** what a cheap scan of the sim looked like at the last dirty check */
+  private dirtySignature = ''
+  private beaconTimer = 0
+  private beacon: { bytes: Uint8Array; night: number; seconds: number } | null = null
+  private packing = false
   private readonly tmpDir = new THREE.Vector3()
   private readonly tmpRight = new THREE.Vector3()
 
@@ -161,7 +176,9 @@ export class Game {
       this.applyBlockEdits(opts.restore.edits)
       this.dayNight.time = opts.restore.time
       this.dayNight.update(0)
-      spawn = opts.restore.spawn
+      const me = opts.restore.players[String(api.user?.id ?? 0)]
+      if (me) spawn = { x: me.pos.x, y: me.pos.y, z: me.pos.z }
+      for (const [id, p] of visitorsOf(opts.restore, String(api.user?.id ?? 0))) this.visitors.leaveSaved(id, p)
     }
     // enough ground under the player to stand on; the rest streams in over the next frames
     this.streamer = new ChunkStreamer(this.world)
@@ -177,17 +194,20 @@ export class Game {
     )
     const localId = opts.session.role === 'client' ? opts.session.welcome!.you : HOST_ID
     this.local = new Avatar(localId, opts.name, spawn)
+    this.local.userId = api.user?.id ?? null
     this.avatars.set(localId, this.local)
-    if (opts.restore) {
-      this.local.inventory.replace(opts.restore.inventory)
-      this.local.kills = opts.restore.kills
-      this.local.deaths = opts.restore.deaths
-    }
+    const me = opts.restore?.players[String(this.local.userId ?? 0)]
+    if (me) restorePlayer(this.local, me, true)
     this.player = new PlayerController(this.world, spawn)
+    if (me) {
+      this.player.state.yaw = me.pos.yaw
+      this.player.state.pitch = me.pos.pitch
+    }
     this.player.updrafts = (x, z) => this.terrain.updraftsNear(x - 3, z - 3, x + 3, z + 3)
     this.input = new Input(canvas)
     this.drops = new DropManager(this.world)
     this.crates = new CrateManager(this.world)
+    if (opts.restore) this.restoreLiveWorld(opts.restore)
     this.zombies = new ZombieManager(
       {
         world: this.world,
@@ -204,9 +224,15 @@ export class Game {
     )
     this.highlight.visible = false
     opts.session.attach(this)
+    if (this.isHost && api.loggedIn) {
+      window.addEventListener('pagehide', this.onPageHide)
+      document.addEventListener('visibilitychange', this.onVisibility)
+    }
   }
 
   dispose(): void {
+    window.removeEventListener('pagehide', this.onPageHide)
+    document.removeEventListener('visibilitychange', this.onVisibility)
     this.input.dispose()
     this.chunks.dispose()
     this.props.dispose()
@@ -393,15 +419,21 @@ export class Game {
   }
 
   // ---------------------------------------------------------------- network helpers (host)
-  addRemoteAvatar(id: string, name: string): Avatar {
+  /** a client joined; one we have seen before (this run or in the save) gets its gear back */
+  addRemoteAvatar(id: string, name: string, userId: number | null = null): Avatar {
     const a = new Avatar(id, name, this.terrain.spawn())
+    a.userId = userId
+    this.visitors.arrive(a, userId)
     this.avatars.set(id, a)
     return a
   }
 
   removeAvatar(id: string): void {
+    const a = this.avatars.get(id)
+    if (a) this.visitors.leave(a, a.userId)
     this.avatars.delete(id)
     this.remotePoses.delete(id)
+    this.autosave.markDirty()
   }
 
   worldEdits(): BlockEdit[] {
@@ -484,9 +516,10 @@ export class Game {
         this.broadcastMessage(`Dawn — you survived night ${dn.night}`)
         this.bestScore = saveBest(this.score)
         this.postScore()
-        if (api.loggedIn) this.saveToCloud().catch(() => {})
+        if (api.loggedIn) this.autosave.saveNow().catch(() => {})
       }
     }
+    this.tickSaving(dt)
     while (this.spawnTimes.length && dn.time >= this.spawnTimes[0]) {
       this.spawnTimes.shift()
       const targets = [...this.avatars.values()].filter(a => a.alive).map(a => ({ x: a.x, y: a.y, z: a.z }))
@@ -739,24 +772,88 @@ export class Game {
   }
 
   buildSave(): SaveData {
-    return {
-      version: 2,
+    return collectSave({
       seed: this.seed,
       time: this.dayNight.time,
       edits: this.worldEdits(),
-      inventory: this.local.inventory.all(),
-      spawn: this.local.spawn,
-      kills: this.local.kills,
-      deaths: this.local.deaths,
-    }
+      live: [...this.avatars.values()].filter(a => a.userId !== null).map(a => ({ userId: String(a.userId), avatar: a })),
+      departed: this.visitors.entries,
+      zombies: this.zombies.zombies,
+      drops: this.drops.drops,
+      crates: this.crates.crates,
+    })
   }
 
-  /** upload the world (block diff, clock, the host's inventory) as the account's one world */
+  /** the host's manual save: upload now (after any upload in flight) and say so */
   async saveToCloud(): Promise<void> {
     if (!this.isHost) throw new Error('Only the host can save')
     if (!api.loggedIn) throw new Error('Log in to save your world')
-    await api.saveWorld(this.buildSave(), this.dayNight.night)
+    await this.autosave.saveNow()
     this.showMessage('World saved')
+  }
+
+  /** true when something happened since the last successful upload */
+  get needsSave(): boolean {
+    return this.isHost && api.loggedIn && (this.autosave.isDirty || this.autosave.inFlight)
+  }
+
+  private async uploadWorld(): Promise<void> {
+    await api.saveWorld(this.buildSave(), this.dayNight.night)
+    this.beacon = null
+  }
+
+  /** zombies, drops and crates that were live when the world was saved */
+  private restoreLiveWorld(save: SaveData): void {
+    for (const z of zombiesToRestore(save, t => this.dayNight.phaseAt(t))) {
+      const zb = this.zombies.spawn(z.kind, z.x, z.y, z.z)
+      zb.hp = Math.min(zb.hp, Math.max(1, z.hp))
+    }
+    for (const d of save.drops) this.drops.spawn(d.id, d.count, d.x, d.y, d.z, 0, 0, 0)
+    for (const c of save.crates) this.crates.restore(c.x, c.y, c.z, c.items.filter((s): s is ItemStack => s !== null))
+  }
+
+  /**
+   * Once a frame on the host: notice changes worth saving (a cheap scan, so nothing has
+   * to remember to call markDirty), run the autosave clock, and keep a packed copy of
+   * the save ready for a beacon in case the tab goes away.
+   */
+  private tickSaving(dt: number): void {
+    if (!this.isHost || !api.loggedIn) return
+    let inventories = 0
+    let deaths = 0
+    for (const a of this.avatars.values()) {
+      inventories += a.inventory.version
+      deaths += a.deaths
+    }
+    const sp = this.local.spawn
+    const sig = `${this.world.edits.size}:${this.world.propsVersion}:${inventories}:${deaths}:${this.drops.drops.length}:${this.crates.crates.length}:${sp.x},${sp.y},${sp.z}`
+    if (sig !== this.dirtySignature) {
+      this.dirtySignature = sig
+      this.autosave.markDirty()
+    }
+    this.autosave.tick(dt)
+    this.beaconTimer += dt
+    if (this.autosave.isDirty && this.beaconTimer >= BEACON_REFRESH_SECONDS && !this.packing) {
+      this.beaconTimer = 0
+      this.packing = true
+      const night = this.dayNight.night
+      const seconds = this.dayNight.time
+      api.packWorld(this.buildSave())
+        .then(bytes => { this.beacon = { bytes, night, seconds } })
+        .catch(() => {})
+        .finally(() => { this.packing = false })
+    }
+  }
+
+  /** the page is going away: fire the last packed save as a beacon */
+  private onPageHide = (): void => {
+    if (!this.autosave.isDirty || !this.beacon) return
+    if (api.beaconWorld(this.beacon.bytes, this.beacon.night, this.beacon.seconds)) this.beacon = null
+  }
+
+  /** the tab went to the background: a normal upload still completes there */
+  private onVisibility = (): void => {
+    if (document.visibilityState === 'hidden' && this.autosave.isDirty) this.autosave.saveNow().catch(() => {})
   }
 
   // ---------------------------------------------------------------- messages

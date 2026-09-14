@@ -13,7 +13,7 @@ import { ClientSession } from '../net/ClientSession'
 import { isRoomCode } from '../net/protocol'
 import { api, type SaveData } from '../net/api'
 import type { PlayProps } from '../net/pageProps'
-import { formatTime } from '../game/score'
+import { formatTime, timeAgo } from '../game/score'
 import { useOpenRooms } from './useOpenRooms'
 import { seatsText } from './openGames'
 
@@ -134,8 +134,8 @@ export function MainMenu() {
             <h3>Your world</h3>
             <p>
               {world
-                ? `Night ${world.night} · ${formatTime(world.seconds)} survived. Solo and hosted games continue it.`
-                : 'A fresh island — it is saved at every dawn and whenever you press Save.'}
+                ? `Night ${world.night} · ${formatTime(world.seconds)} survived · ${world.players} player${world.players === 1 ? '' : 's'} have played · saved ${timeAgo(world.updated_at)}. Solo and hosted games continue it.`
+                : 'A fresh world — it saves itself every minute, at dawn, and when you leave.'}
             </p>
             <button className="wide primary" onClick={solo} disabled={!!busy}>{busy === 'solo' ? 'Loading…' : 'Play solo'}</button>
             <button className="wide" onClick={host} disabled={!!busy}>{busy === 'host' ? 'Opening room…' : 'Host a game for up to 3 friends'}</button>

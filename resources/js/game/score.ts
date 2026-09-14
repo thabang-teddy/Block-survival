@@ -47,3 +47,16 @@ export const formatTime = (seconds: number): string => {
   const m = Math.floor(s / 60)
   return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}:${String(s % 60).padStart(2, '0')}`
 }
+
+/** "just now", "3 min ago", "2 h ago", "4 d ago" for an ISO timestamp */
+export const timeAgo = (iso: string, now: number = Date.now()): string => {
+  const t = Date.parse(iso)
+  if (Number.isNaN(t)) return 'a while ago'
+  const s = Math.max(0, Math.floor((now - t) / 1000))
+  if (s < 60) return 'just now'
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m} min ago`
+  const h = Math.floor(m / 60)
+  if (h < 48) return `${h} h ago`
+  return `${Math.floor(h / 24)} d ago`
+}

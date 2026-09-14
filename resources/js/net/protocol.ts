@@ -71,7 +71,8 @@ export interface BlockEdit {
 
 // ---------------------------------------------------------------- client → host
 export type ClientMessage =
-  | { t: 'hello'; v: number; name: string }
+  /** `userId`: the signed-in account, so the host can hand back gear saved for it */
+  | { t: 'hello'; v: number; name: string; userId?: number }
   /** 30 Hz: the client's own movement is authoritative */
   | { t: 'input'; x: number; y: number; z: number; yaw: number; pitch: number; anim: AnimName; slot: number; aiming: boolean }
   | { t: 'break'; x: number; y: number; z: number }

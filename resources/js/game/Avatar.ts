@@ -24,6 +24,8 @@ export interface Spawn {
 export class Avatar {
   readonly id: string
   name: string
+  /** the account behind this player, when known (host: the signed-in user; clients: from `hello`) */
+  userId: number | null = null
   // ---- pose
   x = 0
   y = 0

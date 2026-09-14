@@ -163,8 +163,10 @@ nights survived × 100 + kills × 5, shown on the Tab scoreboard.
 The same Laravel app that serves the Inertia page. Session auth (`POST /register|login|logout`
 as Inertia form posts), and JSON routes under `/api` sharing that session:
 `POST /rooms` (creates code → host peer id, TTL 2 h), `GET /rooms/{code}` (resolve peer id),
-`POST /scores` + `GET /leaderboard`, `PUT /saves/{slot}` (host uploads gzipped block diff +
-inventory; `GET` restores). The menu's data (user, leaderboard, cloud save) comes as Inertia props.
+`POST /scores` + `GET /leaderboard`, `PUT /world` (host uploads the gzipped save v3 — seed,
+block diff, every player's gear keyed by account, live zombies/drops/crates; `GET` restores;
+`POST /world/beacon` is the multipart form a closing tab sends). The host autosaves every
+60 s when dirty, at dawn, on quit and on unload (issue #13). The menu's data (user, leaderboard, cloud save) comes as Inertia props.
 Rate-limit everything. Later: Laravel Reverb as the WebRTC signalling channel.
 
 ## 9. Project layout

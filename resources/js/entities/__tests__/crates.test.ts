@@ -3,7 +3,7 @@ import { World } from '../../world/chunkStore'
 import { BLOCK } from '../../world/palette'
 import { Inventory } from '../../items/inventory'
 import { CrateManager, settle } from '../crates'
-import { computeScore, formatTime, nightsSurvived } from '../../game/score'
+import { computeScore, formatTime, nightsSurvived, timeAgo } from '../../game/score'
 
 function floor(): World {
   const w = new World()
@@ -77,5 +77,16 @@ describe('score', () => {
     expect(formatTime(0)).toBe('0:00')
     expect(formatTime(75.9)).toBe('1:15')
     expect(formatTime(3725)).toBe('1h 2m')
+  })
+})
+
+describe('timeAgo', () => {
+  const now = Date.parse('2026-09-14T12:00:00Z')
+  test('rounds down to the coarsest sensible unit', () => {
+    expect(timeAgo('2026-09-14T11:59:40Z', now)).toBe('just now')
+    expect(timeAgo('2026-09-14T11:57:00Z', now)).toBe('3 min ago')
+    expect(timeAgo('2026-09-14T09:30:00Z', now)).toBe('2 h ago')
+    expect(timeAgo('2026-09-10T12:00:00Z', now)).toBe('4 d ago')
+    expect(timeAgo('nope', now)).toBe('a while ago')
   })
 })

@@ -77,8 +77,23 @@ export function Hud() {
   const netStatus = useUiStore(s => s.netStatus)
   const netError = useUiStore(s => s.netError)
   const [saving, setSaving] = useState('')
+  const [leaving, setLeaving] = useState(false)
 
   if (!launch) return <MainMenu />
+
+  /** back to the lobby: the host's world is uploaded first when anything changed */
+  const leave = async () => {
+    if (game?.needsSave) {
+      setLeaving(true)
+      try {
+        await game.saveToCloud()
+      } catch {
+        // the autosave / beacon paths keep trying; leaving must still work offline
+      }
+      setLeaving(false)
+    }
+    restart()
+  }
 
   const saveToCloud = async () => {
     if (!game) return
@@ -198,13 +213,16 @@ export function Hud() {
                   {saving || 'Save world'}
                 </button>
               )}
-              <button className="restart" onClick={() => restart()}>
-                {role === 'client' ? 'Leave game' : 'Back to menu'}
+              <button className="restart" onClick={() => void leave()} disabled={leaving}>
+                {leaving ? 'Saving…' : role === 'client' ? 'Leave game' : 'Back to menu'}
               </button>
             </div>
           )}
           {role === 'host' && !roomCode && (
             <p className="fine">Hosting online? Start from the menu with <b>Host a game</b> to get a room code.</p>
+          )}
+          {role === 'client' && timeAlive > 2 && (
+            <p className="fine">Your gear and respawn point are saved with the host's world — rejoin it to get them back.</p>
           )}
         </div>
       )}

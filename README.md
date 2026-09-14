@@ -63,9 +63,12 @@ Up to 4 players. If the host leaves, the match ends.
 The app is sign-in only: an admin creates every account in `/admin/users` (there is no
 registration or password reset, and any password is accepted), approves each new PC the first time
 it signs in, and can limit sign-in to operating hours. Every player has **one world**: the host's
-score is posted at every dawn and on death, the world autosaves at dawn (or from the pause screen),
-and both **Play solo** and **Host a game** continue it — block edits, props, clock, inventory and
-respawn point. **Start over** in the lobby (or the admin's **Reset world**) wipes it.
+score is posted at every dawn and on death, and both **Play solo** and **Host a game** continue the
+world — block edits, props, clock, where you stood, health, ammo, inventory, respawn point, live
+zombies, drops and loot crates, plus the gear of every friend who has played in it (they get it
+back when they rejoin). It saves itself every minute when something changed, at dawn, from the
+pause screen, when you go back to the menu and when the tab closes (a beacon carries the last
+packed copy). **Start over** in the lobby (or the admin's **Reset world**) wipes it.
 
 ## Game source layout (`resources/js`)
 

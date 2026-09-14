@@ -117,13 +117,13 @@ export class HostSession {
         link.close()
         return
       }
-      const avatar = game.addRemoteAvatar(link.id, msg.name.slice(0, 16) || 'Player')
+      const avatar = game.addRemoteAvatar(link.id, msg.name.slice(0, 16) || 'Player', typeof msg.userId === 'number' ? msg.userId : null)
       const welcome: Welcome = {
         t: 'welcome', v: PROTOCOL_VERSION, you: avatar.id, seed: game.seed, time: game.dayNight.time,
         edits: game.worldEdits(), spawn: avatar.spawn,
       }
       this.send(link, welcome)
-      avatar.push({ inventory: avatar.inventory.all(), magazine: 0, health: avatar.health })
+      avatar.push({ inventory: avatar.inventory.all(), magazine: avatar.magazine, health: avatar.health, spawn: avatar.spawn })
       game.showMessage(`${avatar.name} joined`)
       this.onPlayersChanged?.()
       return
