@@ -1,12 +1,14 @@
 /**
- * Owns one THREE.Group of chunk meshes and rebuilds dirty chunks each frame.
+ * Owns one THREE.Group of chunk meshes: rebuilds dirty chunks each frame (a bounded
+ * number) and disposes the meshes of chunks the world has unloaded.
  * Two materials for the whole world: opaque and translucent, both vertex-coloured.
  */
 import * as THREE from 'three'
 import { CHUNK, type World } from '../world/chunkStore'
 import { meshChunk, type MeshData } from '../world/mesher'
 
-const MAX_REBUILDS_PER_FRAME = 6
+/** meshing stops for the frame once this much time was spent (a ground chunk is ~2 ms) */
+const REBUILD_BUDGET_MS = 5
 
 export class ChunkRenderer {
   readonly group = new THREE.Group()
@@ -26,21 +28,45 @@ export class ChunkRenderer {
     this.group.name = 'chunks'
   }
 
-  /** Rebuild every chunk now (initial load). */
-  buildAll(): void {
-    this.world.markAllDirty()
-    this.pending = this.world.takeDirty()
+  /** Rebuild every dirty chunk now (initial load around the spawn). */
+  flush(): void {
+    this.collect()
     while (this.pending.length) this.rebuild(this.pending.pop()!)
   }
 
-  /** Call once per frame: rebuilds a bounded number of dirty chunks. */
-  update(): void {
-    for (const k of this.world.takeDirty()) if (!this.pending.includes(k)) this.pending.push(k)
-    let n = 0
-    while (this.pending.length && n < MAX_REBUILDS_PER_FRAME) {
+  /** Call once per frame: drops unloaded chunks, rebuilds dirty ones under a time budget. */
+  update(now = performance.now()): void {
+    this.collect()
+    const deadline = now + REBUILD_BUDGET_MS
+    while (this.pending.length) {
       this.rebuild(this.pending.shift()!)
-      n++
+      if (performance.now() >= deadline) break
     }
+  }
+
+  /** meshes currently in the scene */
+  get meshCount(): number {
+    return this.meshes.size
+  }
+
+  private collect(): void {
+    for (const k of this.world.takeRemoved()) {
+      this.remove(k)
+      const i = this.pending.indexOf(k)
+      if (i >= 0) this.pending.splice(i, 1)
+    }
+    for (const k of this.world.takeDirty()) if (!this.pending.includes(k)) this.pending.push(k)
+  }
+
+  private remove(key: string): void {
+    const entry = this.meshes.get(key)
+    if (!entry) return
+    for (const mesh of [entry.opaque, entry.translucent]) {
+      if (!mesh) continue
+      this.group.remove(mesh)
+      mesh.geometry.dispose()
+    }
+    this.meshes.delete(key)
   }
 
   dispose(): void {
@@ -56,6 +82,7 @@ export class ChunkRenderer {
 
   private rebuild(key: string): void {
     const [cx, cy, cz] = key.split(',').map(Number)
+    if (!this.world.getChunk(cx, cy, cz)) { this.remove(key); return }
     const data = meshChunk(this.world, cx, cy, cz)
     let entry = this.meshes.get(key)
     if (!entry) {
