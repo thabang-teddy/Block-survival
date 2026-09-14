@@ -18,14 +18,57 @@ use Inertia\Response;
  * window or a disabled account is refused, and a browser no admin has approved
  * yet is parked on /pending-approval. Accounts are created by an admin; there
  * is no registration or password reset.
+ *
+ * In the local (dev) environment only, the sign-in page also offers a one-click
+ * guest account: the first click creates it, every click signs in as it, and the
+ * browser is approved on the spot so the game is reachable without an admin.
  */
 class AuthController extends Controller
 {
+    public const GUEST_EMAIL = 'guest@localhost';
+
+    public const GUEST_NAME = 'Guest';
+
     public function __construct(private readonly AccessPolicy $policy) {}
 
     public function show(): Response
     {
-        return Inertia::render('Login');
+        return Inertia::render('Login', [
+            'guestLogin' => self::guestLoginEnabled(),
+            'guestExists' => self::guestLoginEnabled() && User::query()->where('email', self::GUEST_EMAIL)->exists(),
+        ]);
+    }
+
+    /** dev only: the guest button is hidden (and its route 404s) on staging and production */
+    public static function guestLoginEnabled(): bool
+    {
+        return (bool) config('admin.guest_login');
+    }
+
+    /** dev only: create the guest account on first use, then sign in as it, skipping the gates */
+    public function guest(Request $request): RedirectResponse
+    {
+        abort_unless(self::guestLoginEnabled(), 404);
+
+        $user = User::query()->firstOrCreate(
+            ['email' => self::GUEST_EMAIL],
+            ['name' => self::GUEST_NAME, 'password' => 'guest'],
+        );
+        if ($user->is_disabled) {
+            throw ValidationException::withMessages(['email' => 'The guest account has been disabled.']);
+        }
+
+        // no admin around in dev: this browser is approved for the guest right now
+        $device = $this->policy->device($request, $user);
+        if (! $device->isApproved()) {
+            $device->forceFill(['approved_at' => now(), 'label' => 'dev guest'])->save();
+        }
+
+        Auth::login($user, remember: true);
+        $request->session()->regenerate();
+        $user->forceFill(['last_login_at' => now()])->save();
+
+        return redirect()->intended('/');
     }
 
     public function login(Request $request): RedirectResponse

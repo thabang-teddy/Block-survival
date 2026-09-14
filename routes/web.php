@@ -21,6 +21,8 @@ Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'show'])->name('login');
     // rate-limited against brute force
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('login.store');
+    // dev only (404 elsewhere): one-click guest account
+    Route::post('/login/guest', [AuthController::class, 'guest'])->middleware('throttle:10,1')->name('login.guest');
     // a browser no admin has approved yet waits here (identified by its cookie, not a session)
     Route::get('/pending-approval', [PendingApprovalController::class, 'show'])->name('pending-approval');
     Route::get('/pending-approval/status', [PendingApprovalController::class, 'status'])->middleware('throttle:30,1');

@@ -289,6 +289,9 @@ body { user-select: none; }
 .menu .link { background: none; border: 0; padding: 0; color: var(--hud-accent); cursor: pointer; font: 600 13px inherit; text-decoration: underline; }
 .menu .account-line { margin: 12px 0 0; font-size: 13px; opacity: .9; }
 .menu .account { display: grid; gap: 8px; margin-top: 12px; padding: 12px; border-radius: 8px; background: rgba(255,255,255,.04); }
+/* dev-only guest sign-in under the form */
+.menu .dev-guest { display: grid; gap: 4px; margin: 10px 0 0; justify-items: center; }
+.menu .dev-guest small { font-size: 11px; opacity: .5; }
 .menu .board { margin-top: 16px; text-align: left; }
 .menu .board h3 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; opacity: .6; }
 .menu .board ol { margin: 0; padding: 0 0 0 20px; font-size: 13px; columns: 2; column-gap: 18px; }

@@ -28,4 +28,18 @@ return [
     // a browser that never gets approved is forgotten after this long
     'device_pending_days' => 30,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Dev guest sign-in
+    |--------------------------------------------------------------------------
+    |
+    | The sign-in page's "guest" button: creates a throwaway account on first
+    | click and signs in as it from then on, approving the browser on the spot.
+    | Only in the local environment — the button is hidden and the route 404s
+    | on staging and production.
+    |
+    */
+
+    'guest_login' => env('APP_ENV', 'production') === 'local',
+
 ];
