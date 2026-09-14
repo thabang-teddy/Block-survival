@@ -35,5 +35,8 @@ export default defineConfig({
   },
   test: {
     include: ['resources/js/**/__tests__/**/*.test.ts'],
+    // terrain tests generate dozens of chunk columns; on a slow machine, with the
+    // other files running alongside, that runs past the 5 s default
+    testTimeout: 30_000,
   },
 })
