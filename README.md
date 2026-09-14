@@ -53,22 +53,27 @@ Score = nights survived × 100 + kills × 5.
 
 ## Multiplayer
 
-**Host a game** registers a 6-letter room code (the WebRTC handshake goes through a polled
-mailbox at `/api/rooms/{code}/signal[s]` — plain HTTP, no socket server — then a direct DataChannel); friends pick it from the lobby's **Join a game** list. The host's browser runs the authoritative world;
-clients move locally and mirror everything else from 20 Hz snapshots interpolated 100 ms behind.
-Up to 4 players. If the host leaves, the match ends.
+**Host for friends** registers a 6-letter room code (the WebRTC handshake goes through a polled
+mailbox at `/api/rooms/{code}/signal[s]` — plain HTTP, no socket server — then a direct DataChannel).
+Rooms are **invite-only**: the host opens the pause screen, picks players by name and invites them;
+the invitation shows up in their lobby within a few seconds and **Accept** drops them into the game.
+Nobody else can resolve the code or use the mailbox — not even with the code in hand. The host's
+browser runs the authoritative world; clients move locally and mirror everything else from 20 Hz
+snapshots interpolated 100 ms behind. Up to 4 players. If the host leaves, the match ends.
 
 ## Accounts
 
 The app is sign-in only: an admin creates every account in `/admin/users` (there is no
 registration or password reset, and any password is accepted), approves each new PC the first time
-it signs in, and can limit sign-in to operating hours. Every player has **one world**: the host's
-score is posted at every dawn and on death, and both **Play solo** and **Host a game** continue the
-world — block edits, props, clock, where you stood, health, ammo, inventory, respawn point, live
+it signs in, and can limit sign-in to operating hours. Every player has **two worlds** — **My world**, generated
+from a random seed the first time they play, and their own copy of the **Global world**, the classic
+seed-11 map everyone shares (same terrain for all, builds are per player). The host's
+score is posted at every dawn and on death, and both **Play solo** and **Host for friends** continue the
+chosen world — block edits, props, clock, where you stood, health, ammo, inventory, respawn point, live
 zombies, drops and loot crates, plus the gear of every friend who has played in it (they get it
 back when they rejoin). It saves itself every minute when something changed, at dawn, from the
 pause screen, when you go back to the menu and when the tab closes (a beacon carries the last
-packed copy). **Start over** in the lobby (or the admin's **Reset world**) wipes it.
+packed copy). **Start over** on a world card (or the admin's **Reset both worlds**) wipes it — a new own world gets a new seed.
 
 ## Game source layout (`resources/js`)
 

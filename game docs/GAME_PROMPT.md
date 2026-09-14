@@ -25,6 +25,9 @@ define the asset conventions, the block colour palette and the island generator 
    (`generate_island`, `add_tree`, `n2`) into a template that is stamped over the ground.
    Cell (0, 0) is the legacy `Island_Large` (`size=56, seed=11, max_height=9, depth=16,
    pad_radius=8, lake=True`) floating at y = 80 over the spawn pad. Players start on the ground.
+   Every player has two worlds (issue #5): **their own**, generated from a random 31-bit seed
+   when first played, and their copy of the **global world**, always seed 11 — same terrain for
+   everyone, builds per player. Each is a separate save (`own` / `global`).
    Every island has an **updraft column** (issue #12): a glowing shaft from the ground to just
    above its rim, placed 2 blocks off the island's edge, deterministic from the seed. Standing
    in it: hold Space to rise (6 m/s), Shift to sink, nothing to hover; walk out to drop. It is
@@ -145,8 +148,9 @@ nights survived × 100 + kills × 5, shown on the Tab scoreboard.
 
 ## 7. Multiplayer — peer-to-peer, host authoritative
 
-- **2–4 players.** Host clicks *Create game* and gets a 6-letter **room code**; friends type it
-  to join. Use **WebRTC DataChannels via PeerJS** (`peerjs` npm). For the MVP use the public
+- **2–4 players.** Host clicks *Host for friends* and gets a 6-letter **room code**; joining is
+  **invite-only** (issue #5): the host invites players by name from the pause screen, the invitee
+  accepts in the lobby, and only then can they resolve the code and use the signalling mailbox. Use **WebRTC DataChannels via PeerJS** (`peerjs` npm). For the MVP use the public
   PeerJS signalling server; Phase 7 moves signalling to Laravel.
 - The **host browser runs the authoritative simulation**: island seed, block edits, zombies,
   day/night clock, item drops, damage. Clients run local movement prediction for their own
@@ -162,8 +166,10 @@ nights survived × 100 + kills × 5, shown on the Tab scoreboard.
 
 The same Laravel app that serves the Inertia page. Session auth (`POST /register|login|logout`
 as Inertia form posts), and JSON routes under `/api` sharing that session:
-`POST /rooms` (creates code → host peer id, TTL 2 h), `GET /rooms/{code}` (resolve peer id),
-`POST /scores` + `GET /leaderboard`, `PUT /world` (host uploads the gzipped save v3 — seed,
+`POST /rooms` (creates code → host peer id, TTL 2 h, `world_kind`), `GET /rooms/{code}` (resolve
+peer id — host or accepted invitee only), `POST /rooms/{code}/invites`, `GET /invites`,
+`POST /invites/{id}/accept|decline`, `GET /players`,
+`POST /scores` + `GET /leaderboard`, `PUT /world/{own|global}` (host uploads the gzipped save v3 — seed,
 block diff, every player's gear keyed by account, live zombies/drops/crates; `GET` restores;
 `POST /world/beacon` is the multipart form a closing tab sends). The host autosaves every
 60 s when dirty, at dawn, on quit and on unload (issue #13). The menu's data (user, leaderboard, cloud save) comes as Inertia props.

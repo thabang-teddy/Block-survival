@@ -1,35 +1,39 @@
 /**
- * Polls /api/rooms while the lobby is on screen. Errors are swallowed into the
- * `error` string: the manual room-code input still works when the list does not.
+ * Polls /api/invites while the lobby is on screen. Errors are swallowed into the
+ * `error` string: the rest of the lobby still works when the list does not.
  */
-import { useEffect, useState } from 'react'
-import { api, type OpenRoom } from '../net/api'
-import { OPEN_ROOMS_POLL_MS, sortOpenRooms } from './openGames'
+import { useCallback, useEffect, useState } from 'react'
+import { api, type Invite } from '../net/api'
+import { INVITES_POLL_MS, sortInvites } from './invites'
 
-export interface OpenRoomsState {
-  rooms: OpenRoom[]
+export interface InvitesState {
+  invites: Invite[]
   loaded: boolean
   error: string
+  /** re-fetch now (after accepting or declining one) */
+  refresh: () => void
 }
 
-export function useOpenRooms(enabled: boolean): OpenRoomsState {
-  const [state, setState] = useState<OpenRoomsState>({ rooms: [], loaded: false, error: '' })
+export function useInvites(enabled: boolean): InvitesState {
+  const [state, setState] = useState<Omit<InvitesState, 'refresh'>>({ invites: [], loaded: false, error: '' })
+  const [tickCount, setTickCount] = useState(0)
+  const refresh = useCallback(() => setTickCount(n => n + 1), [])
 
   useEffect(() => {
     if (!enabled) return
     let cancelled = false
     const tick = async () => {
       try {
-        const rooms = sortOpenRooms(await api.listRooms())
-        if (!cancelled) setState({ rooms, loaded: true, error: '' })
+        const invites = sortInvites(await api.invites())
+        if (!cancelled) setState({ invites, loaded: true, error: '' })
       } catch (e) {
         if (!cancelled) setState(s => ({ ...s, loaded: true, error: e instanceof Error ? e.message : String(e) }))
       }
     }
     void tick()
-    const timer = setInterval(() => { void tick() }, OPEN_ROOMS_POLL_MS)
+    const timer = setInterval(() => { void tick() }, INVITES_POLL_MS)
     return () => { cancelled = true; clearInterval(timer) }
-  }, [enabled])
+  }, [enabled, tickCount])
 
-  return state
+  return { ...state, refresh }
 }

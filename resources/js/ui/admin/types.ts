@@ -27,16 +27,29 @@ export interface AdminUser {
   is_env_admin: boolean
   is_disabled: boolean
   devices_count: number
-  /** the player's one world, or null before their first save */
-  world: { size: number; night: number; seconds: number; updated_at: string } | null
+  /** the player's own world, or null before their first save */
+  world: AdminWorld | null
+  /** the player's copy of the shared global world */
+  global_world: AdminWorld | null
   last_login_at: string | null
   created_at: string | null
+}
+
+export interface AdminWorld {
+  size: number
+  night: number
+  seconds: number
+  players: number
+  updated_at: string
 }
 
 export interface AdminRoom {
   code: string
   host_name: string
+  world_kind: 'own' | 'global'
   players: number
+  /** invitations sent for this room */
+  invites: number
   expires_at: string
 }
 

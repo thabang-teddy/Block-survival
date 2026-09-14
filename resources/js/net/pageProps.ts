@@ -12,8 +12,8 @@ export interface SharedProps extends InertiaPageProps {
 export interface PlayProps extends SharedProps {
   auth: { user: ApiUser }
   leaderboard: LeaderboardRow[]
-  /** the player's one world, or null before their first save */
-  world: WorldMeta | null
+  /** the player's own world and their copy of the global world; null before the first save of each */
+  worlds: { own: WorldMeta | null; global: WorldMeta | null }
 }
 
 /** the browser is waiting for an admin to approve it (no session yet) */
