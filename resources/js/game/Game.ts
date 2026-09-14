@@ -10,7 +10,7 @@
  */
 import * as THREE from 'three'
 import { World, type PropMeta } from '../world/chunkStore'
-import { ISLAND_LARGE } from '../world/islandGen'
+import { GLOBAL_SEED, type WorldKind } from '../world/seed'
 import { TerrainGenerator, WORLD_CHUNKS_Y } from '../world/terrainGen'
 import { ChunkStreamer, type StreamAnchor } from '../world/chunkStreamer'
 import { raycastVoxels, type RayHit } from '../world/raycast'
@@ -78,6 +78,10 @@ export interface GameOptions {
   session: HostSession | ClientSession
   /** host only: continue the player's saved world */
   restore?: SaveData
+  /** host only: which of the player's worlds this is (where it saves) */
+  worldKind?: WorldKind
+  /** host only: the seed of a brand-new world (a save's seed wins) */
+  seed?: number
 }
 
 type Ray = { ox: number; oy: number; oz: number; dx: number; dy: number; dz: number }
@@ -85,6 +89,8 @@ type Ray = { ox: number; oy: number; oz: number; dx: number; dy: number; dz: num
 export class Game {
   readonly role: Role
   readonly seed: number
+  /** host: which of the player's worlds this is (where it saves) */
+  readonly worldKind: WorldKind
   readonly world = new World()
   readonly terrain: TerrainGenerator
   readonly streamer: ChunkStreamer
@@ -161,8 +167,9 @@ export class Game {
     this.camera.rotation.order = 'YXZ'
     this.camera.add(this.viewModel.group)
     const t0 = performance.now()
-    // the world seed comes from the host (clients) or the save; new worlds use the classic one
-    this.seed = opts.session.role === 'client' ? opts.session.welcome!.seed : opts.restore?.seed ?? ISLAND_LARGE.seed
+    // the world seed comes from the host (clients), the save, or the lobby (a brand-new world)
+    this.seed = opts.session.role === 'client' ? opts.session.welcome!.seed : opts.restore?.seed ?? opts.seed ?? GLOBAL_SEED
+    this.worldKind = opts.worldKind ?? 'own'
     this.terrain = new TerrainGenerator(this.seed)
     this.world.setGenerator((cx, cy, cz) => this.terrain.generateChunk(cx, cy, cz), WORLD_CHUNKS_Y)
     this.world.trackEdits = true
@@ -798,7 +805,7 @@ export class Game {
   }
 
   private async uploadWorld(): Promise<void> {
-    await api.saveWorld(this.buildSave(), this.dayNight.night)
+    await api.saveWorld(this.buildSave(), this.dayNight.night, this.worldKind)
     this.beacon = null
   }
 
@@ -848,7 +855,7 @@ export class Game {
   /** the page is going away: fire the last packed save as a beacon */
   private onPageHide = (): void => {
     if (!this.autosave.isDirty || !this.beacon) return
-    if (api.beaconWorld(this.beacon.bytes, this.beacon.night, this.beacon.seconds)) this.beacon = null
+    if (api.beaconWorld(this.beacon.bytes, this.beacon.night, this.beacon.seconds, this.worldKind)) this.beacon = null
   }
 
   /** the tab went to the background: a normal upload still completes there */
