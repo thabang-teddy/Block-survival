@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { World } from '../../world/chunkStore'
 import { BLOCK } from '../../world/palette'
 import { boxIntersectsSolid, moveBox, type Box } from '../aabb'
-import { PlayerController, PLAYER } from '../playerController'
+import { PlayerController, PLAYER, wrapAngle } from '../playerController'
 import type { Input } from '../../input/Input'
 
 /** flat 41×41 floor of stone at y = 0 */
@@ -79,14 +79,6 @@ describe('playerController', () => {
     expect(p.state.onGround).toBe(true)
   })
 
-  test('pitch is clamped and yaw wraps freely', () => {
-    const p = new PlayerController(floorWorld(), { x: 0, y: 1, z: 0 })
-    p.look(0, -100000)
-    expect(p.state.pitch).toBeCloseTo(Math.PI / 2 - 0.01)
-    p.look(100000, 0)
-    expect(Number.isFinite(p.state.yaw)).toBe(true)
-  })
-
   test('overlapsVoxel detects the voxel the player is standing in', () => {
     const p = new PlayerController(floorWorld(), { x: 0.5, y: 1, z: 0.5 })
     expect(p.overlapsVoxel(0, 1, 0)).toBe(true)
@@ -124,5 +116,33 @@ describe('playerController', () => {
     for (let i = 0; i < 600; i++) p.update(1 / 60, fakeInput())
     expect(p.state.y).toBeGreaterThan(PLAYER.voidY)
     expect([p.state.x, p.state.z]).toEqual([5, 5]) // back over the spawn column (still falling: empty world)
+  })
+})
+
+describe('mouse look', () => {
+  test('pitch is clamped just short of straight up / down', () => {
+    const p = new PlayerController(floorWorld(), { x: 0.5, y: 1, z: 0.5 })
+    for (let i = 0; i < 50; i++) p.look(0, 200)
+    expect(p.state.pitch).toBeCloseTo(-(Math.PI / 2 - 0.01), 6)
+    for (let i = 0; i < 100; i++) p.look(0, -200)
+    expect(p.state.pitch).toBeCloseTo(Math.PI / 2 - 0.01, 6)
+  })
+
+  test('yaw wraps into (-π, π] instead of growing without bound', () => {
+    const p = new PlayerController(floorWorld(), { x: 0.5, y: 1, z: 0.5 })
+    for (let i = 0; i < 400; i++) p.look(300, 0)
+    expect(Math.abs(p.state.yaw)).toBeLessThanOrEqual(Math.PI)
+    expect(wrapAngle(Math.PI * 3)).toBeCloseTo(Math.PI, 9)
+    expect(wrapAngle(-Math.PI * 3)).toBeCloseTo(Math.PI, 9)
+    expect(wrapAngle(0.5)).toBeCloseTo(0.5, 9)
+    expect(wrapAngle(-Math.PI - 0.5)).toBeCloseTo(Math.PI - 0.5, 9)
+  })
+
+  test('a delta accumulated during a stall is capped per tick', () => {
+    const p = new PlayerController(floorWorld(), { x: 0.5, y: 1, z: 0.5 })
+    p.look(-100_000, 0)
+    expect(p.state.yaw).toBeCloseTo(PLAYER.maxLookPerTick * PLAYER.mouseSensitivity, 9)
+    p.look(0, 100_000)
+    expect(p.state.pitch).toBeCloseTo(-PLAYER.maxLookPerTick * PLAYER.mouseSensitivity, 9)
   })
 })

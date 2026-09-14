@@ -18,6 +18,8 @@ export const PLAYER = {
   groundAccel: 40,
   airAccel: 10,
   mouseSensitivity: 0.0022,
+  /** px of look applied in one tick at most: more than this is a stall, not a move */
+  maxLookPerTick: 400,
   /** below the bedrock at y = 0: something went wrong, put the player back on the pad */
   voidY: -8,
   maxStamina: 100,
@@ -25,6 +27,15 @@ export const PLAYER = {
   staminaRegen: 12,
   staminaRegenDelay: 1.0,
 } as const
+
+/** normalise an angle into (-π, π] */
+export function wrapAngle(a: number): number {
+  const twoPi = Math.PI * 2
+  a = a % twoPi
+  if (a > Math.PI) a -= twoPi
+  else if (a <= -Math.PI) a += twoPi
+  return a
+}
 
 export interface PlayerState {
   /** feet centre */
@@ -92,9 +103,16 @@ export class PlayerController {
     }
   }
 
+  /**
+   * Apply one tick of mouse delta (px). A delta that piled up during a frame stall is
+   * capped rather than applied in one go; yaw stays in (-π, π] so it never loses precision.
+   */
   look(dx: number, dy: number): void {
     const s = this.state
-    s.yaw -= dx * PLAYER.mouseSensitivity
+    const cap = PLAYER.maxLookPerTick
+    dx = Math.max(-cap, Math.min(cap, dx))
+    dy = Math.max(-cap, Math.min(cap, dy))
+    s.yaw = wrapAngle(s.yaw - dx * PLAYER.mouseSensitivity)
     s.pitch -= dy * PLAYER.mouseSensitivity
     const limit = Math.PI / 2 - 0.01
     s.pitch = Math.max(-limit, Math.min(limit, s.pitch))

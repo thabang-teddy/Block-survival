@@ -26,35 +26,62 @@ const KEY_EVENTS: Readonly<Record<string, InputEvent>> = {
   KeyF: { type: 'interact' },
 }
 
+/**
+ * Chromium on Windows sometimes emits a single pointer-lock `mousemove` with an absurd
+ * `movementX/Y` (hundreds to thousands of px) during a fast flick. A real move between two
+ * events, even at 1000 Hz polling, is far below this — anything larger is discarded.
+ */
+export const MAX_EVENT_DELTA = 300
+
+/** the subset of `document` / the canvas the input layer touches (fakeable in tests) */
+export interface InputTarget {
+  addEventListener(type: string, listener: (e: any) => void): void
+  removeEventListener(type: string, listener: (e: any) => void): void
+}
+export interface InputDocument extends InputTarget {
+  pointerLockElement: Element | null
+  exitPointerLock(): void
+  visibilityState?: string
+}
+export interface InputCanvas extends InputTarget {
+  requestPointerLock(options?: { unadjustedMovement?: boolean }): Promise<void> | void
+}
+
 export class Input {
   private readonly keys = new Set<string>()
   private readonly buttons = new Set<number>()
   private readonly look: MouseLook = { dx: 0, dy: 0 }
   private queue: InputEvent[] = []
-  private readonly canvas: HTMLElement
+  private readonly canvas: InputCanvas
+  private readonly doc: InputDocument
   locked = false
+  /** pointer-lock events discarded as spikes (shown on the dev stats line) */
+  droppedSpikes = 0
 
-  constructor(canvas: HTMLElement) {
+  constructor(canvas: InputCanvas, doc: InputDocument = document) {
     this.canvas = canvas
+    this.doc = doc
     canvas.addEventListener('click', this.onCanvasClick)
-    document.addEventListener('pointerlockchange', this.onLockChange)
-    document.addEventListener('mousemove', this.onMouseMove)
-    document.addEventListener('mousedown', this.onMouseDown)
-    document.addEventListener('mouseup', this.onMouseUp)
-    document.addEventListener('keydown', this.onKeyDown)
-    document.addEventListener('keyup', this.onKeyUp)
-    document.addEventListener('contextmenu', this.onContextMenu)
+    doc.addEventListener('pointerlockchange', this.onLockChange)
+    doc.addEventListener('visibilitychange', this.onVisibility)
+    doc.addEventListener('mousemove', this.onMouseMove)
+    doc.addEventListener('mousedown', this.onMouseDown)
+    doc.addEventListener('mouseup', this.onMouseUp)
+    doc.addEventListener('keydown', this.onKeyDown)
+    doc.addEventListener('keyup', this.onKeyUp)
+    doc.addEventListener('contextmenu', this.onContextMenu)
   }
 
   dispose(): void {
     this.canvas.removeEventListener('click', this.onCanvasClick)
-    document.removeEventListener('pointerlockchange', this.onLockChange)
-    document.removeEventListener('mousemove', this.onMouseMove)
-    document.removeEventListener('mousedown', this.onMouseDown)
-    document.removeEventListener('mouseup', this.onMouseUp)
-    document.removeEventListener('keydown', this.onKeyDown)
-    document.removeEventListener('keyup', this.onKeyUp)
-    document.removeEventListener('contextmenu', this.onContextMenu)
+    this.doc.removeEventListener('pointerlockchange', this.onLockChange)
+    this.doc.removeEventListener('visibilitychange', this.onVisibility)
+    this.doc.removeEventListener('mousemove', this.onMouseMove)
+    this.doc.removeEventListener('mousedown', this.onMouseDown)
+    this.doc.removeEventListener('mouseup', this.onMouseUp)
+    this.doc.removeEventListener('keydown', this.onKeyDown)
+    this.doc.removeEventListener('keyup', this.onKeyUp)
+    this.doc.removeEventListener('contextmenu', this.onContextMenu)
   }
 
   isDown(code: string): boolean {
@@ -69,8 +96,7 @@ export class Input {
   /** Accumulated mouse delta since the last call; resets to zero. */
   takeLook(): MouseLook {
     const out = { ...this.look }
-    this.look.dx = 0
-    this.look.dy = 0
+    this.clearLook()
     return out
   }
 
@@ -84,27 +110,61 @@ export class Input {
   panelOpen = false
 
   requestLock(): void {
-    if (!this.locked) this.canvas.requestPointerLock()
+    if (!this.locked) this.lock()
   }
 
   releaseLock(): void {
-    if (this.locked) document.exitPointerLock()
+    if (this.locked) this.doc.exitPointerLock()
+  }
+
+  /**
+   * Lock without OS pointer acceleration so a fast flick maps linearly to look. Chromium
+   * returns a promise that rejects when the option is unsupported; Firefox returns undefined.
+   */
+  private lock(): void {
+    let result: Promise<void> | void
+    try {
+      result = this.canvas.requestPointerLock({ unadjustedMovement: true })
+    } catch {
+      this.canvas.requestPointerLock()
+      return
+    }
+    if (result && typeof result.catch === 'function') {
+      result.catch(() => {
+        try { this.canvas.requestPointerLock() } catch { /* the user will click again */ }
+      })
+    }
+  }
+
+  private clearLook(): void {
+    this.look.dx = 0
+    this.look.dy = 0
   }
 
   private onCanvasClick = (): void => {
-    if (!this.locked && !this.panelOpen) this.canvas.requestPointerLock()
+    if (!this.locked && !this.panelOpen) this.lock()
   }
 
   private onLockChange = (): void => {
-    this.locked = document.pointerLockElement === this.canvas
+    this.locked = this.doc.pointerLockElement === (this.canvas as unknown as Element)
+    // whatever accumulated while the lock was changing hands is not the player's intent
+    this.clearLook()
     if (!this.locked) {
       this.keys.clear()
       this.buttons.clear()
     }
   }
 
+  private onVisibility = (): void => {
+    if (this.doc.visibilityState === 'hidden') this.clearLook()
+  }
+
   private onMouseMove = (e: MouseEvent): void => {
     if (!this.locked) return
+    if (Math.abs(e.movementX) > MAX_EVENT_DELTA || Math.abs(e.movementY) > MAX_EVENT_DELTA) {
+      this.droppedSpikes++
+      return
+    }
     this.look.dx += e.movementX
     this.look.dy += e.movementY
   }

@@ -223,6 +223,7 @@ export class Game {
     this.time += dt
     const look = this.input.takeLook()
     if (!this.dead) this.player.look(look.dx, look.dy)
+    this.reportLookSpikes()
     for (const ev of this.input.takeEvents()) if (!this.dead) this.handleEvent(ev)
     // never integrate physics over ground that has not streamed in yet (e.g. right after a teleport)
     const p = this.player.state
@@ -485,6 +486,16 @@ export class Game {
       const targets = [...this.avatars.values()].filter(a => a.alive).map(a => ({ x: a.x, y: a.y, z: a.z }))
       this.zombies.spawnGroup(kindsForNight(dn.night), 3 + Math.floor(Math.random() * 4), targets, 28)
     }
+  }
+
+  /** dev only: how many pointer-lock spikes the input layer has discarded (issue #14) */
+  private loggedSpikes = 0
+  private reportLookSpikes(): void {
+    if (!import.meta.env.DEV) return
+    const n = this.input.droppedSpikes
+    if (n === this.loggedSpikes) return
+    this.loggedSpikes = n
+    console.info(`mouse: discarded ${n} pointer-lock delta spike${n === 1 ? '' : 's'}`)
   }
 
   /** Split the night's zombie count into groups of 3–6 spread over the spawn window. */
