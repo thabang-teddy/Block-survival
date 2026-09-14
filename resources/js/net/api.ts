@@ -7,6 +7,7 @@
 import type { BlockEdit } from './protocol'
 import { migrateSave } from './saveMigrate'
 import type { ItemStack } from '../items/inventory'
+import type { ZombieKind } from '../entities/zombies'
 
 export interface ApiUser {
   id: number
@@ -34,23 +35,43 @@ export interface WorldMeta {
   size: number
   night: number
   seconds: number
+  /** how many different players' gear the save holds (host included) */
+  players: number
   updated_at: string
 }
 
-/**
- * What a saved world contains (gzipped JSON). Version 2 worlds are infinite: the seed
- * regenerates the terrain and `edits` is the player's diff on top of it.
- */
-export interface SaveData {
-  version: 2
-  seed: number
-  time: number
-  edits: BlockEdit[]
+/** one player's gear and standing in a saved world, keyed by their user id */
+export interface SavedPlayer {
+  name: string
   inventory: readonly (ItemStack | null)[]
   spawn: { x: number; y: number; z: number }
+  pos: { x: number; y: number; z: number; yaw: number; pitch: number }
+  health: number
+  magazine: number
   kills: number
   deaths: number
 }
+
+/**
+ * What a saved world contains (gzipped JSON). The seed regenerates the terrain and
+ * `edits` is the diff on top of it; version 3 (issue #13) also keeps everyone who has
+ * played in the world, and the zombies, drops and crates that were live at save time.
+ */
+export interface SaveData {
+  version: 3
+  seed: number
+  time: number
+  edits: BlockEdit[]
+  players: Record<string, SavedPlayer>
+  zombies: { kind: ZombieKind; x: number; y: number; z: number; hp: number }[]
+  drops: { id: string; count: number; x: number; y: number; z: number }[]
+  crates: { x: number; y: number; z: number; items: (ItemStack | null)[] }[]
+  /** Date.now() on the host when the save was built */
+  savedAt: number
+}
+
+/** the sendBeacon queue holds this much per page; a bigger save cannot go out on unload */
+export const BEACON_LIMIT = 60 * 1024
 
 export interface SignalRow {
   id: number
@@ -69,11 +90,14 @@ export class ApiError extends Error {
 
 let currentUser: ApiUser | null = null
 
+/** the plain session token from the page head; the only form the `_token` field accepts */
+const pageCsrfToken = (): string => document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? ''
+
 /** Laravel's XSRF-TOKEN cookie, sent back as a header so VerifyCsrfToken accepts the call */
 function csrfToken(): string {
   const m = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]+)/)
   if (m) return decodeURIComponent(m[1])
-  return document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? ''
+  return pageCsrfToken()
 }
 
 async function request<T>(method: string, path: string, body?: unknown, raw?: BodyInit, headers: Record<string, string> = {}): Promise<T> {
@@ -136,6 +160,22 @@ export const api = {
     const body = new Blob([bytes as BlobPart], { type: 'application/gzip' })
     return (await request<{ world: WorldMeta }>('PUT', `/world${q}`, undefined, body, { 'Content-Type': 'application/gzip' })).world
   },
+  /** the gzipped bytes of a save, prepared ahead of time so an unload can beacon them */
+  packWorld: (data: SaveData): Promise<Uint8Array> => gzip(JSON.stringify(data)),
+  /**
+   * Fire-and-forget save while the page is going away: a beacon cannot carry headers,
+   * so the CSRF token travels as a form field. Returns false when the browser refused
+   * to queue it (too big, or beacons unsupported).
+   */
+  beaconWorld(bytes: Uint8Array, night: number, seconds: number): boolean {
+    if (typeof navigator.sendBeacon !== 'function' || bytes.byteLength > BEACON_LIMIT) return false
+    const form = new FormData()
+    form.append('payload', new Blob([bytes as BlobPart], { type: 'application/gzip' }), 'world.json.gz')
+    form.append('night', String(night))
+    form.append('seconds', String(Math.floor(seconds)))
+    form.append('_token', pageCsrfToken())
+    return navigator.sendBeacon('/api/world/beacon', form)
+  },
   /** the saved world, or null when the player has not saved one yet */
   async loadWorld(): Promise<SaveData | null> {
     let res: Response
@@ -146,7 +186,7 @@ export const api = {
       throw e
     }
     const text = await gunzip(await res.arrayBuffer())
-    const data = migrateSave(JSON.parse(text))
+    const data = migrateSave(JSON.parse(text), currentUser?.id ?? 0)
     if (!data) throw new ApiError(422, 'Unreadable save')
     return data
   },
