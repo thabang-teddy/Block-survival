@@ -142,8 +142,10 @@ export class Game {
   private readonly autosave = new Autosave(() => this.uploadWorld())
   /** players who left (or have not reconnected since the load), by account id */
   private readonly visitors = new Visitors()
-  /** what a cheap scan of the sim looked like at the last dirty check */
+  /** what a cheap scan of the sim looked like at the last dirty check ('' = not scanned yet) */
   private dirtySignature = ''
+  /** a brand-new world must be uploaded once so its seed sticks; a restored one only when it changes */
+  private readonly needsFirstSave: boolean
   private beaconTimer = 0
   private beacon: { bytes: Uint8Array; night: number; seconds: number } | null = null
   private packing = false
@@ -170,6 +172,7 @@ export class Game {
     // the world seed comes from the host (clients), the save, or the lobby (a brand-new world)
     this.seed = opts.session.role === 'client' ? opts.session.welcome!.seed : opts.restore?.seed ?? opts.seed ?? GLOBAL_SEED
     this.worldKind = opts.worldKind ?? 'own'
+    this.needsFirstSave = opts.session.role === 'host' && !opts.restore
     this.terrain = new TerrainGenerator(this.seed)
     this.world.setGenerator((cx, cy, cz) => this.terrain.generateChunk(cx, cy, cz), WORLD_CHUNKS_Y)
     this.world.trackEdits = true
@@ -834,7 +837,10 @@ export class Game {
     }
     const sp = this.local.spawn
     const sig = `${this.world.edits.size}:${this.world.propsVersion}:${inventories}:${deaths}:${this.drops.drops.length}:${this.crates.crates.length}:${sp.x},${sp.y},${sp.z}`
-    if (sig !== this.dirtySignature) {
+    if (this.dirtySignature === '') {
+      this.dirtySignature = sig
+      if (this.needsFirstSave) this.autosave.markDirty()
+    } else if (sig !== this.dirtySignature) {
       this.dirtySignature = sig
       this.autosave.markDirty()
     }
