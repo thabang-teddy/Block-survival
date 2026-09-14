@@ -40,6 +40,23 @@ export function makeRng(seed: number): Rng {
   }
 }
 
+/**
+ * Deterministic 32-bit integer hash of up to four ints (murmur3-style finaliser).
+ * Used wherever terrain must be decided per column / per cell with no RNG state.
+ */
+export function hashInt(a: number, b = 0, c = 0, d = 0): number {
+  let h = Math.imul(a | 0, 0x9e3779b1) ^ 0x85ebca6b
+  h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) ^ Math.imul(b | 0, 0x27d4eb2f)
+  h = Math.imul(h ^ (h >>> 13), 0x165667b1) ^ Math.imul(c | 0, 0x9e3779b1)
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) ^ Math.imul(d | 0, 0xc2b2ae35)
+  h ^= h >>> 13
+  h = Math.imul(h, 0x27d4eb2f)
+  return (h ^ (h >>> 16)) >>> 0
+}
+
+/** hashInt scaled to [0, 1) */
+export const hash01 = (a: number, b = 0, c = 0, d = 0): number => hashInt(a, b, c, d) / 4294967296
+
 const GRAD: readonly (readonly [number, number, number])[] = [
   [1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0],
   [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1],
@@ -101,5 +118,15 @@ export class PerlinNoise {
       ),
       w,
     )
+  }
+}
+
+/** 2-D fractal noise in roughly -1.5..1.5 (`n2` in islands.py); `seed` picks a slice. */
+export function fractal2(perlin: PerlinNoise) {
+  return (x: number, z: number, seed: number, freq: number): number => {
+    const vx = x * freq
+    const vz = z * freq
+    const vs = seed * 7.31
+    return perlin.noise(vx, vz, vs) + 0.5 * perlin.noise(vx * 2.1 + 3.3, vz * 2.1 + 1.7, vs * 2.1)
   }
 }

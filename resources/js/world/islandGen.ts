@@ -5,8 +5,14 @@
  * Origin = island centre, y = 0 is the lowest grass layer, the island hangs below.
  */
 import { BLOCK } from './palette'
-import { makeRng, PerlinNoise, type Rng } from './noise'
-import type { World } from './chunkStore'
+import { fractal2, makeRng, PerlinNoise, type Rng } from './noise'
+
+/** where generated voxels go: the live World, or a template that is stamped later */
+export interface VoxelSink {
+  getBlock(x: number, y: number, z: number): number
+  setBlock(x: number, y: number, z: number, id: number): void
+  setBlockIfAir(x: number, y: number, z: number, id: number): void
+}
 
 export interface IslandParams {
   size: number
@@ -37,17 +43,7 @@ export interface IslandInfo {
 
 const colKey = (x: number, z: number): number => (x + 512) * 1024 + (z + 512)
 
-/** 2-D fractal noise in roughly -1..1 (`n2` in islands.py). */
-function makeN2(perlin: PerlinNoise) {
-  return (x: number, z: number, seed: number, freq: number): number => {
-    const vx = x * freq
-    const vz = z * freq
-    const vs = seed * 7.31
-    return perlin.noise(vx, vz, vs) + 0.5 * perlin.noise(vx * 2.1 + 3.3, vz * 2.1 + 1.7, vs * 2.1)
-  }
-}
-
-function addTree(world: World, x: number, y: number, z: number, rng: Rng): void {
+function addTree(world: VoxelSink, x: number, y: number, z: number, rng: Rng): void {
   const height = rng.randint(4, 6)
   for (let dy = 0; dy < height; dy++) world.setBlock(x, y + dy, z, BLOCK.log)
   const top = y + height
@@ -63,10 +59,10 @@ function addTree(world: World, x: number, y: number, z: number, rng: Rng): void 
   world.setBlock(x, top + 2, z, BLOCK.leaves)
 }
 
-export function generateIsland(world: World, p: IslandParams): IslandInfo {
+export function generateIsland(world: VoxelSink, p: IslandParams): IslandInfo {
   const { size, seed, maxHeight, depth, padRadius, lake, treeDensity } = p
   const rng = makeRng(seed)
-  const n2 = makeN2(new PerlinNoise(seed))
+  const n2 = fractal2(new PerlinNoise(seed))
   const R = size / 2
   const Ri = Math.trunc(R)
 

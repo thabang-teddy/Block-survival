@@ -34,7 +34,7 @@ const blockItem = (name: BlockName): ItemDef => ({
 
 /** props get bespoke item defs below */
 const PLACEABLE: readonly BlockName[] = BLOCK_NAMES.filter(
-  n => n !== 'air' && n !== 'water' && n !== 'torch' && n !== 'workbench' && n !== 'bed',
+  n => n !== 'air' && n !== 'water' && n !== 'bedrock' && n !== 'torch' && n !== 'workbench' && n !== 'bed',
 )
 
 export const ITEMS: Readonly<Record<string, ItemDef>> = Object.fromEntries(

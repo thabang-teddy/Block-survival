@@ -27,6 +27,8 @@ export const BLOCK = {
   workbench: 16,
   bed: 17,
   reinforced_wall: 18,
+  /** the unbreakable floor of the world at y = 0 */
+  bedrock: 19,
 } as const
 
 export type BlockId = (typeof BLOCK)[keyof typeof BLOCK]
@@ -35,7 +37,7 @@ export type BlockName = keyof typeof BLOCK
 export const BLOCK_NAMES: readonly BlockName[] = [
   'air', 'grass', 'dirt', 'stone', 'cobble', 'sand', 'gravel', 'log',
   'planks', 'leaves', 'water', 'glass', 'snow', 'ore_iron', 'ore_coal',
-  'torch', 'workbench', 'bed', 'reinforced_wall',
+  'torch', 'workbench', 'bed', 'reinforced_wall', 'bedrock',
 ]
 
 interface BlockDef {
@@ -84,6 +86,7 @@ export const BLOCK_DEFS: Readonly<Record<BlockId, BlockDef>> = {
     colours: [[0.36, 0.38, 0.40], [0.30, 0.32, 0.35], [0.30, 0.32, 0.35]],
     alpha: 1, seeThrough: false, solid: true,
   },
+  [BLOCK.bedrock]: { colours: solidRgb([0.18, 0.18, 0.20]), alpha: 1, seeThrough: false, solid: true },
 }
 
 export const isSolid = (id: number): boolean => BLOCK_DEFS[id as BlockId]?.solid ?? false
