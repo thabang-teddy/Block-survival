@@ -3,6 +3,7 @@
  * all resolved against the voxel world with swept AABBs.
  */
 import type { World } from '../world/chunkStore'
+import { UPDRAFT, updraftAt, type Updraft } from '../world/updraft'
 import { boxIntersectsSolid, moveBox, type Box } from './aabb'
 import type { Input } from '../input/Input'
 
@@ -53,6 +54,8 @@ export interface PlayerState {
   sprinting: boolean
   /** seconds since the player last sprinted */
   sinceSprint: number
+  /** standing in an updraft shaft: Space rises, Shift sinks, otherwise hover */
+  inUpdraft: boolean
 }
 
 export class PlayerController {
@@ -61,13 +64,15 @@ export class PlayerController {
   spawn: { x: number; y: number; z: number }
   private readonly world: World
   private jumpQueued = false
+  /** the updraft shafts near a point (the terrain generator's; tests pass a fake) */
+  updrafts: (x: number, z: number) => readonly Updraft[] = () => []
 
   constructor(world: World, spawn: { x: number; y: number; z: number }) {
     this.world = world
     this.spawn = { ...spawn }
     this.state = {
       x: spawn.x, y: spawn.y, z: spawn.z, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, onGround: false,
-      stamina: PLAYER.maxStamina, sprinting: false, sinceSprint: 99,
+      stamina: PLAYER.maxStamina, sprinting: false, sinceSprint: 99, inUpdraft: false,
     }
   }
 
@@ -143,10 +148,20 @@ export class PlayerController {
     s.vz += Math.max(-accel, Math.min(accel, wishZ * speed - s.vz))
 
     // ---- vertical
-    if (this.jumpQueued && s.onGround && !frozen) s.vy = PLAYER.jumpSpeed
+    const shaft = frozen ? null : updraftAt(this.updrafts(s.x, s.z), s.x, s.y, s.z)
+    s.inUpdraft = shaft !== null
+    if (shaft) {
+      // the shaft carries you: ease towards rise / sink / hover, never past its top
+      const want = down('Space') ? UPDRAFT.rise : down('ShiftLeft') ? -UPDRAFT.sink : 0
+      const step = UPDRAFT.accel * dt
+      s.vy += Math.max(-step, Math.min(step, want - s.vy))
+      if (s.vy > 0 && s.y + s.vy * dt > shaft.topY) s.vy = Math.max(0, (shaft.topY - s.y) / dt)
+    } else {
+      if (this.jumpQueued && s.onGround && !frozen) s.vy = PLAYER.jumpSpeed
+      s.vy -= PLAYER.gravity * dt
+      s.vy = Math.max(s.vy, -50)
+    }
     this.jumpQueued = false
-    s.vy -= PLAYER.gravity * dt
-    s.vy = Math.max(s.vy, -50)
 
     this.move(s.vx * dt, s.vy * dt, s.vz * dt)
     if (s.y < PLAYER.voidY) this.teleport(this.spawn.x, this.spawn.y, this.spawn.z)
