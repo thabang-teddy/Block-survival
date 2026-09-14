@@ -25,6 +25,10 @@ define the asset conventions, the block colour palette and the island generator 
    (`generate_island`, `add_tree`, `n2`) into a template that is stamped over the ground.
    Cell (0, 0) is the legacy `Island_Large` (`size=56, seed=11, max_height=9, depth=16,
    pad_radius=8, lake=True`) floating at y = 80 over the spawn pad. Players start on the ground.
+   Every island has an **updraft column** (issue #12): a glowing shaft from the ground to just
+   above its rim, placed 2 blocks off the island's edge, deterministic from the seed. Standing
+   in it: hold Space to rise (6 m/s), Shift to sink, nothing to hover; walk out to drop. It is
+   the intended way up — a bed placed on an island sets the respawn point like any bed.
    `Design/Islands/*.glb` are reference/set-dressing only — **do not** use them as the playable
    terrain (they are not editable).
 3. **Never place thousands of `Block_*.glb` instances.** Build chunk meshes in JS:

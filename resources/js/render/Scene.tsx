@@ -44,6 +44,7 @@ function GameLoop() {
       <Lighting game={game} />
       <primitive object={game.chunks.group} />
       <primitive object={game.props.group} />
+      <primitive object={game.updrafts.group} />
       <primitive object={game.drops.group} />
       <primitive object={game.crates.group} />
       <primitive object={game.zombieRenderer.group} />

@@ -17,6 +17,7 @@ import { raycastVoxels, type RayHit } from '../world/raycast'
 import { AIR, BLOCK, isProp, isSolid } from '../world/palette'
 import { ChunkRenderer } from '../render/ChunkRenderer'
 import { PropRenderer } from '../render/PropRenderer'
+import { UpdraftRenderer } from '../render/UpdraftRenderer'
 import { ViewModel } from '../render/ViewModel'
 import { ZombieRenderer, preloadZombies } from '../render/ZombieRenderer'
 import { RemotePlayerRenderer } from '../render/RemotePlayerRenderer'
@@ -83,6 +84,7 @@ export class Game {
   readonly streamer: ChunkStreamer
   readonly chunks: ChunkRenderer
   readonly props: PropRenderer
+  readonly updrafts: UpdraftRenderer
   readonly player: PlayerController
   readonly input: Input
   readonly drops: DropManager
@@ -168,6 +170,7 @@ export class Game {
     this.chunks = new ChunkRenderer(this.world)
     this.chunks.flush()
     this.props = new PropRenderer(this.world)
+    this.updrafts = new UpdraftRenderer(this.terrain)
     const t2 = performance.now()
     console.info(
       `world seed ${this.seed}: ${this.world.loadedColumnCount} columns, ${this.world.chunkCount} chunks — gen ${(t1 - t0).toFixed(0)} ms, mesh ${(t2 - t1).toFixed(0)} ms (${this.role})`,
@@ -181,6 +184,7 @@ export class Game {
       this.local.deaths = opts.restore.deaths
     }
     this.player = new PlayerController(this.world, spawn)
+    this.player.updrafts = (x, z) => this.terrain.updraftsNear(x - 3, z - 3, x + 3, z + 3)
     this.input = new Input(canvas)
     this.drops = new DropManager(this.world)
     this.crates = new CrateManager(this.world)
@@ -206,6 +210,7 @@ export class Game {
     this.input.dispose()
     this.chunks.dispose()
     this.props.dispose()
+    this.updrafts.dispose()
     this.drops.dispose()
     this.zombieRenderer.dispose()
     this.remotePlayers.dispose()
@@ -248,6 +253,7 @@ export class Game {
     this.streamWorld()
     this.chunks.update()
     this.props.update(dt, this.camera.position.x, this.camera.position.y, this.camera.position.z)
+    this.updrafts.update(dt, this.camera.position.x, this.camera.position.z)
     this.zombieRenderer.update(dt, this.zombies)
     this.remotePlayers.update(dt, this.remotePoses.values())
     this.crates.update(this.time)
@@ -371,7 +377,7 @@ export class Game {
     }
     if (st.respawnIn !== undefined) a.respawnAt = this.time + st.respawnIn
     if (st.spawn) a.spawn = st.spawn
-    if (st.teleport) this.player.teleport(st.teleport.x, st.teleport.y, st.teleport.z)
+    if (st.teleport) this.teleportLocal(st.teleport.x, st.teleport.y, st.teleport.z)
     if (st.message) this.showMessage(st.message)
     for (const f of st.fx ?? []) {
       if (f.kind === 'flash') this.fx.muzzleFlash(f.ax, f.ay, f.az)
@@ -537,6 +543,12 @@ export class Game {
     if (a === this.local) this.postScore()
   }
 
+  /** move the local player somewhere that may not be streamed yet (a bed on an island) */
+  private teleportLocal(x: number, y: number, z: number): void {
+    this.streamer.loadNow(x, z, INITIAL_LOAD_RADIUS)
+    this.player.teleport(x, y, z)
+  }
+
   private respawn(a: Avatar): void {
     a.dead = false
     a.health = AVATAR.maxHealth
@@ -545,7 +557,7 @@ export class Game {
     a.x = sp.x; a.y = sp.y; a.z = sp.z
     const msg = this.crates.crates.length ? 'Your loot crate is where you fell' : 'Back on your feet'
     if (a === this.local) {
-      this.player.teleport(sp.x, sp.y, sp.z)
+      this.teleportLocal(sp.x, sp.y, sp.z)
       this.player.state.stamina = PLAYER.maxStamina
       this.cameraMode = this.cameraBeforeDeath
       this.showMessage(msg)
@@ -996,7 +1008,8 @@ export class Game {
       message: this.time < this.messageUntil ? this.message : '',
       interactHint: this.crateTarget ? `F  take loot (${this.crateTarget.count})`
         : this.target?.block === BLOCK.bed ? 'F  set respawn'
-        : this.target?.block === BLOCK.workbench ? 'F  craft' : '',
+        : this.target?.block === BLOCK.workbench ? 'F  craft'
+        : this.player.state.inUpdraft ? 'Space  rise · Shift  sink · walk out to drop' : '',
       timer: this.dayNight.timerText,
       phase: this.dayNight.phase,
       night: this.dayNight.night,
