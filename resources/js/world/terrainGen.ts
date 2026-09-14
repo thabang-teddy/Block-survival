@@ -9,6 +9,7 @@ import { AIR, BLOCK } from './palette'
 import { GroundModel, SEA_LEVEL, TREE_MAX_HEIGHT } from './groundGen'
 import { islandsNear, IslandTemplates, type PlacedIsland } from './islandField'
 import type { IslandTemplate } from './islandTemplate'
+import { updraftFor, type Updraft } from './updraft'
 
 /** vertical band of the world: chunks cy 0 .. WORLD_CHUNKS_Y-1 (y 0..127) */
 export const WORLD_CHUNKS_Y = 8
@@ -19,6 +20,8 @@ const CANOPY = 2
 const COLS = CHUNK + 2 * BORDER
 /** column blocks kept; each is 24×24 heights + tree table */
 const COLUMN_CACHE = 512
+/** a shaft sits at most this far from its island's centre (half extent + margin + gap) */
+const UPDRAFT_REACH = 8
 
 export interface Spawn {
   x: number
@@ -40,6 +43,7 @@ export class TerrainGenerator {
   readonly ground: GroundModel
   private readonly templates = new IslandTemplates()
   private readonly columns = new Map<string, ColumnBlock>()
+  private readonly updrafts = new Map<string, Updraft>()
 
   constructor(seed: number) {
     this.seed = seed
@@ -49,6 +53,27 @@ export class TerrainGenerator {
   /** where a new player stands: on the centre of the spawn pad */
   spawn(): Spawn {
     return { x: 0.5, y: this.ground.padHeight + 1, z: 0.5 }
+  }
+
+  /** the updraft shaft of an island (memoised; a pure function of the island) */
+  updraftOf(island: PlacedIsland): Updraft {
+    const key = `${island.ix},${island.iz}`
+    let u = this.updrafts.get(key)
+    if (!u) {
+      u = updraftFor(island, this.templates.get(island), (x, z) => this.ground.height(x, z))
+      this.updrafts.set(key, u)
+    }
+    return u
+  }
+
+  /** shafts whose axis lies inside the block range [x0, x1] × [z0, z1] */
+  updraftsNear(x0: number, z0: number, x1: number, z1: number): Updraft[] {
+    const out: Updraft[] = []
+    for (const island of islandsNear(this.seed, x0 - UPDRAFT_REACH, z0 - UPDRAFT_REACH, x1 + UPDRAFT_REACH, z1 + UPDRAFT_REACH)) {
+      const u = this.updraftOf(island)
+      if (u.x >= x0 && u.x <= x1 + 1 && u.z >= z0 && u.z <= z1 + 1) out.push(u)
+    }
+    return out
   }
 
   /** The pristine contents of a chunk, or null when it is all air. */
