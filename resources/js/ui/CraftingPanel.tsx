@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useUiStore } from '../state/uiStore'
-import { craftStatus, RECIPES, type Recipe } from '../items/recipes'
+import { craftStatus, recipesFor, type Recipe } from '../items/recipes'
 import { getItem } from '../items/registry'
 import { HOTBAR_SIZE } from '../items/inventory'
 import { ItemIcon } from './ItemIcon'
@@ -15,8 +15,11 @@ export function CraftingPanel() {
   const game = useUiStore(s => s.game)
   const nearWorkbench = useUiStore(s => s.nearWorkbench)
   useUiStore(s => s.inventoryVersion) // subscribe so crafting re-renders the counts
-  const [selected, setSelected] = useState<Recipe>(RECIPES[0])
+  const recipes = recipesFor(nearWorkbench ? 'bench' : 'hand')
+  const [selected, setSelected] = useState<Recipe>(recipes[0])
   const [pickedSlot, setPickedSlot] = useState<number | null>(null)
+  // opening E after F (or walking away from the bench) must not keep a hidden recipe selected
+  if (!recipes.includes(selected)) setSelected(recipes[0])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -56,7 +59,7 @@ export function CraftingPanel() {
 
         <div className="craft-body">
           <ul className="recipes">
-            {RECIPES.map(r => {
+            {recipes.map(r => {
               const st = craftStatus(inv, r, nearWorkbench)
               const def = getItem(r.output.id)
               return (
@@ -71,6 +74,7 @@ export function CraftingPanel() {
                 </li>
               )
             })}
+            {!nearWorkbench && <li className="bench-hint">Build a workbench for tools, weapons, glass, walls and torches.</li>}
           </ul>
 
           <section className="details">

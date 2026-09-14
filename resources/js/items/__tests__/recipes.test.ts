@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { Inventory } from '../inventory'
-import { craft, craftStatus, getRecipe, RECIPES } from '../recipes'
+import { craft, craftStatus, getRecipe, RECIPES, recipesFor } from '../recipes'
 import { getItem } from '../registry'
 
 describe('recipes', () => {
@@ -21,6 +21,39 @@ describe('recipes', () => {
     expect(craftStatus(inv, getRecipe('pickaxe_stone'), false)).toBe('needsBench')
     expect(craftStatus(inv, getRecipe('pickaxe_stone'), true)).toBe('ok')
     expect(craftStatus(inv, getRecipe('sword'), true)).toBe('missing')
+  })
+
+  test('by hand you can only make planks, sticks, a workbench and a wooden pickaxe', () => {
+    expect(recipesFor('hand').map(r => r.id)).toEqual(['planks', 'stick', 'workbench', 'pickaxe_wood'])
+  })
+
+  test('a workbench makes everything except another workbench', () => {
+    const ids = recipesFor('bench').map(r => r.id)
+    expect(ids).not.toContain('workbench')
+    expect(ids).toHaveLength(RECIPES.length - 1)
+    for (const hand of ['planks', 'stick', 'pickaxe_wood', 'torch', 'rifle']) expect(ids).toContain(hand)
+  })
+
+  test('torches need a workbench', () => {
+    const inv = new Inventory()
+    inv.add('stick', 1)
+    inv.add('coal', 1)
+    expect(craft(inv, getRecipe('torch'), false)).toBeNull()
+    expect(craft(inv, getRecipe('torch'), true)).toEqual({ overflow: 0 })
+    expect(inv.count('torch')).toBe(4)
+    expect(inv.count('stick')).toBe(0)
+    expect(inv.count('coal')).toBe(0)
+  })
+
+  test('nothing to a wooden pickaxe needs only hand recipes', () => {
+    const inv = new Inventory()
+    inv.add('log', 3)
+    for (const id of ['planks', 'planks', 'planks', 'stick', 'workbench', 'pickaxe_wood']) {
+      expect(craftStatus(inv, getRecipe(id), false), id).toBe('ok')
+      craft(inv, getRecipe(id), false)
+    }
+    expect(inv.count('pickaxe_wood')).toBe(1)
+    expect(inv.count('workbench')).toBe(1)
   })
 
   test('crafting consumes inputs and adds the output', () => {

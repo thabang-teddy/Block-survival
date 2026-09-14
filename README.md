@@ -44,8 +44,8 @@ swing · **right** place, or aim with the rifle · **1–9** hotbar · **Q** dro
 **E** inventory & crafting · **F** workbench / set respawn at a bed / take loot · **Tab** scoreboard ·
 Esc pause.
 
-Punch logs, craft planks → sticks → workbench → pickaxes; mine cobble, coal and iron; craft a sword,
-glass, walls, torches, a bed and finally a rifle. The first sunset is at 5:00 — build walls first.
+Punch logs, craft planks → sticks → workbench → a wooden pickaxe by hand; everything else (stone and
+iron pickaxes, sword, glass, walls, torches, a bed and finally a rifle) needs the workbench. The first sunset is at 5:00 — build walls first.
 Dying leaves your gear in a crate where you fell; you respawn at your bed after 5 s.
 Score = nights survived × 100 + kills × 5.
 

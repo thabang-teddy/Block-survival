@@ -108,7 +108,7 @@ digs by hand. Water and bedrock-level stone (lowest 2 layers) are indestructible
 | Planks ×4 | Log ×1 | hand |
 | Sticks ×4 | Planks ×2 | hand |
 | Workbench | Planks ×4 | hand |
-| Torch ×4 (light) | Stick ×1 + Coal ×1 | hand |
+| Torch ×4 (light) | Stick ×1 + Coal ×1 | bench |
 | Wooden Pickaxe | Planks ×3 + Stick ×2 | hand |
 | Stone Pickaxe | Cobble ×3 + Stick ×2 | bench |
 | Iron Pickaxe | Iron ×3 + Stick ×2 | bench |
@@ -119,6 +119,8 @@ digs by hand. Water and bedrock-level stone (lowest 2 layers) are indestructible
 | Rifle | Iron ×8 + Planks ×2 + Coal ×2 | bench |
 | Rifle Ammo ×30 | Iron ×1 + Coal ×1 | bench |
 
+By hand (E, anywhere) you can only make planks, sticks, a workbench and a wooden pickaxe;
+the workbench (F) makes everything except another workbench (issue #10).
 Crafting UI is a React panel: recipe list on the left (greyed if ingredients are missing),
 ingredient requirements on the right, click to craft. Item icons are the GLB models rendered
 once at startup with an offscreen renderer (SVG fallbacks are fine for the MVP).
