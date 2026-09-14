@@ -18,8 +18,8 @@ export const PLAYER = {
   groundAccel: 40,
   airAccel: 10,
   mouseSensitivity: 0.0022,
-  /** fall below this and you are respawned (Phase 1 stand-in for death) */
-  voidY: -40,
+  /** below the bedrock at y = 0: something went wrong, put the player back on the pad */
+  voidY: -8,
   maxStamina: 100,
   staminaDrain: 15,
   staminaRegen: 12,

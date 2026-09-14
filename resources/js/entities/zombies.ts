@@ -4,7 +4,7 @@
  * Rendering lives in render/ZombieRenderer.ts.
  */
 import type { World } from '../world/chunkStore'
-import { AIR, BLOCK, isProp, isSolid } from '../world/palette'
+import { BLOCK, isProp, isSolid } from '../world/palette'
 import { moveBox } from '../physics/aabb'
 import { findPath, standingCellAt, type Cell } from './pathfinding'
 import type { Rng } from '../world/noise'
@@ -109,6 +109,8 @@ export const ZOMBIE = {
   pathMaxNodes: 500,
   /** beyond this distance zombies walk straight at the target instead of searching */
   pathMaxDistance: 40,
+  /** spawn spots are looked for this far above / below the player being surrounded */
+  spawnSearchHeight: 24,
 } as const
 
 export class ZombieManager {
@@ -140,26 +142,29 @@ export class ZombieManager {
   }
 
   /**
-   * Spawn a group at a grass cell on the island rim, ≥ minSpawnDistance from every target.
+   * Spawn a group on grass / sand around one of the targets, `radius` blocks out and
+   * ≥ minSpawnDistance from every target, on the same layer (ground or island) as them.
    * Returns how many were spawned (0 if no spot was found or the cap is reached).
    */
   spawnGroup(kinds: ZombieKind[], count: number, targets: ZombieTarget[], radius: number): number {
     const world = this.host.world
     let spawned = 0
+    if (!targets.length) return 0
     for (let attempt = 0; attempt < 40 && spawned < count; attempt++) {
       if (this.liveCount >= ZOMBIE.maxLive) break
+      const around = targets[this.rng.randint(0, targets.length - 1)]
       const angle = this.rng.random() * Math.PI * 2
       const dist = radius * (0.6 + this.rng.random() * 0.35)
-      const x = Math.round(Math.cos(angle) * dist)
-      const z = Math.round(Math.sin(angle) * dist)
-      const y = this.grassTop(x, z)
+      const x = Math.round(around.x + Math.cos(angle) * dist)
+      const z = Math.round(around.z + Math.sin(angle) * dist)
+      const y = this.grassTop(x, z, around.y)
       if (y === null) continue
       if (targets.some(t => Math.hypot(t.x - x, t.z - z) < ZOMBIE.minSpawnDistance)) continue
       // scatter the group around the spot
       for (let i = 0; i < count && spawned < count; i++) {
         const sx = x + this.rng.randint(-2, 2)
         const sz = z + this.rng.randint(-2, 2)
-        const sy = this.grassTop(sx, sz) ?? y
+        const sy = this.grassTop(sx, sz, y) ?? y
         if (!isSolid(world.getBlock(sx, sy, sz)) && !isSolid(world.getBlock(sx, sy + 1, sz))) {
           this.spawn(kinds[this.rng.randint(0, kinds.length - 1)], sx + 0.5, sy, sz + 0.5)
           spawned++
@@ -169,13 +174,22 @@ export class ZombieManager {
     return spawned
   }
 
-  /** standing y above the top grass block of a column, or null */
-  private grassTop(x: number, z: number): number | null {
+  /**
+   * Standing y above the grass / sand surface nearest to `nearY` in a loaded column, or
+   * null. Searching out from the anchor keeps island spawns on the island and ground
+   * spawns on the ground.
+   */
+  private grassTop(x: number, z: number, nearY: number): number | null {
     const world = this.host.world
-    for (let y = world.bounds.maxY; y >= world.bounds.minY; y--) {
-      const id = world.getBlock(x, y, z)
-      if (id === AIR || isProp(id)) continue
-      return id === BLOCK.grass || id === BLOCK.sand ? y + 1 : null
+    if (!world.isColumnLoaded(x, z)) return null
+    const centre = Math.floor(nearY)
+    for (let d = 0; d <= ZOMBIE.spawnSearchHeight; d++) {
+      for (const y of d ? [centre - d, centre + d] : [centre]) {
+        const id = world.getBlock(x, y, z)
+        if (id !== BLOCK.grass && id !== BLOCK.sand) continue
+        if (isSolid(world.getBlock(x, y + 1, z)) || isSolid(world.getBlock(x, y + 2, z))) continue
+        return y + 1
+      }
     }
     return null
   }
@@ -305,7 +319,7 @@ export class ZombieManager {
     if (r.hitY) { z.onGround = z.vy <= 0; z.vy = 0 } else z.onGround = false
     if (r.hitX) z.vx = 0
     if (r.hitZ) z.vz = 0
-    if (z.y < -60) { z.state = 'dead'; z.burnTimer = 0 }
+    if (z.y < -8) { z.state = 'dead'; z.burnTimer = 0 } // fell out of the world (should never happen over bedrock)
     return (r.hitX || r.hitZ) && (wishX !== 0 || wishZ !== 0)
   }
 

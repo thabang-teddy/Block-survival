@@ -64,6 +64,14 @@ describe('pathfinding', () => {
     expect(r.path[r.path.length - 1]).toEqual({ x: 5, y: 1, z: 0 })
   })
 
+  test('finds paths far from the origin (visited keys are start-relative)', () => {
+    const w = new World()
+    for (let x = 90_000; x <= 90_020; x++) for (let z = -70_010; z <= -69_990; z++) w.setBlock(x, 0, z, BLOCK.grass)
+    const r = findPath(w, { x: 90_000, y: 1, z: -70_000 }, { x: 90_012, y: 1, z: -70_000 })
+    expect(r.reached).toBe(true)
+    expect(r.path.length).toBe(11)
+  })
+
   test('routes around a wall and steps up over a single block', () => {
     const w = floor()
     for (let z = -3; z <= 3; z++) for (let y = 1; y <= 3; y++) w.setBlock(3, y, z, BLOCK.stone)
@@ -175,5 +183,27 @@ describe('zombies', () => {
     for (const z of zm.zombies) expect(Math.hypot(z.x, z.z)).toBeGreaterThanOrEqual(ZOMBIE.minSpawnDistance - 3)
     for (let i = 0; i < 20; i++) zm.spawnGroup(['Basic'], 6, [target], 28)
     expect(zm.liveCount).toBeLessThanOrEqual(ZOMBIE.maxLive + 5)
+  })
+
+  test('spawnGroup surrounds a player far from the origin, on the layer they stand on', () => {
+    // ground at y = 0 everywhere around (5000, 5000) plus an "island" slab at y = 40 over part of it
+    const w = new World()
+    for (let x = 4960; x <= 5040; x++) for (let z = 4960; z <= 5040; z++) w.setBlock(x, 0, z, BLOCK.grass)
+    for (let x = 4960; x <= 5040; x++) for (let z = 4960; z <= 5040; z++) w.setBlock(x, 40, z, BLOCK.grass)
+    const zm = new ZombieManager(host(w), makeRng(5))
+    expect(zm.spawnGroup(['Basic'], 4, [{ x: 5000.5, y: 1, z: 5000.5 }], 28)).toBe(4)
+    for (const z of zm.zombies) {
+      expect(z.y).toBe(1)
+      expect(Math.hypot(z.x - 5000.5, z.z - 5000.5)).toBeGreaterThanOrEqual(ZOMBIE.minSpawnDistance - 3)
+    }
+    expect(zm.spawnGroup(['Basic'], 3, [{ x: 5000.5, y: 41, z: 5000.5 }], 28)).toBe(3)
+    expect(zm.zombies.slice(4).every(z => z.y === 41)).toBe(true)
+  })
+
+  test('spawnGroup finds nothing where the world is not loaded', () => {
+    const w = new World()
+    w.setGenerator(() => null, 1)
+    const zm = new ZombieManager(host(w), makeRng(5))
+    expect(zm.spawnGroup(['Basic'], 4, [{ x: 0.5, y: 1, z: 0.5 }], 28)).toBe(0)
   })
 })

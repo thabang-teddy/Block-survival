@@ -10,7 +10,9 @@
  */
 import * as THREE from 'three'
 import { World, type PropMeta } from '../world/chunkStore'
-import { generateIsland, ISLAND_LARGE, type IslandInfo } from '../world/islandGen'
+import { ISLAND_LARGE } from '../world/islandGen'
+import { TerrainGenerator, WORLD_CHUNKS_Y } from '../world/terrainGen'
+import { ChunkStreamer, type StreamAnchor } from '../world/chunkStreamer'
 import { raycastVoxels, type RayHit } from '../world/raycast'
 import { AIR, BLOCK, isProp, isSolid } from '../world/palette'
 import { ChunkRenderer } from '../render/ChunkRenderer'
@@ -60,6 +62,8 @@ const RESPAWN_SECONDS = 5
 /** requests from clients must originate within this distance of their avatar's eye */
 const ACTION_REACH = REACH + 1.5
 const HOST_ID = 'host'
+/** columns loaded synchronously around the spawn before the first frame */
+const INITIAL_LOAD_RADIUS = 2
 
 export interface GameOptions {
   role: Role
@@ -73,9 +77,10 @@ type Ray = { ox: number; oy: number; oz: number; dx: number; dy: number; dz: num
 
 export class Game {
   readonly role: Role
-  readonly seed = ISLAND_LARGE.seed
+  readonly seed: number
   readonly world = new World()
-  readonly island: IslandInfo
+  readonly terrain: TerrainGenerator
+  readonly streamer: ChunkStreamer
   readonly chunks: ChunkRenderer
   readonly props: PropRenderer
   readonly player: PlayerController
@@ -139,9 +144,12 @@ export class Game {
     this.camera.rotation.order = 'YXZ'
     this.camera.add(this.viewModel.group)
     const t0 = performance.now()
-    this.island = generateIsland(this.world, ISLAND_LARGE)
+    // the world seed comes from the host (clients) or the save; new worlds use the classic one
+    this.seed = opts.session.role === 'client' ? opts.session.welcome!.seed : opts.restore?.seed ?? ISLAND_LARGE.seed
+    this.terrain = new TerrainGenerator(this.seed)
+    this.world.setGenerator((cx, cy, cz) => this.terrain.generateChunk(cx, cy, cz), WORLD_CHUNKS_Y)
     this.world.trackEdits = true
-    let spawn: Spawn = this.island.spawn
+    let spawn: Spawn = this.terrain.spawn()
     if (opts.session.role === 'client') {
       const w = opts.session.welcome!
       this.applyBlockEdits(w.edits)
@@ -153,13 +161,16 @@ export class Game {
       this.dayNight.update(0)
       spawn = opts.restore.spawn
     }
+    // enough ground under the player to stand on; the rest streams in over the next frames
+    this.streamer = new ChunkStreamer(this.world)
+    this.streamer.loadNow(spawn.x, spawn.z, INITIAL_LOAD_RADIUS)
     const t1 = performance.now()
     this.chunks = new ChunkRenderer(this.world)
-    this.chunks.buildAll()
+    this.chunks.flush()
     this.props = new PropRenderer(this.world)
     const t2 = performance.now()
     console.info(
-      `island: ${this.island.voxelCount} voxels, ${this.world.chunkCount} chunks — gen ${(t1 - t0).toFixed(0)} ms, mesh ${(t2 - t1).toFixed(0)} ms (${this.role})`,
+      `world seed ${this.seed}: ${this.world.loadedColumnCount} columns, ${this.world.chunkCount} chunks — gen ${(t1 - t0).toFixed(0)} ms, mesh ${(t2 - t1).toFixed(0)} ms (${this.role})`,
     )
     const localId = opts.session.role === 'client' ? opts.session.welcome!.you : HOST_ID
     this.local = new Avatar(localId, opts.name, spawn)
@@ -213,7 +224,9 @@ export class Game {
     const look = this.input.takeLook()
     if (!this.dead) this.player.look(look.dx, look.dy)
     for (const ev of this.input.takeEvents()) if (!this.dead) this.handleEvent(ev)
-    this.player.update(dt, this.input, this.dead)
+    // never integrate physics over ground that has not streamed in yet (e.g. right after a teleport)
+    const p = this.player.state
+    if (this.world.isColumnLoaded(Math.floor(p.x), Math.floor(p.z))) this.player.update(dt, this.input, this.dead)
     this.mirrorLocalPose()
     this.updateAiming(dt)
     this.syncCamera()
@@ -231,6 +244,7 @@ export class Game {
     this.nearWorkbench = this.isNear(this.local, BLOCK.workbench, BENCH_REACH)
     this.heldLight.visible = this.heldItem === 'torch' && !this.dead
     this.heldLight.position.set(s.x, s.y + 1.3, s.z)
+    this.streamWorld()
     this.chunks.update()
     this.props.update(dt, this.camera.position.x, this.camera.position.y, this.camera.position.z)
     this.zombieRenderer.update(dt, this.zombies)
@@ -238,6 +252,13 @@ export class Game {
     this.crates.update(this.time)
     this.fx.update(dt)
     this.publishUi()
+  }
+
+  /** The host keeps the world loaded around every player (it simulates them all); a client around itself. */
+  private streamWorld(): void {
+    const anchors: StreamAnchor[] = this.isHost ? [...this.avatars.values()] : [this.local]
+    const keep: StreamAnchor[] = this.isHost ? [...this.zombies.zombies, ...this.drops.drops] : []
+    this.streamer.update(anchors, keep)
   }
 
   private mirrorLocalPose(): void {
@@ -366,7 +387,7 @@ export class Game {
 
   // ---------------------------------------------------------------- network helpers (host)
   addRemoteAvatar(id: string, name: string): Avatar {
-    const a = new Avatar(id, name, this.island.spawn)
+    const a = new Avatar(id, name, this.terrain.spawn())
     this.avatars.set(id, a)
     return a
   }
@@ -531,8 +552,8 @@ export class Game {
   private doBreak(a: Avatar, x: number, y: number, z: number): void {
     if (a.dead || !this.withinReach(a, x, y, z)) return
     const block = this.world.getBlock(x, y, z)
-    if (block === AIR || y <= this.world.bounds.minY + 1) return
-    if (!Number.isFinite(breakTime(block, a.heldItem))) return
+    if (block === AIR) return
+    if (!Number.isFinite(breakTime(block, a.heldItem))) return // includes bedrock
     this.breakBlock(x, y, z, block)
   }
 
@@ -696,7 +717,7 @@ export class Game {
 
   buildSave(): SaveData {
     return {
-      version: 1,
+      version: 2,
       seed: this.seed,
       time: this.dayNight.time,
       edits: this.worldEdits(),
@@ -822,8 +843,7 @@ export class Game {
     if (!this.breaking || this.breaking.x !== t.x || this.breaking.y !== t.y || this.breaking.z !== t.z) {
       this.breaking = { x: t.x, y: t.y, z: t.z, progress: 0 }
     }
-    if (t.y <= this.world.bounds.minY + 1) return // bedrock
-    const seconds = breakTime(t.block, held)
+    const seconds = breakTime(t.block, held) // bedrock and pickaxe-only blocks are Infinity
     if (!Number.isFinite(seconds)) return
     this.breaking.progress += dt / seconds
     if (this.time > this.swingUntil - SWING_SECONDS * 0.5) this.swing()
