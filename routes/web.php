@@ -50,6 +50,8 @@ Route::middleware(['auth', 'access'])->group(function () {
         // the player's one world
         Route::get('/world', [WorldController::class, 'show']);
         Route::put('/world', [WorldController::class, 'update']);
+        // sendBeacon on unload: multipart, CSRF token as a form field
+        Route::post('/world/beacon', [WorldController::class, 'beacon']);
         Route::delete('/world', [WorldController::class, 'destroy']);
     });
 

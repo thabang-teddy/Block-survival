@@ -7,6 +7,7 @@ use App\Models\RoomSignal;
 use App\Models\User;
 use App\Models\World;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -290,5 +291,35 @@ class ApiTest extends TestCase
         $a = $this->user();
         $this->putGzip($a, '/api/world', 'not gzip')->assertUnprocessable();
         $this->putGzip($a, '/api/world', '')->assertStatus(413);
+        $this->putGzip($a, '/api/world', str_repeat('x', World::MAX_BYTES + 1))->assertStatus(413);
+    }
+
+    public function test_the_world_counts_the_players_it_holds_gear_for(): void
+    {
+        $a = $this->user();
+        $v3 = gzencode(json_encode(['version' => 3, 'seed' => 11, 'edits' => [], 'players' => ['1' => [], '2' => [], '3' => []]]));
+        $this->putGzip($a, '/api/world?night=1', $v3)->assertOk()->assertJsonPath('world.players', 3);
+        $this->actingAs($a)->get('/')->assertInertia(fn (Assert $page) => $page->where('world.players', 3));
+
+        // a v2 save (no players map) counts as the host alone
+        $v2 = gzencode(json_encode(['version' => 2, 'seed' => 11, 'edits' => []]));
+        $this->putGzip($a, '/api/world', $v2)->assertOk()->assertJsonPath('world.players', 1);
+    }
+
+    /** a closing tab posts the save as a beacon: multipart with the gzip as a file */
+    public function test_the_world_can_be_saved_by_a_beacon_on_unload(): void
+    {
+        $a = $this->user();
+        $payload = gzencode(json_encode(['version' => 3, 'seed' => 5, 'edits' => [], 'players' => ['1' => []]]));
+        $file = UploadedFile::fake()->createWithContent('world.json.gz', $payload);
+
+        $this->actingAs($a)->post('/api/world/beacon', ['payload' => $file, 'night' => 4, 'seconds' => 321])
+            ->assertOk()->assertJsonPath('world.night', 4)->assertJsonPath('world.seconds', 321)->assertJsonPath('world.players', 1);
+        $res = $this->actingAs($a)->get('/api/world')->assertOk()->assertHeader('X-Save-Night', '4');
+        $this->assertSame($payload, $res->getContent());
+
+        $this->actingAs($a)->post('/api/world/beacon', ['night' => 4])->assertUnprocessable();
+        $bad = UploadedFile::fake()->createWithContent('world.json', 'plain json');
+        $this->actingAs($a)->post('/api/world/beacon', ['payload' => $bad])->assertUnprocessable();
     }
 }
