@@ -9,25 +9,26 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
- * The player's one world. The host uploads it as gzipped JSON (block diff, clock,
- * every player's gear, live zombies / drops / crates) in the request body; GET streams
- * the same bytes back. A page that is closing cannot await a PUT, so it posts the same
+ * The player's worlds: their own (`own`) and their copy of the shared global world
+ * (`global`). The host uploads a world as gzipped JSON (block diff, clock, every
+ * player's gear, live zombies / drops / crates) in the request body; GET streams the
+ * same bytes back. A page that is closing cannot await a PUT, so it posts the same
  * bytes as a multipart beacon instead (issue #13).
  */
 class WorldController extends Controller
 {
-    public function update(Request $request): JsonResponse
+    public function update(Request $request, string $kind = World::OWN): JsonResponse
     {
         $meta = $request->validate([
             'night' => ['sometimes', 'integer', 'min:0'],
             'seconds' => ['sometimes', 'integer', 'min:0'],
         ]);
 
-        return $this->store($request, $request->getContent(), $meta);
+        return $this->store($request, $kind, $request->getContent(), $meta);
     }
 
     /** `navigator.sendBeacon` on unload: multipart with the gzip as a file and the CSRF token as a field */
-    public function beacon(Request $request): JsonResponse
+    public function beacon(Request $request, string $kind = World::OWN): JsonResponse
     {
         $meta = $request->validate([
             'payload' => ['required', 'file'],
@@ -36,11 +37,12 @@ class WorldController extends Controller
         ]);
         $bytes = (string) file_get_contents($request->file('payload')->getRealPath());
 
-        return $this->store($request, $bytes, $meta);
+        return $this->store($request, $kind, $bytes, $meta);
     }
 
-    private function store(Request $request, string $bytes, array $meta): JsonResponse
+    private function store(Request $request, string $kind, string $bytes, array $meta): JsonResponse
     {
+        abort_unless(World::isKind($kind), 404);
         if ($bytes === '' || strlen($bytes) > World::MAX_BYTES) {
             return response()->json(['message' => 'Save must be between 1 byte and '.(World::MAX_BYTES / 1024 / 1024).' MB.'], 413);
         }
@@ -49,7 +51,7 @@ class WorldController extends Controller
         }
 
         $world = World::query()->updateOrCreate(
-            ['user_id' => $request->user()->id],
+            ['user_id' => $request->user()->id, 'kind' => $kind],
             [
                 'payload' => base64_encode($bytes),
                 'size' => strlen($bytes),
@@ -77,9 +79,10 @@ class WorldController extends Controller
         return max(1, min(65535, count($data['players'])));
     }
 
-    public function show(Request $request): Response|JsonResponse
+    public function show(Request $request, string $kind = World::OWN): Response|JsonResponse
     {
-        $world = $request->user()->world()->first();
+        abort_unless(World::isKind($kind), 404);
+        $world = $request->user()->worlds()->where('kind', $kind)->first();
         if (! $world) {
             return response()->json(['message' => 'No world yet.'], 404);
         }
@@ -93,9 +96,10 @@ class WorldController extends Controller
     }
 
     /** start over: the next save creates a fresh world */
-    public function destroy(Request $request): JsonResponse
+    public function destroy(Request $request, string $kind = World::OWN): JsonResponse
     {
-        $request->user()->world()->delete();
+        abort_unless(World::isKind($kind), 404);
+        $request->user()->worlds()->where('kind', $kind)->delete();
 
         return response()->json(['ok' => true]);
     }
