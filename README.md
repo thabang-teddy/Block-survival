@@ -1,6 +1,7 @@
 # Block Survival
 
-A voxel zombie-survival game (Minecraft-style) in the browser: one floating island, first/third
+A voxel zombie-survival game (Minecraft-style) in the browser: an infinite, seeded world of
+rolling ground with floating islands in the sky (streamed in chunks as you walk), first/third
 person, crafting, a 10-minute day/night cycle with zombies that path and break walls, sword and
 rifle combat, death and score, four-player peer-to-peer co-op, accounts with a leaderboard and
 cloud saves.
@@ -68,8 +69,9 @@ respawn point. **Start over** in the lobby (or the admin's **Reset world**) wipe
 
 ```
 app.tsx      Inertia bootstrap          Pages/Play.tsx   the page (Scene + Hud)
-world/       palette, seeded noise, island generator (port of Design/blender_scripts/islands.py),
-             16³ chunk store, culled mesher with vertex colours + AO, DDA raycast
+world/       palette, seeded noise, per-chunk terrain generator (ground heightmap + spawn pad,
+             sky-island field, island generator ported from Design/blender_scripts/islands.py),
+             16³ chunk store with column streaming, culled mesher with vertex colours + AO, DDA raycast
 physics/     swept AABB vs voxels, player controller
 entities/    drops, loot crates, A* pathfinding, zombie sim (variants, spawning, AI, block breaking)
 items/       registry, recipes + crafting, inventory
