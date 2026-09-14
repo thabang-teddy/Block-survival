@@ -5,6 +5,7 @@
  * fully when logged out or offline.
  */
 import type { BlockEdit } from './protocol'
+import { migrateSave } from './saveMigrate'
 import type { ItemStack } from '../items/inventory'
 
 export interface ApiUser {
@@ -36,9 +37,12 @@ export interface WorldMeta {
   updated_at: string
 }
 
-/** what a saved world contains (gzipped JSON) */
+/**
+ * What a saved world contains (gzipped JSON). Version 2 worlds are infinite: the seed
+ * regenerates the terrain and `edits` is the player's diff on top of it.
+ */
 export interface SaveData {
-  version: 1
+  version: 2
   seed: number
   time: number
   edits: BlockEdit[]
@@ -142,8 +146,8 @@ export const api = {
       throw e
     }
     const text = await gunzip(await res.arrayBuffer())
-    const data = JSON.parse(text) as SaveData
-    if (data.version !== 1 || !Array.isArray(data.edits)) throw new ApiError(422, 'Unreadable save')
+    const data = migrateSave(JSON.parse(text))
+    if (!data) throw new ApiError(422, 'Unreadable save')
     return data
   },
   /** start over: forget the saved world */
