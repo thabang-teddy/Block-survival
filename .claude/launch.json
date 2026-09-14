@@ -8,19 +8,21 @@
     {
       "name": "vite",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 5173
-    },
-    {
-      "name": "reverb",
-      "runtimeExecutable": "php",
-      "runtimeArgs": ["artisan", "reverb:start", "--host=127.0.0.1", "--port=8080"],
-      "port": 8080
     },
     {
       "name": "app",
       "runtimeExecutable": "php",
-      "runtimeArgs": ["artisan", "serve", "--host=127.0.0.1", "--port=8000"],
+      "runtimeArgs": [
+        "artisan",
+        "serve",
+        "--host=127.0.0.1",
+        "--port=8000"
+      ],
       "port": 8000,
       "url": "http://localhost:8000"
     }

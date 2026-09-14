@@ -40,11 +40,14 @@ return [
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
             // WAL + a busy timeout so several players writing rooms/scores/saves at
             // once wait instead of failing with "database is locked" (shared hosting
-            // runs one SQLite file per environment — docs/cpanel-go-live.md §4.4)
+            // runs one SQLite file per environment — docs/cpanel-go-live.md §4.4).
+            // IMMEDIATE matters: a DEFERRED transaction that reads then writes (the
+            // rate limiter's cache increment does exactly that) gets SQLITE_BUSY the
+            // moment another writer commits, and busy_timeout never gets a say.
             'busy_timeout' => env('DB_BUSY_TIMEOUT', 5000),
             'journal_mode' => env('DB_JOURNAL_MODE', 'wal'),
             'synchronous' => env('DB_SYNCHRONOUS', 'normal'),
-            'transaction_mode' => 'DEFERRED',
+            'transaction_mode' => env('DB_TRANSACTION_MODE', 'IMMEDIATE'),
         ],
 
         'mysql' => [

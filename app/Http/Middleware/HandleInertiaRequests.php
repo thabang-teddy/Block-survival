@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Device;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -24,11 +25,13 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $user ? ['id' => $user->id, 'name' => $user->name, 'email' => $user->email] : null,
+                'user' => $user ? ['id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'is_admin' => $user->isAdmin()] : null,
             ],
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),
             ],
+            // the admin nav badge; only computed inside the admin section
+            'pendingDevices' => fn () => $request->is('admin*') && $user?->isAdmin() ? Device::query()->pending()->count() : 0,
         ];
     }
 }

@@ -42,8 +42,9 @@ export class HostSession {
   }
 
   /**
-   * Open the room: subscribe to its signalling channel and register the code → host id
-   * with the app so joiners can resolve it. Fails if the app cannot be reached.
+   * Open the room: register the code → host id with the app so joiners can resolve
+   * it, then start reading the room's mailbox (which 404s until the room exists).
+   * Fails if the app cannot be reached.
    */
   async listen(hostName = 'Survivor'): Promise<void> {
     if (this.transport) return
@@ -52,8 +53,8 @@ export class HostSession {
       onData: (link, bytes) => this.onData(link, bytes),
       onClose: link => this.onLeave(link),
     })
-    await t.listen(this.code)
     await api.createRoom(this.code, t.id, hostName)
+    await t.listen(this.code)
     this.transport = t
   }
 
