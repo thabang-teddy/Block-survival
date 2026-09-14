@@ -22,8 +22,8 @@ class SignalController extends Controller
     public function store(Request $request, string $code): JsonResponse
     {
         $code = strtoupper($code);
-        if (! Room::query()->live()->where('code', $code)->exists()) {
-            return response()->json(['message' => 'No game with that code.'], 404);
+        if ($denied = $this->gate($request, $code)) {
+            return $denied;
         }
 
         $data = $request->validate([
@@ -52,8 +52,8 @@ class SignalController extends Controller
     public function index(Request $request, string $code): JsonResponse
     {
         $code = strtoupper($code);
-        if (! Room::query()->live()->where('code', $code)->exists()) {
-            return response()->json(['message' => 'No game with that code.'], 404);
+        if ($denied = $this->gate($request, $code)) {
+            return $denied;
         }
 
         $q = $request->validate([
@@ -68,5 +68,19 @@ class SignalController extends Controller
             ->map(fn (RoomSignal $s) => $s->toPublic());
 
         return response()->json(['signals' => $signals]);
+    }
+
+    /** the mailbox is for the host and accepted invitees only (issue #5) */
+    private function gate(Request $request, string $code): ?JsonResponse
+    {
+        $room = Room::query()->live()->where('code', $code)->first();
+        if (! $room) {
+            return response()->json(['message' => 'No game with that code.'], 404);
+        }
+        if (! $room->admits($request->user())) {
+            return response()->json(['message' => 'You need an invitation to join this game.'], 403);
+        }
+
+        return null;
     }
 }

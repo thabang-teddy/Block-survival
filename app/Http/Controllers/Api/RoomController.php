@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Room;
 use App\Models\RoomSignal;
+use App\Models\World;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,34 +19,13 @@ class RoomController extends Controller
 
     public const MAX_PLAYERS = 4;
 
-    private const LIST_SIZE = 50;
-
-    /**
-     * Open rooms a player can join from the lobby, minus their own (a host cannot
-     * join themselves); the host's peer id stays private until they pick one.
-     */
-    public function index(Request $request): JsonResponse
-    {
-        $rooms = Room::query()->live()->where('players', '<', self::MAX_PLAYERS)
-            ->where(fn ($q) => $q->whereNull('user_id')->orWhere('user_id', '!=', $request->user()->id))
-            ->latest()->limit(self::LIST_SIZE)->get()
-            ->map(fn (Room $room) => [
-                'code' => $room->code,
-                'host_name' => $room->host_name,
-                'players' => $room->players,
-                'max_players' => self::MAX_PLAYERS,
-                'expires_at' => $room->expires_at->toIso8601String(),
-            ]);
-
-        return response()->json(['rooms' => $rooms]);
-    }
-
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
             'code' => ['required', 'string', self::CODE_RULE],
             'host_peer_id' => ['required', 'string', 'max:128'],
             'host_name' => ['required', 'string', 'max:16'],
+            'world_kind' => ['sometimes', 'in:'.implode(',', World::KINDS)],
         ]);
 
         $existing = Room::query()->where('code', $data['code'])->first();
@@ -61,6 +41,7 @@ class RoomController extends Controller
             [
                 'host_peer_id' => $data['host_peer_id'],
                 'host_name' => $data['host_name'],
+                'world_kind' => $data['world_kind'] ?? World::OWN,
                 'user_id' => $request->user()?->id,
                 'players' => 1,
                 'expires_at' => now()->addHours(Room::TTL_HOURS),
@@ -70,11 +51,15 @@ class RoomController extends Controller
         return response()->json(['room' => $this->publicRoom($room)], 201);
     }
 
-    public function show(string $code): JsonResponse
+    /** resolve a code to the host's peer id: the host, or a player with an accepted invite (issue #5) */
+    public function show(Request $request, string $code): JsonResponse
     {
         $room = Room::query()->live()->where('code', strtoupper($code))->first();
         if (! $room) {
             return response()->json(['message' => 'No game with that code.'], 404);
+        }
+        if (! $room->admits($request->user())) {
+            return response()->json(['message' => 'You need an invitation to join this game.'], 403);
         }
 
         return response()->json(['room' => $this->publicRoom($room)]);
@@ -116,6 +101,7 @@ class RoomController extends Controller
             'code' => $room->code,
             'host_peer_id' => $room->host_peer_id,
             'host_name' => $room->host_name,
+            'world_kind' => $room->world_kind,
             'players' => $room->players,
             'expires_at' => $room->expires_at->toIso8601String(),
         ];

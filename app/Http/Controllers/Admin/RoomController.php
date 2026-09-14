@@ -15,11 +15,13 @@ class RoomController extends Controller
     public function index(): Response
     {
         return Inertia::render('Admin/Rooms', [
-            'rooms' => Room::query()->live()->latest()->get()
+            'rooms' => Room::query()->live()->withCount('invites')->latest()->get()
                 ->map(fn (Room $r) => [
                     'code' => $r->code,
                     'host_name' => $r->host_name,
+                    'world_kind' => $r->world_kind,
                     'players' => $r->players,
+                    'invites' => (int) $r->invites_count,
                     'expires_at' => $r->expires_at->toIso8601String(),
                 ])->all(),
         ]);

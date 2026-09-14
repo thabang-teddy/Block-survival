@@ -209,8 +209,9 @@ class AdminTest extends TestCase
         $admin = $this->admin();
         $player = User::factory()->create(['name' => 'Player']);
         World::create(['user_id' => $player->id, 'payload' => base64_encode(gzencode('{}')), 'size' => 22]);
+        World::create(['user_id' => $player->id, 'kind' => 'global', 'payload' => base64_encode(gzencode('{}')), 'size' => 22]);
 
-        $this->actingAs($admin)->delete("/admin/users/{$player->id}/world")->assertRedirect()->assertSessionHas('status', "Player's world was reset.");
+        $this->actingAs($admin)->delete("/admin/users/{$player->id}/world")->assertRedirect()->assertSessionHas('status', "Player's worlds were reset.");
         $this->assertSame(0, World::count());
         $this->actingAs($admin)->delete("/admin/users/{$player->id}/world")->assertRedirect(); // nothing to reset is fine
     }
@@ -249,7 +250,8 @@ class AdminTest extends TestCase
         RoomSignal::create(['room_code' => 'ABCDEF', 'from_peer' => 'a', 'to_peer' => 'b', 'type' => 'offer', 'data' => ['x' => 1]]);
 
         $this->actingAs($admin)->get('/admin/rooms')->assertInertia(fn (Assert $page) => $page
-            ->component('Admin/Rooms')->has('rooms', 1)->where('rooms.0.code', 'ABCDEF'));
+            ->component('Admin/Rooms')->has('rooms', 1)->where('rooms.0.code', 'ABCDEF')
+            ->where('rooms.0.world_kind', 'own')->where('rooms.0.invites', 0));
 
         $this->actingAs($admin)->delete('/admin/rooms/abcdef')->assertRedirect()->assertSessionHas('status', 'Room ABCDEF closed.');
         $this->assertSame(0, Room::query()->where('code', 'ABCDEF')->count());
