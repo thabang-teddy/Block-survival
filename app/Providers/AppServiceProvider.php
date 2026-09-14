@@ -16,7 +16,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // a WebRTC handshake is a burst of ~20 small messages per joining player
-        RateLimiter::for('signal', fn (Request $request) => Limit::perMinute(240)->by($request->ip()));
+        // signalling is polled: a host at 500 ms plus a joining client at 500 ms
+        // behind one NAT is ~240 req/min, on top of the ~20 POSTs of a handshake
+        RateLimiter::for('signal', fn (Request $request) => Limit::perMinute(600)->by($request->ip()));
     }
 }

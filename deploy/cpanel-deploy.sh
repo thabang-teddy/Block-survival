@@ -215,6 +215,9 @@ else
   log "migrations applied"
 fi
 
+# the admin account from ADMIN_EMAIL / ADMIN_PASSWORD in .env (idempotent; warns if unset)
+artisan admin:sync --no-ansi
+
 # ---------------------------------------------------------------------------
 # 8. caches (config:cache is safe: no env() outside config/ — §3.3)
 # ---------------------------------------------------------------------------

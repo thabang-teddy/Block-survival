@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Room;
+use App\Models\RoomSignal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,6 +15,30 @@ use Illuminate\Http\Request;
 class RoomController extends Controller
 {
     private const CODE_RULE = 'regex:/^[ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/';
+
+    public const MAX_PLAYERS = 4;
+
+    private const LIST_SIZE = 50;
+
+    /**
+     * Open rooms a player can join from the lobby, minus their own (a host cannot
+     * join themselves); the host's peer id stays private until they pick one.
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $rooms = Room::query()->live()->where('players', '<', self::MAX_PLAYERS)
+            ->where(fn ($q) => $q->whereNull('user_id')->orWhere('user_id', '!=', $request->user()->id))
+            ->latest()->limit(self::LIST_SIZE)->get()
+            ->map(fn (Room $room) => [
+                'code' => $room->code,
+                'host_name' => $room->host_name,
+                'players' => $room->players,
+                'max_players' => self::MAX_PLAYERS,
+                'expires_at' => $room->expires_at->toIso8601String(),
+            ]);
+
+        return response()->json(['rooms' => $rooms]);
+    }
 
     public function store(Request $request): JsonResponse
     {
@@ -27,6 +52,9 @@ class RoomController extends Controller
         if ($existing && $existing->expires_at->isFuture() && $existing->host_peer_id !== $data['host_peer_id']) {
             return response()->json(['message' => 'That room code is in use.'], 409);
         }
+
+        // no scheduler on shared hosting: opening a room is when stale mail is swept
+        RoomSignal::pruneStale();
 
         $room = Room::query()->updateOrCreate(
             ['code' => $data['code']],
@@ -57,7 +85,7 @@ class RoomController extends Controller
     {
         $data = $request->validate([
             'host_peer_id' => ['required', 'string', 'max:128'],
-            'players' => ['required', 'integer', 'min:1', 'max:4'],
+            'players' => ['required', 'integer', 'min:1', 'max:'.self::MAX_PLAYERS],
         ]);
 
         $room = Room::query()->where('code', strtoupper($code))->where('host_peer_id', $data['host_peer_id'])->first();
@@ -73,7 +101,10 @@ class RoomController extends Controller
     public function destroy(Request $request, string $code): JsonResponse
     {
         $data = $request->validate(['host_peer_id' => ['required', 'string', 'max:128']]);
-        Room::query()->where('code', strtoupper($code))->where('host_peer_id', $data['host_peer_id'])->delete();
+        $deleted = Room::query()->where('code', strtoupper($code))->where('host_peer_id', $data['host_peer_id'])->delete();
+        if ($deleted) {
+            RoomSignal::query()->where('room_code', strtoupper($code))->delete();
+        }
 
         return response()->json(['ok' => true]);
     }

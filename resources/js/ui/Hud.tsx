@@ -86,7 +86,7 @@ export function Hud() {
     try {
       await game.saveToCloud()
       setSaving('Saved')
-      router.reload({ only: ['cloudSave'] }) // the menu's "Continue" summary
+      router.reload({ only: ['world'] }) // the menu's world summary
     } catch (e) {
       setSaving(e instanceof Error ? e.message : 'Save failed')
     }
@@ -195,7 +195,7 @@ export function Hud() {
             <div className="pause-actions" onClick={e => e.stopPropagation()}>
               {role === 'host' && api.loggedIn && (
                 <button className="restart secondary" onClick={saveToCloud} disabled={saving === 'Saving…'}>
-                  {saving || 'Save to cloud'}
+                  {saving || 'Save world'}
                 </button>
               )}
               <button className="restart" onClick={() => restart()}>

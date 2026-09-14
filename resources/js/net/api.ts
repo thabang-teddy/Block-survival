@@ -11,6 +11,16 @@ export interface ApiUser {
   id: number
   name: string
   email: string
+  is_admin: boolean
+}
+
+/** a room the lobby can join in one click; the host's peer id is only revealed by resolveRoom */
+export interface OpenRoom {
+  code: string
+  host_name: string
+  players: number
+  max_players: number
+  expires_at: string
 }
 
 export interface LeaderboardRow {
@@ -18,15 +28,15 @@ export interface LeaderboardRow {
   score: number
 }
 
-export interface SaveMeta {
-  slot: string
+/** summary of the player's one world, as the lobby and the admin show it */
+export interface WorldMeta {
   size: number
   night: number
   seconds: number
   updated_at: string
 }
 
-/** what a cloud save contains (gzipped JSON) */
+/** what a saved world contains (gzipped JSON) */
 export interface SaveData {
   version: 1
   seed: number
@@ -36,6 +46,13 @@ export interface SaveData {
   spawn: { x: number; y: number; z: number }
   kills: number
   deaths: number
+}
+
+export interface SignalRow {
+  id: number
+  from: string
+  type: 'offer' | 'answer' | 'candidate'
+  data: Record<string, unknown>
 }
 
 export class ApiError extends Error {
@@ -86,6 +103,8 @@ export const api = {
   /** the page tells us who is signed in (Inertia shared prop) */
   setUser(user: ApiUser | null): void { currentUser = user },
 
+  /** open (live, not full) rooms, newest first */
+  listRooms: () => request<{ rooms: OpenRoom[] }>('GET', '/rooms').then(r => r.rooms),
   createRoom: (code: string, hostPeerId: string, hostName: string) =>
     request<{ room: unknown }>('POST', '/rooms', { code, host_peer_id: hostPeerId, host_name: hostName }),
   refreshRoom: (code: string, hostPeerId: string, players: number) =>
@@ -94,29 +113,41 @@ export const api = {
     request<{ ok: boolean }>('DELETE', `/rooms/${code}`, { host_peer_id: hostPeerId }),
   resolveRoom: (code: string) =>
     request<{ room: { code: string; host_peer_id: string; host_name: string; players: number } }>('GET', `/rooms/${code}`),
-  /** relay one WebRTC signalling message to the room; X-Socket-ID keeps it from echoing back to us */
-  signal: (code: string, msg: { from: string; to: string; type: string; data: Record<string, unknown> }, socketId?: string) =>
-    request<{ ok: boolean }>('POST', `/rooms/${code}/signal`, msg, undefined, { 'X-Socket-ID': socketId ?? '' }).then(() => undefined),
+  /** drop one WebRTC signalling message into the room's mailbox */
+  signal: (code: string, msg: { from: string; to: string; type: string; data: Record<string, unknown> }) =>
+    request<{ id: number }>('POST', `/rooms/${code}/signal`, msg).then(() => undefined),
+  /** everything addressed to `to` with an id past `after`, oldest first */
+  signals: (code: string, to: string, after: number) =>
+    request<{ signals: SignalRow[] }>('GET', `/rooms/${code}/signals?to=${encodeURIComponent(to)}&after=${after}`),
 
   postScore: (nights: number, kills: number, deaths: number, seconds: number) =>
     request<{ score: number; best: number }>('POST', '/scores', { nights, kills, deaths, seconds }),
   leaderboard: async (): Promise<LeaderboardRow[]> =>
     (await request<{ leaderboard: LeaderboardRow[] }>('GET', '/leaderboard')).leaderboard,
 
-  listSaves: async (): Promise<SaveMeta[]> => (await request<{ saves: SaveMeta[] }>('GET', '/saves')).saves,
-  async saveGame(slot: string, data: SaveData, night: number): Promise<SaveMeta> {
+  /** every player has exactly one world; saving replaces it */
+  async saveWorld(data: SaveData, night: number): Promise<WorldMeta> {
     const bytes = await gzip(JSON.stringify(data))
     const q = `?night=${night}&seconds=${Math.floor(data.time)}`
     const body = new Blob([bytes as BlobPart], { type: 'application/gzip' })
-    return (await request<{ save: SaveMeta }>('PUT', `/saves/${slot}${q}`, undefined, body, { 'Content-Type': 'application/gzip' })).save
+    return (await request<{ world: WorldMeta }>('PUT', `/world${q}`, undefined, body, { 'Content-Type': 'application/gzip' })).world
   },
-  async loadGame(slot: string): Promise<SaveData> {
-    const res = await request<Response>('GET', `/saves/${slot}`)
+  /** the saved world, or null when the player has not saved one yet */
+  async loadWorld(): Promise<SaveData | null> {
+    let res: Response
+    try {
+      res = await request<Response>('GET', '/world')
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) return null
+      throw e
+    }
     const text = await gunzip(await res.arrayBuffer())
     const data = JSON.parse(text) as SaveData
     if (data.version !== 1 || !Array.isArray(data.edits)) throw new ApiError(422, 'Unreadable save')
     return data
   },
+  /** start over: forget the saved world */
+  resetWorld: () => request<{ ok: boolean }>('DELETE', '/world').then(() => undefined),
 }
 
 async function gzip(text: string): Promise<Uint8Array> {
