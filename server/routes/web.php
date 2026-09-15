@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\GlobalWorldController as AdminGlobalWorldControll
 use App\Http\Controllers\Admin\LoginWindowController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Api\AuthController as ApiAuthController;
 use App\Http\Controllers\Api\GlobalWorldController;
 use App\Http\Controllers\Api\InviteController;
 use App\Http\Controllers\Api\RoomController;
@@ -30,20 +31,37 @@ Route::middleware('guest')->group(function () {
     Route::get('/pending-approval/status', [PendingApprovalController::class, 'status'])->middleware('throttle:30,1');
 });
 
-// `access` ends the session when the account is disabled, the login window closes
-// or the browser's approval is revoked; admins are exempt
+// The native client signs in here instead of /login: same credentials, same three
+// gates, but a Sanctum token comes back instead of a session (plan D2 / S5).
+Route::prefix('api/auth')->group(function () {
+    Route::post('/token', [ApiAuthController::class, 'token'])->middleware('throttle:10,1');
+    Route::get('/status', [ApiAuthController::class, 'status'])->middleware('throttle:30,1');
+});
+
+// `access` ends the sign-in when the account is disabled, the login window closes
+// or the device's approval is revoked; admins are exempt
 Route::middleware(['auth', 'access'])->group(function () {
     Route::get('/', PlayController::class)->name('play');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+});
 
-    // WebRTC signalling is polled at up to 2 Hz per browser, so it gets its own,
+// The JSON API is shared by both clients: `auth:sanctum` accepts the browser's
+// session (with CSRF) or the native client's bearer token (no session, no CSRF —
+// see ValidateCsrfTokenUnlessBearer).
+Route::middleware(['auth:sanctum', 'access'])->group(function () {
+    Route::prefix('api/auth')->middleware('throttle:60,1')->group(function () {
+        Route::get('/me', [ApiAuthController::class, 'me']);
+        Route::post('/logout', [ApiAuthController::class, 'logout']);
+    });
+
+    // WebRTC signalling is polled at up to 2 Hz per client, so it gets its own,
     // looser limit instead of the general 60/min below (the two would stack)
     Route::prefix('api')->middleware('throttle:signal')->group(function () {
         Route::post('/rooms/{code}/signal', [SignalController::class, 'store']);
         Route::get('/rooms/{code}/signals', [SignalController::class, 'index']);
     });
 
-    // JSON endpoints used by the running game; same session + CSRF as the page
+    // JSON endpoints used by the running game
     Route::prefix('api')->middleware('throttle:60,1')->group(function () {
         // rooms are invite-only (issue #5): there is no open list, and resolving a code
         // needs an accepted invite
@@ -72,8 +90,10 @@ Route::middleware(['auth', 'access'])->group(function () {
         Route::post('/world/beacon', [WorldController::class, 'beacon']);
         Route::post('/world/{kind}/beacon', [WorldController::class, 'beacon'])->where('kind', 'own|global');
     });
+});
 
-    // admin section (issue #1): operating hours, device approval, users, live rooms
+// admin section (issue #1): operating hours, device approval, users, live rooms — web only
+Route::middleware(['auth', 'access'])->group(function () {
     Route::prefix('admin')->middleware('admin')->name('admin.')->group(function () {
         Route::get('/', DashboardController::class)->name('index');
         Route::get('/hours', [LoginWindowController::class, 'show'])->name('hours');

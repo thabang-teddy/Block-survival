@@ -146,7 +146,9 @@ class DeviceApprovalTest extends TestCase
         $this->actingAs($user)->getJson('/api/leaderboard')->assertForbidden()
             ->assertJsonPath('message', 'The server is closed right now — it opens Thursday at 18:00 (UTC).');
         $this->actingAs($user)->get('/')->assertRedirect('/login');
-        $this->assertGuest();
+        // the /api call above switched the default guard to sanctum for the rest of
+        // the test; the session that must be gone lives on the web guard
+        $this->assertGuest('web');
         $this->actingAs($admin)->get('/')->assertOk();
     }
 }

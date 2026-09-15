@@ -4,9 +4,11 @@ use App\Http\Middleware\EnforceAccessPolicy;
 use App\Http\Middleware\EnforceMaintenanceToggle;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\PreventRequestForgeryUnlessBearer;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -16,7 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->web(prepend: [EnforceMaintenanceToggle::class], append: [HandleInertiaRequests::class]);
+        $middleware->web(
+            prepend: [EnforceMaintenanceToggle::class],
+            append: [HandleInertiaRequests::class],
+            // the native client authenticates /api calls with a bearer token, not a session
+            replace: [PreventRequestForgery::class => PreventRequestForgeryUnlessBearer::class],
+        );
         $middleware->alias(['admin' => EnsureUserIsAdmin::class, 'access' => EnforceAccessPolicy::class]);
         // an SDP must keep its trailing CRLF: Chrome rejects the last line without it
         $middleware->trimStrings(except: ['data.sdp']);
