@@ -9,6 +9,7 @@ import type { ItemStack } from '../items/inventory'
 import { ItemIcon } from './ItemIcon'
 import { CraftingPanel } from './CraftingPanel'
 import { MainMenu } from './MainMenu'
+import { InvitePanel } from './InvitePanel'
 import { formatTime } from '../game/score'
 import { api } from '../net/api'
 import { router } from '@inertiajs/react'
@@ -77,8 +78,24 @@ export function Hud() {
   const netStatus = useUiStore(s => s.netStatus)
   const netError = useUiStore(s => s.netError)
   const [saving, setSaving] = useState('')
+  const [leaving, setLeaving] = useState(false)
+  const [inviting, setInviting] = useState(false)
 
   if (!launch) return <MainMenu />
+
+  /** back to the lobby: the host's world is uploaded first when anything changed */
+  const leave = async () => {
+    if (game?.needsSave) {
+      setLeaving(true)
+      try {
+        await game.saveToCloud()
+      } catch {
+        // the autosave / beacon paths keep trying; leaving must still work offline
+      }
+      setLeaving(false)
+    }
+    restart()
+  }
 
   const saveToCloud = async () => {
     if (!game) return
@@ -86,7 +103,7 @@ export function Hud() {
     try {
       await game.saveToCloud()
       setSaving('Saved')
-      router.reload({ only: ['world'] }) // the menu's world summary
+      router.reload({ only: ['worlds'] }) // the menu's world summaries
     } catch (e) {
       setSaving(e instanceof Error ? e.message : 'Save failed')
     }
@@ -198,13 +215,24 @@ export function Hud() {
                   {saving || 'Save world'}
                 </button>
               )}
-              <button className="restart" onClick={() => restart()}>
-                {role === 'client' ? 'Leave game' : 'Back to menu'}
+              {role === 'host' && roomCode && (
+                <button className="restart secondary" onClick={() => setInviting(v => !v)}>
+                  {inviting ? 'Hide invitations' : 'Invite players'}
+                </button>
+              )}
+              <button className="restart" onClick={() => void leave()} disabled={leaving}>
+                {leaving ? 'Saving…' : role === 'client' ? 'Leave game' : 'Back to menu'}
               </button>
             </div>
           )}
+          {role === 'host' && roomCode && inviting && (
+            <InvitePanel code={roomCode} joinedNames={players.filter(p => !p.you).map(p => p.name)} onClose={() => setInviting(false)} />
+          )}
           {role === 'host' && !roomCode && (
-            <p className="fine">Hosting online? Start from the menu with <b>Host a game</b> to get a room code.</p>
+            <p className="fine">Want friends in? Start from the menu with <b>Host for friends</b>, then invite them from here.</p>
+          )}
+          {role === 'client' && timeAlive > 2 && (
+            <p className="fine">Your gear and respawn point are saved with the host's world — rejoin it to get them back.</p>
           )}
         </div>
       )}

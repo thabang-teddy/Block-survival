@@ -105,10 +105,10 @@ describe('islandGen', () => {
     generateIsland(a, ISLAND_MEDIUM)
     generateIsland(b, ISLAND_MEDIUM)
     const counts = new Map<number, number>()
-    const bnd = a.bounds
-    for (let x = bnd.minX; x <= bnd.maxX; x++) {
-      for (let y = bnd.minY; y <= bnd.maxY; y++) {
-        for (let z = bnd.minZ; z <= bnd.maxZ; z++) {
+    const r = ISLAND_MEDIUM.size / 2 + 4
+    for (let x = -r; x <= r; x++) {
+      for (let y = -ISLAND_MEDIUM.depth - 8; y <= ISLAND_MEDIUM.maxHeight + 12; y++) {
+        for (let z = -r; z <= r; z++) {
           const id = a.getBlock(x, y, z)
           expect(id).toBe(b.getBlock(x, y, z))
           counts.set(id, (counts.get(id) ?? 0) + 1)
@@ -119,7 +119,7 @@ describe('islandGen', () => {
     expect(counts.get(BLOCK.ore_coal)).toBeGreaterThan(0)
     expect(counts.get(BLOCK.log)).toBeGreaterThan(0)
     expect(counts.get(BLOCK.leaves)).toBeGreaterThan(0)
-    expect(bnd.minY).toBeLessThan(-5) // hangs below y=0
+    expect(a.getBlock(0, -6, 0)).not.toBe(AIR) // hangs below y=0
   })
 })
 

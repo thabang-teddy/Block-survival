@@ -20,13 +20,15 @@ export function RoomsPanel({ rooms }: Props) {
       {rooms.length === 0 ? <p className="empty">No rooms open right now.</p> : (
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Code</th><th>Host</th><th>Players</th><th>Expires</th><th /></tr></thead>
+            <thead><tr><th>Code</th><th>Host</th><th>World</th><th>Players</th><th>Invited</th><th>Expires</th><th /></tr></thead>
             <tbody>
               {rooms.map(r => (
                 <tr key={r.code}>
                   <td className="mono code">{r.code}</td>
                   <td><b>{r.host_name}</b></td>
+                  <td>{r.world_kind === 'global' ? 'global' : 'own'}</td>
                   <td className="mono">{r.players}/4</td>
+                  <td className="mono">{r.invites}</td>
                   <td>{when(r.expires_at)}</td>
                   <td className="actions"><button className="danger" onClick={() => close(r.code)}>Close</button></td>
                 </tr>

@@ -176,6 +176,14 @@ mkdir -p \
   "$APP_DIR/bootstrap/cache"
 chmod -R u+rwX "$APP_DIR/storage" "$APP_DIR/bootstrap/cache"
 
+# The artefact ships no compiled files, so the previous deploy's package manifest
+# and caches are still here. They must go before the first artisan call: a
+# provider that has since left composer.json (Reverb, once) is otherwise loaded
+# from the stale manifest and every command dies at boot.
+for f in packages services config routes-v7 events; do rm -f "$APP_DIR/bootstrap/cache/$f.php"; done
+artisan package:discover --no-ansi >/dev/null
+log "package manifest rebuilt"
+
 # ---------------------------------------------------------------------------
 # 7. migrations — only when something is pending
 # ---------------------------------------------------------------------------

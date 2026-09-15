@@ -6,6 +6,8 @@ import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Game } from '../game/Game'
+import { CHUNK } from '../world/chunkStore'
+import { LOAD_RADIUS } from '../world/chunkStreamer'
 
 interface Palette {
   sky: THREE.Color
@@ -30,8 +32,9 @@ const NIGHT: Palette = {
 }
 
 const SUN_DISTANCE = 120
-const FOG_NEAR = 70
-const FOG_FAR = 180
+/** the fog closes just inside the streamed radius so the world's edge is never seen */
+const FOG_FAR = (LOAD_RADIUS + 0.5) * CHUNK
+const FOG_NEAR = FOG_FAR * 0.55
 
 export function Lighting({ game }: { game: Game }) {
   const { scene } = useThree()
@@ -63,10 +66,18 @@ export function Lighting({ game }: { game: Game }) {
       hemi.current.intensity = mixN(p => p.hemi, sky)
     }
     if (sun.current) {
-      // at night the "sun" becomes a dim moon opposite the sun's position
+      // at night the "sun" becomes a dim moon opposite the sun's position; the light and
+      // its shadow frustum travel with the player, the world has no centre to sit at
       const up = sky.sunY >= 0
       const s = up ? 1 : -1
-      sun.current.position.set(sky.sunX * s * SUN_DISTANCE, Math.max(0.15, sky.sunY * s) * SUN_DISTANCE, sky.sunZ * SUN_DISTANCE)
+      const pos = game.player.state
+      sun.current.position.set(
+        pos.x + sky.sunX * s * SUN_DISTANCE,
+        pos.y + Math.max(0.15, sky.sunY * s) * SUN_DISTANCE,
+        pos.z + sky.sunZ * SUN_DISTANCE,
+      )
+      sun.current.target.position.set(pos.x, pos.y, pos.z)
+      sun.current.target.updateMatrixWorld()
       sun.current.color.copy(mix(p => p.sun, sky))
       sun.current.intensity = mixN(p => p.sunIntensity, sky)
     }

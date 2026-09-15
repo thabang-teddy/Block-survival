@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
-/** The one page: the game. Menu data (leaderboard, the player's world) arrives as props. */
+/** The one page: the game. Menu data (leaderboard, the player's worlds) arrives as props. */
 class PlayController extends Controller
 {
     private const LEADERBOARD_SIZE = 8;
@@ -26,7 +26,7 @@ class PlayController extends Controller
                 ->get()
                 ->map(fn (Score $row) => ['name' => $row->user?->name ?? 'Unknown', 'score' => (int) $row->best])
                 ->values(),
-            'world' => fn () => $user?->world?->meta(),
+            'worlds' => fn () => $user?->worldsMeta() ?? ['own' => null, 'global' => null],
         ]);
     }
 }

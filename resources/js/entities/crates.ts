@@ -65,6 +65,14 @@ export class CrateManager {
     return crate
   }
 
+  /** put a saved crate back (issue #13) */
+  restore(x: number, y: number, z: number, items: readonly ItemStack[]): LootCrate {
+    const crate: LootCrate = { id: this.nextId++, x, y, z, items: items.map(s => ({ ...s })), count: items.length }
+    this.crates.push(crate)
+    this.buildMesh(crate)
+    return crate
+  }
+
   /** The crate the player is looking at within reach, if any. */
   targeted(ex: number, ey: number, ez: number, dx: number, dy: number, dz: number): LootCrate | null {
     let best: LootCrate | null = null

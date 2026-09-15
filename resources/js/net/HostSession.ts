@@ -4,6 +4,7 @@
  * authoritative Game and broadcasts snapshots at SNAPSHOT_HZ.
  */
 import type { Game } from '../game/Game'
+import type { WorldKind } from '../world/seed'
 import { HostTransport, type Link } from './transport'
 import {
   decode, encode, makeRoomCode, MAX_PLAYERS, PROTOCOL_VERSION, SNAPSHOT_HZ,
@@ -46,14 +47,14 @@ export class HostSession {
    * it, then start reading the room's mailbox (which 404s until the room exists).
    * Fails if the app cannot be reached.
    */
-  async listen(hostName = 'Survivor'): Promise<void> {
+  async listen(hostName = 'Survivor', worldKind: WorldKind = 'own'): Promise<void> {
     if (this.transport) return
     const t = new HostTransport({
       onOpen: link => { this.pending.add(link.id) },
       onData: (link, bytes) => this.onData(link, bytes),
       onClose: link => this.onLeave(link),
     })
-    await api.createRoom(this.code, t.id, hostName)
+    await api.createRoom(this.code, t.id, hostName, worldKind)
     await t.listen(this.code)
     this.transport = t
   }
@@ -117,13 +118,13 @@ export class HostSession {
         link.close()
         return
       }
-      const avatar = game.addRemoteAvatar(link.id, msg.name.slice(0, 16) || 'Player')
+      const avatar = game.addRemoteAvatar(link.id, msg.name.slice(0, 16) || 'Player', typeof msg.userId === 'number' ? msg.userId : null)
       const welcome: Welcome = {
         t: 'welcome', v: PROTOCOL_VERSION, you: avatar.id, seed: game.seed, time: game.dayNight.time,
         edits: game.worldEdits(), spawn: avatar.spawn,
       }
       this.send(link, welcome)
-      avatar.push({ inventory: avatar.inventory.all(), magazine: 0, health: avatar.health })
+      avatar.push({ inventory: avatar.inventory.all(), magazine: avatar.magazine, health: avatar.health, spawn: avatar.spawn })
       game.showMessage(`${avatar.name} joined`)
       this.onPlayersChanged?.()
       return

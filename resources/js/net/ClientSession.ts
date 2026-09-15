@@ -3,6 +3,7 @@
  * (seed + world diff) before the Game is built, then streams inputs at INPUT_HZ and
  * applies snapshots / private state / block edits to the Game.
  */
+import { api } from './api'
 import type { Game } from '../game/Game'
 import { ClientTransport, type Link } from './transport'
 import { SnapshotBuffer } from './SnapshotBuffer'
@@ -40,7 +41,7 @@ export class ClientSession {
       this.transport = new ClientTransport({
         onOpen: link => {
           this.link = link
-          link.send(encode({ t: 'hello', v: PROTOCOL_VERSION, name: this.name }))
+          link.send(encode({ t: 'hello', v: PROTOCOL_VERSION, name: this.name, userId: api.user?.id }))
         },
         onData: (_link, bytes) => this.onData(bytes),
         onClose: () => this.onClose(),

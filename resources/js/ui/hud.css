@@ -158,6 +158,7 @@ body { user-select: none; }
 .inv-grid .slot.picked { border-color: #fff; background: rgba(255,255,255,.2); }
 .inv-grid .slot:nth-child(10) { margin-top: 6px; }
 .panel .hint { margin: 10px 0 0; font-size: 12px; opacity: .6; text-align: center; }
+.recipes .bench-hint { grid-column: 1 / -1; margin-top: 6px; font-size: 12px; opacity: .6; }
 .panel .hint b { color: var(--hud-accent); }
 
 .icon.large.block { width: 40px; height: 40px; }
@@ -271,7 +272,9 @@ body { user-select: none; }
 .menu .option .fine { margin: 10px 0 0; text-align: center; }
 .menu .option .fine .link { font-size: 12px; opacity: .8; }
 .menu .open-games { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 150px; overflow-y: auto; }
-.menu .open-games li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 6px; background: rgba(0,0,0,.25); font-size: 13px; }
+.menu .open-games li { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 6px; background: rgba(0,0,0,.25); font-size: 13px; }
+.menu .open-games li .host small { opacity: .6; font-weight: 400; }
+.menu .open-games li .link { font-size: 12px; opacity: .7; }
 .menu .open-games .host { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu .open-games .seats { font: 700 12px ui-monospace, Consolas, monospace; color: var(--hud-accent); }
 .menu .open-games button { padding: 5px 12px; font-size: 12px; }
@@ -286,8 +289,25 @@ body { user-select: none; }
 .menu .link { background: none; border: 0; padding: 0; color: var(--hud-accent); cursor: pointer; font: 600 13px inherit; text-decoration: underline; }
 .menu .account-line { margin: 12px 0 0; font-size: 13px; opacity: .9; }
 .menu .account { display: grid; gap: 8px; margin-top: 12px; padding: 12px; border-radius: 8px; background: rgba(255,255,255,.04); }
+/* dev-only guest sign-in under the form */
+.menu .dev-guest { display: grid; gap: 4px; margin: 10px 0 0; justify-items: center; }
+.menu .dev-guest small { font-size: 11px; opacity: .5; }
 .menu .board { margin-top: 16px; text-align: left; }
 .menu .board h3 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; opacity: .6; }
 .menu .board ol { margin: 0; padding: 0 0 0 20px; font-size: 13px; columns: 2; column-gap: 18px; }
 .menu .board li { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; break-inside: avoid; }
 .menu .board li b { font-family: ui-monospace, Consolas, monospace; color: var(--hud-accent); }
+
+/* ---- host's invitation list on the pause screen (issue #5) */
+.invite-panel { margin-top: 16px; width: min(360px, 90vw); text-align: left; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.12); border-radius: 10px; padding: 10px 12px; }
+.invite-panel header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.invite-panel h3 { margin: 0; font-size: 15px; font-weight: 800; }
+.invite-panel .close { background: none; border: 0; color: inherit; font-size: 16px; cursor: pointer; opacity: .7; }
+.invite-panel ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 220px; overflow-y: auto; font-size: 13px; line-height: 1.4; }
+.invite-panel li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 8px; border-radius: 6px; background: rgba(255,255,255,.05); }
+.invite-panel li.empty { opacity: .6; justify-content: center; }
+.invite-panel button { font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.08); color: inherit; cursor: pointer; }
+.invite-panel button:disabled { opacity: .5; cursor: default; }
+.invite-panel .tag { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; opacity: .7; }
+.invite-panel .tag.accepted, .invite-panel .tag.joined { color: var(--hud-accent); opacity: 1; }
+.invite-panel .error { margin: 6px 0 0; font-size: 12px; color: #ff6b5b; }

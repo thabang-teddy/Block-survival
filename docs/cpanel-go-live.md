@@ -333,7 +333,10 @@ Runs on the server. In order:
    **`git clean` is never used.** Tracked files edited on the server are
    listed as a warning before they are discarded.
 6. Ensure `storage/{app,framework/{cache,sessions,views},logs}` exist and
-   `bootstrap/cache` is writable.
+   `bootstrap/cache` is writable. Delete the previous deploy's compiled files in
+   `bootstrap/cache/` (the artefact ships none, so they would otherwise survive
+   `reset --hard`) and run `package:discover` — a package removed since the last
+   deploy would make every later artisan call fail at boot.
 7. **Migrations if needed**: `php artisan migrate:status --pending`; if any
    are listed, copy the SQLite file to `<data>/backups/pre-migrate-<ts>.sqlite`
    first, then `php artisan migrate --force`. Otherwise print "no pending

@@ -9,6 +9,7 @@ import type { Phase } from '../game/DayNight'
 import type { HostSession } from '../net/HostSession'
 import type { ClientSession } from '../net/ClientSession'
 import type { SaveData } from '../net/api'
+import type { WorldKind } from '../world/seed'
 
 export interface ScoreRow {
   id: string
@@ -21,7 +22,7 @@ export interface ScoreRow {
 
 /** how the current run was started; null = main menu */
 export type Launch =
-  | { role: 'host'; name: string; session: HostSession; restore?: SaveData }
+  | { role: 'host'; name: string; session: HostSession; restore?: SaveData; worldKind: WorldKind; seed: number }
   | { role: 'client'; name: string; session: ClientSession }
 
 export interface UiSnapshot {

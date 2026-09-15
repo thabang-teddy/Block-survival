@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\DeviceController;
 use App\Http\Controllers\Admin\LoginWindowController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Api\InviteController;
 use App\Http\Controllers\Api\RoomController;
 use App\Http\Controllers\Api\ScoreController;
 use App\Http\Controllers\Api\SignalController;
@@ -20,6 +21,8 @@ Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'show'])->name('login');
     // rate-limited against brute force
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('login.store');
+    // dev only (404 elsewhere): one-click guest account
+    Route::post('/login/guest', [AuthController::class, 'guest'])->middleware('throttle:10,1')->name('login.guest');
     // a browser no admin has approved yet waits here (identified by its cookie, not a session)
     Route::get('/pending-approval', [PendingApprovalController::class, 'show'])->name('pending-approval');
     Route::get('/pending-approval/status', [PendingApprovalController::class, 'status'])->middleware('throttle:30,1');
@@ -40,17 +43,27 @@ Route::middleware(['auth', 'access'])->group(function () {
 
     // JSON endpoints used by the running game; same session + CSRF as the page
     Route::prefix('api')->middleware('throttle:60,1')->group(function () {
-        Route::get('/rooms', [RoomController::class, 'index']);
+        // rooms are invite-only (issue #5): there is no open list, and resolving a code
+        // needs an accepted invite
         Route::post('/rooms', [RoomController::class, 'store']);
         Route::get('/rooms/{code}', [RoomController::class, 'show']);
         Route::patch('/rooms/{code}', [RoomController::class, 'update']);
         Route::delete('/rooms/{code}', [RoomController::class, 'destroy']);
+        Route::get('/rooms/{code}/invites', [InviteController::class, 'room']);
+        Route::post('/rooms/{code}/invites', [InviteController::class, 'store']);
+        Route::get('/players', [InviteController::class, 'players']);
+        Route::get('/invites', [InviteController::class, 'index']);
+        Route::post('/invites/{invite}/accept', [InviteController::class, 'accept']);
+        Route::post('/invites/{invite}/decline', [InviteController::class, 'decline']);
         Route::get('/leaderboard', [ScoreController::class, 'leaderboard']);
         Route::post('/scores', [ScoreController::class, 'store']);
-        // the player's one world
-        Route::get('/world', [WorldController::class, 'show']);
-        Route::put('/world', [WorldController::class, 'update']);
-        Route::delete('/world', [WorldController::class, 'destroy']);
+        // the player's worlds: `own` (random seed) and `global` (the shared seed); no kind = own
+        Route::get('/world/{kind?}', [WorldController::class, 'show'])->where('kind', 'own|global');
+        Route::put('/world/{kind?}', [WorldController::class, 'update'])->where('kind', 'own|global');
+        Route::delete('/world/{kind?}', [WorldController::class, 'destroy'])->where('kind', 'own|global');
+        // sendBeacon on unload: multipart, CSRF token as a form field
+        Route::post('/world/beacon', [WorldController::class, 'beacon']);
+        Route::post('/world/{kind}/beacon', [WorldController::class, 'beacon'])->where('kind', 'own|global');
     });
 
     // admin section (issue #1): operating hours, device approval, users, live rooms

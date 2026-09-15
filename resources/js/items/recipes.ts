@@ -1,6 +1,9 @@
 /**
  * Recipe table (GAME_PROMPT.md §5) and the pure crafting rules.
- * `hand` recipes work anywhere; `bench` recipes need a Workbench within reach.
+ * By hand (E, anywhere) you can only make planks, sticks, a workbench and a wooden
+ * pickaxe; a Workbench within reach (F) makes everything except another workbench
+ * (issue #10). `craftStatus` is the one rule the host enforces; `recipesFor` is what
+ * the panel lists.
  */
 import type { Inventory, ItemStack } from './inventory'
 
@@ -22,7 +25,7 @@ export const RECIPES: readonly Recipe[] = [
   r('planks', ['planks', 4], [['log', 1]], false),
   r('stick', ['stick', 4], [['planks', 2]], false),
   r('workbench', ['workbench', 1], [['planks', 4]], false),
-  r('torch', ['torch', 4], [['stick', 1], ['coal', 1]], false),
+  r('torch', ['torch', 4], [['stick', 1], ['coal', 1]], true),
   r('pickaxe_wood', ['pickaxe_wood', 1], [['planks', 3], ['stick', 2]], false),
   r('pickaxe_stone', ['pickaxe_stone', 1], [['cobble', 3], ['stick', 2]], true),
   r('pickaxe_iron', ['pickaxe_iron', 1], [['iron', 3], ['stick', 2]], true),
@@ -33,6 +36,13 @@ export const RECIPES: readonly Recipe[] = [
   r('rifle', ['rifle', 1], [['iron', 8], ['planks', 2], ['coal', 2]], true),
   r('ammo', ['ammo', 30], [['iron', 1], ['coal', 1]], true),
 ]
+
+export type CraftContext = 'hand' | 'bench'
+
+/** what the crafting panel lists: hand recipes anywhere, everything but the bench at a bench */
+export function recipesFor(context: CraftContext): readonly Recipe[] {
+  return context === 'hand' ? RECIPES.filter(r => !r.bench) : RECIPES.filter(r => r.id !== 'workbench')
+}
 
 export const getRecipe = (id: string): Recipe => {
   const rec = RECIPES.find(x => x.id === id)

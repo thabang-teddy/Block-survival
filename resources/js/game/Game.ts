@@ -10,11 +10,14 @@
  */
 import * as THREE from 'three'
 import { World, type PropMeta } from '../world/chunkStore'
-import { generateIsland, ISLAND_LARGE, type IslandInfo } from '../world/islandGen'
+import { GLOBAL_SEED, type WorldKind } from '../world/seed'
+import { TerrainGenerator, WORLD_CHUNKS_Y } from '../world/terrainGen'
+import { ChunkStreamer, type StreamAnchor } from '../world/chunkStreamer'
 import { raycastVoxels, type RayHit } from '../world/raycast'
 import { AIR, BLOCK, isProp, isSolid } from '../world/palette'
 import { ChunkRenderer } from '../render/ChunkRenderer'
 import { PropRenderer } from '../render/PropRenderer'
+import { UpdraftRenderer } from '../render/UpdraftRenderer'
 import { ViewModel } from '../render/ViewModel'
 import { ZombieRenderer, preloadZombies } from '../render/ZombieRenderer'
 import { RemotePlayerRenderer } from '../render/RemotePlayerRenderer'
@@ -35,6 +38,10 @@ import type { HostSession } from '../net/HostSession'
 import type { ClientSession } from '../net/ClientSession'
 import type { BlockEdit, ClientMessage, PlayerSnap, PrivateState, Snapshot } from '../net/protocol'
 import { api, type SaveData } from '../net/api'
+import { Autosave } from './autosave'
+import { collectSave, restorePlayer, visitorsOf, zombiesToRestore } from './saveState'
+import { Visitors } from './visitors'
+import type { ItemStack } from '../items/inventory'
 import { useUiStore } from '../state/uiStore'
 
 export const REACH = 5
@@ -60,6 +67,10 @@ const RESPAWN_SECONDS = 5
 /** requests from clients must originate within this distance of their avatar's eye */
 const ACTION_REACH = REACH + 1.5
 const HOST_ID = 'host'
+/** columns loaded synchronously around the spawn before the first frame */
+const INITIAL_LOAD_RADIUS = 2
+/** while dirty, the host re-packs the save this often so a sudden unload can beacon it */
+const BEACON_REFRESH_SECONDS = 10
 
 export interface GameOptions {
   role: Role
@@ -67,17 +78,25 @@ export interface GameOptions {
   session: HostSession | ClientSession
   /** host only: continue the player's saved world */
   restore?: SaveData
+  /** host only: which of the player's worlds this is (where it saves) */
+  worldKind?: WorldKind
+  /** host only: the seed of a brand-new world (a save's seed wins) */
+  seed?: number
 }
 
 type Ray = { ox: number; oy: number; oz: number; dx: number; dy: number; dz: number }
 
 export class Game {
   readonly role: Role
-  readonly seed = ISLAND_LARGE.seed
+  readonly seed: number
+  /** host: which of the player's worlds this is (where it saves) */
+  readonly worldKind: WorldKind
   readonly world = new World()
-  readonly island: IslandInfo
+  readonly terrain: TerrainGenerator
+  readonly streamer: ChunkStreamer
   readonly chunks: ChunkRenderer
   readonly props: PropRenderer
+  readonly updrafts: UpdraftRenderer
   readonly player: PlayerController
   readonly input: Input
   readonly drops: DropManager
@@ -119,6 +138,17 @@ export class Game {
   private spawnTimes: number[] = []
   /** block edits since the last network flush (host) */
   private blockEdits: BlockEdit[] = []
+  // ---- saving (host, issue #13)
+  private readonly autosave = new Autosave(() => this.uploadWorld())
+  /** players who left (or have not reconnected since the load), by account id */
+  private readonly visitors = new Visitors()
+  /** what a cheap scan of the sim looked like at the last dirty check ('' = not scanned yet) */
+  private dirtySignature = ''
+  /** a brand-new world must be uploaded once so its seed sticks; a restored one only when it changes */
+  private readonly needsFirstSave: boolean
+  private beaconTimer = 0
+  private beacon: { bytes: Uint8Array; night: number; seconds: number } | null = null
+  private packing = false
   private readonly tmpDir = new THREE.Vector3()
   private readonly tmpRight = new THREE.Vector3()
 
@@ -139,9 +169,14 @@ export class Game {
     this.camera.rotation.order = 'YXZ'
     this.camera.add(this.viewModel.group)
     const t0 = performance.now()
-    this.island = generateIsland(this.world, ISLAND_LARGE)
+    // the world seed comes from the host (clients), the save, or the lobby (a brand-new world)
+    this.seed = opts.session.role === 'client' ? opts.session.welcome!.seed : opts.restore?.seed ?? opts.seed ?? GLOBAL_SEED
+    this.worldKind = opts.worldKind ?? 'own'
+    this.needsFirstSave = opts.session.role === 'host' && !opts.restore
+    this.terrain = new TerrainGenerator(this.seed)
+    this.world.setGenerator((cx, cy, cz) => this.terrain.generateChunk(cx, cy, cz), WORLD_CHUNKS_Y)
     this.world.trackEdits = true
-    let spawn: Spawn = this.island.spawn
+    let spawn: Spawn = this.terrain.spawn()
     if (opts.session.role === 'client') {
       const w = opts.session.welcome!
       this.applyBlockEdits(w.edits)
@@ -151,28 +186,38 @@ export class Game {
       this.applyBlockEdits(opts.restore.edits)
       this.dayNight.time = opts.restore.time
       this.dayNight.update(0)
-      spawn = opts.restore.spawn
+      const me = opts.restore.players[String(api.user?.id ?? 0)]
+      if (me) spawn = { x: me.pos.x, y: me.pos.y, z: me.pos.z }
+      for (const [id, p] of visitorsOf(opts.restore, String(api.user?.id ?? 0))) this.visitors.leaveSaved(id, p)
     }
+    // enough ground under the player to stand on; the rest streams in over the next frames
+    this.streamer = new ChunkStreamer(this.world)
+    this.streamer.loadNow(spawn.x, spawn.z, INITIAL_LOAD_RADIUS)
     const t1 = performance.now()
     this.chunks = new ChunkRenderer(this.world)
-    this.chunks.buildAll()
+    this.chunks.flush()
     this.props = new PropRenderer(this.world)
+    this.updrafts = new UpdraftRenderer(this.terrain)
     const t2 = performance.now()
     console.info(
-      `island: ${this.island.voxelCount} voxels, ${this.world.chunkCount} chunks — gen ${(t1 - t0).toFixed(0)} ms, mesh ${(t2 - t1).toFixed(0)} ms (${this.role})`,
+      `world seed ${this.seed}: ${this.world.loadedColumnCount} columns, ${this.world.chunkCount} chunks — gen ${(t1 - t0).toFixed(0)} ms, mesh ${(t2 - t1).toFixed(0)} ms (${this.role})`,
     )
     const localId = opts.session.role === 'client' ? opts.session.welcome!.you : HOST_ID
     this.local = new Avatar(localId, opts.name, spawn)
+    this.local.userId = api.user?.id ?? null
     this.avatars.set(localId, this.local)
-    if (opts.restore) {
-      this.local.inventory.replace(opts.restore.inventory)
-      this.local.kills = opts.restore.kills
-      this.local.deaths = opts.restore.deaths
-    }
+    const me = opts.restore?.players[String(this.local.userId ?? 0)]
+    if (me) restorePlayer(this.local, me, true)
     this.player = new PlayerController(this.world, spawn)
+    if (me) {
+      this.player.state.yaw = me.pos.yaw
+      this.player.state.pitch = me.pos.pitch
+    }
+    this.player.updrafts = (x, z) => this.terrain.updraftsNear(x - 3, z - 3, x + 3, z + 3)
     this.input = new Input(canvas)
     this.drops = new DropManager(this.world)
     this.crates = new CrateManager(this.world)
+    if (opts.restore) this.restoreLiveWorld(opts.restore)
     this.zombies = new ZombieManager(
       {
         world: this.world,
@@ -189,12 +234,19 @@ export class Game {
     )
     this.highlight.visible = false
     opts.session.attach(this)
+    if (this.isHost && api.loggedIn) {
+      window.addEventListener('pagehide', this.onPageHide)
+      document.addEventListener('visibilitychange', this.onVisibility)
+    }
   }
 
   dispose(): void {
+    window.removeEventListener('pagehide', this.onPageHide)
+    document.removeEventListener('visibilitychange', this.onVisibility)
     this.input.dispose()
     this.chunks.dispose()
     this.props.dispose()
+    this.updrafts.dispose()
     this.drops.dispose()
     this.zombieRenderer.dispose()
     this.remotePlayers.dispose()
@@ -212,8 +264,11 @@ export class Game {
     this.time += dt
     const look = this.input.takeLook()
     if (!this.dead) this.player.look(look.dx, look.dy)
+    this.reportLookSpikes()
     for (const ev of this.input.takeEvents()) if (!this.dead) this.handleEvent(ev)
-    this.player.update(dt, this.input, this.dead)
+    // never integrate physics over ground that has not streamed in yet (e.g. right after a teleport)
+    const p = this.player.state
+    if (this.world.isColumnLoaded(Math.floor(p.x), Math.floor(p.z))) this.player.update(dt, this.input, this.dead)
     this.mirrorLocalPose()
     this.updateAiming(dt)
     this.syncCamera()
@@ -231,13 +286,22 @@ export class Game {
     this.nearWorkbench = this.isNear(this.local, BLOCK.workbench, BENCH_REACH)
     this.heldLight.visible = this.heldItem === 'torch' && !this.dead
     this.heldLight.position.set(s.x, s.y + 1.3, s.z)
+    this.streamWorld()
     this.chunks.update()
     this.props.update(dt, this.camera.position.x, this.camera.position.y, this.camera.position.z)
+    this.updrafts.update(dt, this.camera.position.x, this.camera.position.z)
     this.zombieRenderer.update(dt, this.zombies)
     this.remotePlayers.update(dt, this.remotePoses.values())
     this.crates.update(this.time)
     this.fx.update(dt)
     this.publishUi()
+  }
+
+  /** The host keeps the world loaded around every player (it simulates them all); a client around itself. */
+  private streamWorld(): void {
+    const anchors: StreamAnchor[] = this.isHost ? [...this.avatars.values()] : [this.local]
+    const keep: StreamAnchor[] = this.isHost ? [...this.zombies.zombies, ...this.drops.drops] : []
+    this.streamer.update(anchors, keep)
   }
 
   private mirrorLocalPose(): void {
@@ -349,7 +413,7 @@ export class Game {
     }
     if (st.respawnIn !== undefined) a.respawnAt = this.time + st.respawnIn
     if (st.spawn) a.spawn = st.spawn
-    if (st.teleport) this.player.teleport(st.teleport.x, st.teleport.y, st.teleport.z)
+    if (st.teleport) this.teleportLocal(st.teleport.x, st.teleport.y, st.teleport.z)
     if (st.message) this.showMessage(st.message)
     for (const f of st.fx ?? []) {
       if (f.kind === 'flash') this.fx.muzzleFlash(f.ax, f.ay, f.az)
@@ -365,15 +429,21 @@ export class Game {
   }
 
   // ---------------------------------------------------------------- network helpers (host)
-  addRemoteAvatar(id: string, name: string): Avatar {
-    const a = new Avatar(id, name, this.island.spawn)
+  /** a client joined; one we have seen before (this run or in the save) gets its gear back */
+  addRemoteAvatar(id: string, name: string, userId: number | null = null): Avatar {
+    const a = new Avatar(id, name, this.terrain.spawn())
+    a.userId = userId
+    this.visitors.arrive(a, userId)
     this.avatars.set(id, a)
     return a
   }
 
   removeAvatar(id: string): void {
+    const a = this.avatars.get(id)
+    if (a) this.visitors.leave(a, a.userId)
     this.avatars.delete(id)
     this.remotePoses.delete(id)
+    this.autosave.markDirty()
   }
 
   worldEdits(): BlockEdit[] {
@@ -456,14 +526,25 @@ export class Game {
         this.broadcastMessage(`Dawn — you survived night ${dn.night}`)
         this.bestScore = saveBest(this.score)
         this.postScore()
-        if (api.loggedIn) this.saveToCloud().catch(() => {})
+        if (api.loggedIn) this.autosave.saveNow().catch(() => {})
       }
     }
+    this.tickSaving(dt)
     while (this.spawnTimes.length && dn.time >= this.spawnTimes[0]) {
       this.spawnTimes.shift()
       const targets = [...this.avatars.values()].filter(a => a.alive).map(a => ({ x: a.x, y: a.y, z: a.z }))
       this.zombies.spawnGroup(kindsForNight(dn.night), 3 + Math.floor(Math.random() * 4), targets, 28)
     }
+  }
+
+  /** dev only: how many pointer-lock spikes the input layer has discarded (issue #14) */
+  private loggedSpikes = 0
+  private reportLookSpikes(): void {
+    if (!import.meta.env.DEV) return
+    const n = this.input.droppedSpikes
+    if (n === this.loggedSpikes) return
+    this.loggedSpikes = n
+    console.info(`mouse: discarded ${n} pointer-lock delta spike${n === 1 ? '' : 's'}`)
   }
 
   /** Split the night's zombie count into groups of 3–6 spread over the spawn window. */
@@ -505,6 +586,12 @@ export class Game {
     if (a === this.local) this.postScore()
   }
 
+  /** move the local player somewhere that may not be streamed yet (a bed on an island) */
+  private teleportLocal(x: number, y: number, z: number): void {
+    this.streamer.loadNow(x, z, INITIAL_LOAD_RADIUS)
+    this.player.teleport(x, y, z)
+  }
+
   private respawn(a: Avatar): void {
     a.dead = false
     a.health = AVATAR.maxHealth
@@ -513,7 +600,7 @@ export class Game {
     a.x = sp.x; a.y = sp.y; a.z = sp.z
     const msg = this.crates.crates.length ? 'Your loot crate is where you fell' : 'Back on your feet'
     if (a === this.local) {
-      this.player.teleport(sp.x, sp.y, sp.z)
+      this.teleportLocal(sp.x, sp.y, sp.z)
       this.player.state.stamina = PLAYER.maxStamina
       this.cameraMode = this.cameraBeforeDeath
       this.showMessage(msg)
@@ -531,8 +618,8 @@ export class Game {
   private doBreak(a: Avatar, x: number, y: number, z: number): void {
     if (a.dead || !this.withinReach(a, x, y, z)) return
     const block = this.world.getBlock(x, y, z)
-    if (block === AIR || y <= this.world.bounds.minY + 1) return
-    if (!Number.isFinite(breakTime(block, a.heldItem))) return
+    if (block === AIR) return
+    if (!Number.isFinite(breakTime(block, a.heldItem))) return // includes bedrock
     this.breakBlock(x, y, z, block)
   }
 
@@ -695,24 +782,91 @@ export class Game {
   }
 
   buildSave(): SaveData {
-    return {
-      version: 1,
+    return collectSave({
       seed: this.seed,
       time: this.dayNight.time,
       edits: this.worldEdits(),
-      inventory: this.local.inventory.all(),
-      spawn: this.local.spawn,
-      kills: this.local.kills,
-      deaths: this.local.deaths,
-    }
+      live: [...this.avatars.values()].filter(a => a.userId !== null).map(a => ({ userId: String(a.userId), avatar: a })),
+      departed: this.visitors.entries,
+      zombies: this.zombies.zombies,
+      drops: this.drops.drops,
+      crates: this.crates.crates,
+    })
   }
 
-  /** upload the world (block diff, clock, the host's inventory) as the account's one world */
+  /** the host's manual save: upload now (after any upload in flight) and say so */
   async saveToCloud(): Promise<void> {
     if (!this.isHost) throw new Error('Only the host can save')
     if (!api.loggedIn) throw new Error('Log in to save your world')
-    await api.saveWorld(this.buildSave(), this.dayNight.night)
+    await this.autosave.saveNow()
     this.showMessage('World saved')
+  }
+
+  /** true when something happened since the last successful upload */
+  get needsSave(): boolean {
+    return this.isHost && api.loggedIn && (this.autosave.isDirty || this.autosave.inFlight)
+  }
+
+  private async uploadWorld(): Promise<void> {
+    await api.saveWorld(this.buildSave(), this.dayNight.night, this.worldKind)
+    this.beacon = null
+  }
+
+  /** zombies, drops and crates that were live when the world was saved */
+  private restoreLiveWorld(save: SaveData): void {
+    for (const z of zombiesToRestore(save, t => this.dayNight.phaseAt(t))) {
+      const zb = this.zombies.spawn(z.kind, z.x, z.y, z.z)
+      zb.hp = Math.min(zb.hp, Math.max(1, z.hp))
+    }
+    for (const d of save.drops) this.drops.spawn(d.id, d.count, d.x, d.y, d.z, 0, 0, 0)
+    for (const c of save.crates) this.crates.restore(c.x, c.y, c.z, c.items.filter((s): s is ItemStack => s !== null))
+  }
+
+  /**
+   * Once a frame on the host: notice changes worth saving (a cheap scan, so nothing has
+   * to remember to call markDirty), run the autosave clock, and keep a packed copy of
+   * the save ready for a beacon in case the tab goes away.
+   */
+  private tickSaving(dt: number): void {
+    if (!this.isHost || !api.loggedIn) return
+    let inventories = 0
+    let deaths = 0
+    for (const a of this.avatars.values()) {
+      inventories += a.inventory.version
+      deaths += a.deaths
+    }
+    const sp = this.local.spawn
+    const sig = `${this.world.edits.size}:${this.world.propsVersion}:${inventories}:${deaths}:${this.drops.drops.length}:${this.crates.crates.length}:${sp.x},${sp.y},${sp.z}`
+    if (this.dirtySignature === '') {
+      this.dirtySignature = sig
+      if (this.needsFirstSave) this.autosave.markDirty()
+    } else if (sig !== this.dirtySignature) {
+      this.dirtySignature = sig
+      this.autosave.markDirty()
+    }
+    this.autosave.tick(dt)
+    this.beaconTimer += dt
+    if (this.autosave.isDirty && this.beaconTimer >= BEACON_REFRESH_SECONDS && !this.packing) {
+      this.beaconTimer = 0
+      this.packing = true
+      const night = this.dayNight.night
+      const seconds = this.dayNight.time
+      api.packWorld(this.buildSave())
+        .then(bytes => { this.beacon = { bytes, night, seconds } })
+        .catch(() => {})
+        .finally(() => { this.packing = false })
+    }
+  }
+
+  /** the page is going away: fire the last packed save as a beacon */
+  private onPageHide = (): void => {
+    if (!this.autosave.isDirty || !this.beacon) return
+    if (api.beaconWorld(this.beacon.bytes, this.beacon.night, this.beacon.seconds, this.worldKind)) this.beacon = null
+  }
+
+  /** the tab went to the background: a normal upload still completes there */
+  private onVisibility = (): void => {
+    if (document.visibilityState === 'hidden' && this.autosave.isDirty) this.autosave.saveNow().catch(() => {})
   }
 
   // ---------------------------------------------------------------- messages
@@ -822,8 +976,7 @@ export class Game {
     if (!this.breaking || this.breaking.x !== t.x || this.breaking.y !== t.y || this.breaking.z !== t.z) {
       this.breaking = { x: t.x, y: t.y, z: t.z, progress: 0 }
     }
-    if (t.y <= this.world.bounds.minY + 1) return // bedrock
-    const seconds = breakTime(t.block, held)
+    const seconds = breakTime(t.block, held) // bedrock and pickaxe-only blocks are Infinity
     if (!Number.isFinite(seconds)) return
     this.breaking.progress += dt / seconds
     if (this.time > this.swingUntil - SWING_SECONDS * 0.5) this.swing()
@@ -965,7 +1118,8 @@ export class Game {
       message: this.time < this.messageUntil ? this.message : '',
       interactHint: this.crateTarget ? `F  take loot (${this.crateTarget.count})`
         : this.target?.block === BLOCK.bed ? 'F  set respawn'
-        : this.target?.block === BLOCK.workbench ? 'F  craft' : '',
+        : this.target?.block === BLOCK.workbench ? 'F  craft'
+        : this.player.state.inUpdraft ? 'Space  rise · Shift  sink · walk out to drop' : '',
       timer: this.dayNight.timerText,
       phase: this.dayNight.phase,
       night: this.dayNight.night,

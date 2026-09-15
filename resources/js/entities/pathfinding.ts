@@ -16,7 +16,8 @@ export interface Cell {
 
 const DIRS: readonly (readonly [number, number])[] = [[1, 0], [-1, 0], [0, 1], [0, -1]]
 const STEPS = [0, 1, -1, -2, -3] as const
-const key = (x: number, y: number, z: number): number => ((x + 512) * 1024 + (y + 512)) * 1024 + (z + 512)
+/** visited-set key relative to the search start (searches are local; the world is not) */
+const relKey = (x: number, y: number, z: number): number => ((x + 512) * 1024 + (y + 512)) * 1024 + (z + 512)
 
 export function isStanding(world: World, x: number, y: number, z: number): boolean {
   return !isSolid(world.getBlock(x, y, z)) && !isSolid(world.getBlock(x, y + 1, z)) && isSolid(world.getBlock(x, y - 1, z))
@@ -88,6 +89,7 @@ export interface PathResult {
 
 export function findPath(world: World, start: Cell, goal: Cell, maxNodes = 800): PathResult {
   const h = (x: number, y: number, z: number): number => Math.abs(x - goal.x) + Math.abs(z - goal.z) + Math.abs(y - goal.y) * 0.5
+  const key = (x: number, y: number, z: number): number => relKey(x - start.x, y - start.y, z - start.z)
   const open = new Heap()
   const best = new Map<number, number>()
   const startNode: Node = { ...start, g: 0, f: h(start.x, start.y, start.z), parent: null }
