@@ -14,7 +14,7 @@ Written 2026-09-13 against commit `027b9a2`. Host: **not yet measured** (§2.0).
 |---|---|---|
 | ~~Laravel Reverb WebSocket server for WebRTC signalling~~ (removed, §3.1) | No process supervisor, no custom listening ports; PHP only runs per-request under LiteSpeed/Apache | Signalling is a polled mailbox in the database. **§3.1** |
 | `DB_CONNECTION=sqlite` at `database/database.sqlite` (dev default) | Any file the account can write. cPanel backups cover `$HOME`, not "the database" | SQLite file kept **outside the git tree** at `$HOME/<env>/data/block-survival.sqlite`. **§4.4** |
-| `SESSION_DRIVER`, `CACHE_STORE`, `QUEUE_CONNECTION` = `database` | Works unchanged on SQLite | Nothing dispatches jobs (`grep ShouldQueue app/` is empty; `RoomSignal` is `ShouldBroadcastNow`) → **no queue worker**. |
+| `SESSION_DRIVER`, `CACHE_STORE`, `QUEUE_CONNECTION` = `database` | Works unchanged on SQLite | Nothing dispatches jobs (`grep ShouldQueue server/app/` is empty; `RoomSignal` is `ShouldBroadcastNow`) → **no queue worker**. |
 | `php ^8.3` in composer.json, PHP 8.4.20 locally | PHP Selector per account; user has chosen **8.4** | CI builds vendor on 8.4; deploy script refuses anything older (`MIN_PHP_ID=80400`). |
 | Docroot is `public/` | Primary domain docroot is `public_html/` and often cannot be changed; addon/sub-domains can point anywhere | **§4.3**: each environment is a (sub)domain whose docroot is `.../public`. |
 | Vite build on the dev machine (`npm run build`) | No Node on most shared plans | CI builds the bundle and commits `public/build/` to the artefact branch. **§5** |
@@ -94,7 +94,7 @@ echo "sqlite lib: $(php -r 'echo (new PDO("sqlite::memory:"))->query("select sql
   rows past the cursor, oldest first, 50 per page. Both under `throttle:signal`,
   raised from 240 to **600/min per IP** (a host and a joiner behind one NAT
   both polling at 500 ms is ~240/min on its own).
-- `resources/js/net/transport.ts` `Signaller` polls with an id cursor:
+- `server/resources/js/net/transport.ts` `Signaller` polls with an id cursor:
   **500 ms while a handshake is in flight** (any signal in the last 10 s),
   **1.5 s idle** — the host polls for the whole match to accept late joiners;
   a joining client polls at 500 ms and stops the moment its DataChannel opens.
