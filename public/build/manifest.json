@@ -1,0 +1,141 @@
+{
+  "_hud-DXJ_hPfw.css": {
+    "file": "assets/hud-DXJ_hPfw.css",
+    "src": "_hud-DXJ_hPfw.css"
+  },
+  "_score--vXbDtDY.js": {
+    "file": "assets/score--vXbDtDY.js",
+    "name": "score"
+  },
+  "_types-CpzcjATO.css": {
+    "file": "assets/types-CpzcjATO.css",
+    "src": "_types-CpzcjATO.css"
+  },
+  "_types-NGYO9ylh.js": {
+    "file": "assets/types-NGYO9ylh.js",
+    "name": "types",
+    "imports": [
+      "resources/js/app.tsx"
+    ],
+    "css": [
+      "assets/types-CpzcjATO.css",
+      "assets/hud-DXJ_hPfw.css"
+    ]
+  },
+  "resources/js/Pages/Admin/Dashboard.tsx": {
+    "file": "assets/Dashboard-_vhLdDmi.js",
+    "name": "Dashboard",
+    "src": "resources/js/Pages/Admin/Dashboard.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx",
+      "_types-NGYO9ylh.js"
+    ]
+  },
+  "resources/js/Pages/Admin/Devices.tsx": {
+    "file": "assets/Devices-DuiDvfzA.js",
+    "name": "Devices",
+    "src": "resources/js/Pages/Admin/Devices.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx",
+      "_types-NGYO9ylh.js"
+    ]
+  },
+  "resources/js/Pages/Admin/Hours.tsx": {
+    "file": "assets/Hours-CXlaQxoR.js",
+    "name": "Hours",
+    "src": "resources/js/Pages/Admin/Hours.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx",
+      "_types-NGYO9ylh.js"
+    ]
+  },
+  "resources/js/Pages/Admin/Rooms.tsx": {
+    "file": "assets/Rooms-CF6XQN_g.js",
+    "name": "Rooms",
+    "src": "resources/js/Pages/Admin/Rooms.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx",
+      "_types-NGYO9ylh.js"
+    ]
+  },
+  "resources/js/Pages/Admin/UserForm.tsx": {
+    "file": "assets/UserForm-B0eWPS__.js",
+    "name": "UserForm",
+    "src": "resources/js/Pages/Admin/UserForm.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx",
+      "_types-NGYO9ylh.js",
+      "_score--vXbDtDY.js"
+    ]
+  },
+  "resources/js/Pages/Admin/Users.tsx": {
+    "file": "assets/Users-BJnuKp6T.js",
+    "name": "Users",
+    "src": "resources/js/Pages/Admin/Users.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx",
+      "_types-NGYO9ylh.js",
+      "_score--vXbDtDY.js"
+    ]
+  },
+  "resources/js/Pages/Login.tsx": {
+    "file": "assets/Login-BiX0OUEC.js",
+    "name": "Login",
+    "src": "resources/js/Pages/Login.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx"
+    ],
+    "css": [
+      "assets/hud-DXJ_hPfw.css"
+    ]
+  },
+  "resources/js/Pages/PendingApproval.tsx": {
+    "file": "assets/PendingApproval-DtwCoC4s.js",
+    "name": "PendingApproval",
+    "src": "resources/js/Pages/PendingApproval.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx"
+    ],
+    "css": [
+      "assets/hud-DXJ_hPfw.css"
+    ]
+  },
+  "resources/js/Pages/Play.tsx": {
+    "file": "assets/Play-DoaYRmXR.js",
+    "name": "Play",
+    "src": "resources/js/Pages/Play.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx",
+      "_score--vXbDtDY.js"
+    ],
+    "css": [
+      "assets/hud-DXJ_hPfw.css"
+    ]
+  },
+  "resources/js/app.tsx": {
+    "file": "assets/app-B3zkhqsI.js",
+    "name": "app",
+    "src": "resources/js/app.tsx",
+    "isEntry": true,
+    "dynamicImports": [
+      "resources/js/Pages/Admin/Dashboard.tsx",
+      "resources/js/Pages/Admin/Devices.tsx",
+      "resources/js/Pages/Admin/Hours.tsx",
+      "resources/js/Pages/Admin/Rooms.tsx",
+      "resources/js/Pages/Admin/UserForm.tsx",
+      "resources/js/Pages/Admin/Users.tsx",
+      "resources/js/Pages/Login.tsx",
+      "resources/js/Pages/PendingApproval.tsx",
+      "resources/js/Pages/Play.tsx"
+    ]
+  }
+}
