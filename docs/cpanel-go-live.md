@@ -274,6 +274,11 @@ Pull requests run tests only; they never build an artefact.
 
 Job `flow` (PRs only): the §5.0 promotion-order check. No checkout, no deps.
 
+The Laravel app lives in `server/` (the repo also holds `client/`, the native
+Flutter app, and `shared/`); `test` and `build` run every command there, and
+the artefact is `server/` itself, so the deploy branches and everything below
+about the cPanel side are unchanged.
+
 Job `test` (every push and PR):
 - PHP 8.4 (`shivammathur/setup-php`), `composer install`, `php artisan test`
 - Node 24, `npm ci`, `npm run typecheck`, `npm test`
@@ -281,8 +286,8 @@ Job `test` (every push and PR):
 Job `build` (push to `master`/`staging` only, needs `test`; a push to `dev` runs `test` and stops):
 - `composer install --no-dev --optimize-autoloader --classmap-authoritative` on PHP 8.4
 - `npm ci && npm run build`
-- Assemble a tree: source + `vendor/` + `public/build/`, minus `node_modules`,
-  `tests`, `Design`, `game docs`, `.github`, `.env*`, `storage/logs/*`
+- Assemble a tree from `server/`: source + `vendor/` + `public/build/`, minus
+  `node_modules`, `tests`, `.env*`, `storage/logs/*`
 - Commit it as a **single orphan commit** and force-push to `deploy/<env>`
 
 Why orphan + force: the artefact branch never accumulates history (a fresh

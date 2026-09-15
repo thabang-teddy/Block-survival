@@ -87,12 +87,15 @@ the cPanel side is not touched). Concretely:
    `Design/` and `game docs/` move to the top level next to `shared/`.
 2. `ci.yml`: `defaults.run.working-directory: server` on the `test` and `build`
    jobs; cache keys `hashFiles('server/composer.lock')`; setup-node
-   `cache-dependency-path: server/package-lock.json`; rsync source `./server/`
-   (the exclude list is relative to it and stays as is); `paths-ignore:
-   ['client/**']` on push/PR.
-3. New `client.yml`: `paths: ['client/**', 'shared/**']`, matrix of
-   `ubuntu-latest` (analyze, test, Android + Linux builds) and `windows-latest`
-   (Windows build), `working-directory: client`.
+   `cache-dependency-path: server/package-lock.json`; the rsync step runs in
+   `server/` so `./` and the exclude list are unchanged. **No `paths-ignore`**:
+   `flow` and `test` are required checks, and GitHub never reports a check a
+   path filter skipped, which would block client-only PRs forever. A client PR
+   also runs the server tests (~1 min) — acceptable.
+3. New `client.yml` (lands with the first Flutter commit): `paths: ['client/**',
+   'shared/**']`, matrix of `ubuntu-latest` (analyze, test, Android + Linux
+   builds) and `windows-latest` (Windows build), `working-directory: client`.
+   Its checks become required only once the client exists on `dev`.
 4. `.claude/launch.json`: `cwd: server` on the `vite` and `app` configs; re-link
    the Herd site `block-survival.test` to `server/`.
 5. `README.md` "Run it", `CLAUDE.md`, `docs/cpanel-go-live.md` (~44 lines
