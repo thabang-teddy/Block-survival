@@ -10,10 +10,13 @@ import {
   decode, encode, makeRoomCode, MAX_PLAYERS, PROTOCOL_VERSION, SNAPSHOT_HZ,
   type ClientMessage, type HostMessage, type Welcome,
 } from './protocol'
-import { api } from './api'
+import { api, ApiError } from './api'
 
-/** how often the host refreshes its room row on the API (seconds) */
-const ROOM_REFRESH_SECONDS = 60
+/**
+ * how often the host refreshes its room row on the API (seconds) — in the global world
+ * this is also the heartbeat that keeps everyone's seat (a seat is stale after 45 s)
+ */
+export const ROOM_REFRESH_SECONDS = 15
 
 export class HostSession {
   readonly role = 'host' as const
@@ -24,7 +27,10 @@ export class HostSession {
   /** links that connected but have not said hello yet */
   private readonly pending = new Set<string>()
   onPlayersChanged: (() => void) | null = null
+  /** the server no longer counts us as the global world's host (its queue moved on) */
+  onLost: ((reason: string) => void) | null = null
   private roomRefreshTimer = 0
+  private worldKind: WorldKind = 'own'
 
   constructor(code = makeRoomCode()) {
     this.code = code
@@ -57,6 +63,7 @@ export class HostSession {
     await api.createRoom(this.code, t.id, hostName, worldKind)
     await t.listen(this.code)
     this.transport = t
+    this.worldKind = worldKind
   }
 
   tick(dt: number): void {
@@ -65,7 +72,8 @@ export class HostSession {
     this.roomRefreshTimer += dt
     if (this.roomRefreshTimer >= ROOM_REFRESH_SECONDS) {
       this.roomRefreshTimer = 0
-      api.refreshRoom(this.code, this.transport.id, game.avatars.size).catch(() => {})
+      const userIds = [...game.avatars.values()].map(a => a.userId).filter((id): id is number => id !== null)
+      api.refreshRoom(this.code, this.transport.id, game.avatars.size, userIds).catch(e => this.onRefreshFailed(e))
     }
     // block edits go out immediately, snapshots at a fixed rate, private state when dirty
     const edits = game.takeBlockEdits()
@@ -86,6 +94,12 @@ export class HostSession {
       const state = avatar.takeOutbox()
       if (state) link.send(encode(state))
     }
+  }
+
+  /** a refresh the server refused outright means the global world has a new host; anything else is retried next time */
+  private onRefreshFailed(e: unknown): void {
+    if (this.worldKind !== 'global' || !(e instanceof ApiError) || (e.status !== 404 && e.status !== 409)) return
+    this.onLost?.(e.message)
   }
 
   dispose(): void {

@@ -45,7 +45,7 @@ function UserFormBody() {
     else form.post('/admin/users')
   }
   const resetWorld = () => {
-    if (user && confirm(`Reset ${user.name}'s worlds? Their own world and their copy of the global world both start again.`)) {
+    if (user && confirm(`Reset ${user.name}'s world? It starts again with a new seed.`)) {
       router.delete(`/admin/users/${user.id}/world`, { preserveScroll: true })
     }
   }
@@ -96,19 +96,14 @@ function UserFormBody() {
       {editing && (
         <section className="admin-panel narrow" aria-labelledby="world-heading">
           <header>
-            <h2 id="world-heading">Worlds</h2>
+            <h2 id="world-heading">World</h2>
             <p>
               {user.world
                 ? `Own world: night ${user.world.night} · ${formatTime(user.world.seconds)} survived · ${user.world.players} player${user.world.players === 1 ? '' : 's'} · last saved ${when(user.world.updated_at)} · ${Math.round(user.world.size / 1024)} KB.`
                 : 'No own world saved yet — their first game starts on a fresh world with a new seed.'}
             </p>
-            <p>
-              {user.global_world
-                ? `Global world: night ${user.global_world.night} · ${formatTime(user.global_world.seconds)} survived · last saved ${when(user.global_world.updated_at)} · ${Math.round(user.global_world.size / 1024)} KB.`
-                : 'They have not played the global world yet.'}
-            </p>
           </header>
-          {(user.world || user.global_world) && <button className="danger" onClick={resetWorld}>Reset both worlds</button>}
+          {user.world && <button className="danger" onClick={resetWorld}>Reset world</button>}
         </section>
       )}
     </AdminLayout>

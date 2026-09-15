@@ -23,7 +23,7 @@ class UserController extends Controller
     public function index(): Response
     {
         return Inertia::render('Admin/Users', [
-            'users' => User::query()->withCount('devices')->with(['world', 'globalWorld'])->orderBy('name')->get()
+            'users' => User::query()->withCount('devices')->with('world')->orderBy('name')->get()
                 ->map(fn (User $u) => $this->row($u))->all(),
         ]);
     }
@@ -51,7 +51,7 @@ class UserController extends Controller
 
     public function edit(User $user): Response
     {
-        return Inertia::render('Admin/UserForm', ['user' => $this->row($user->loadCount('devices')->load(['world', 'globalWorld']))]);
+        return Inertia::render('Admin/UserForm', ['user' => $this->row($user->loadCount('devices')->load('world'))]);
     }
 
     public function update(Request $request, User $user): RedirectResponse
@@ -83,12 +83,12 @@ class UserController extends Controller
         return redirect()->route('admin.users.index')->with('status', "{$user->name} deleted.");
     }
 
-    /** wipes both the player's own world and their copy of the global one */
+    /** wipes the player's own world (the shared global world is reset from the dashboard) */
     public function resetWorld(User $user): RedirectResponse
     {
         $user->worlds()->delete();
 
-        return back()->with('status', "{$user->name}'s worlds were reset.");
+        return back()->with('status', "{$user->name}'s world was reset.");
     }
 
     /** @param array<string, mixed> $data */
@@ -130,7 +130,6 @@ class UserController extends Controller
             'is_disabled' => $u->is_disabled,
             'devices_count' => $u->devices_count ?? 0,
             'world' => $u->world?->meta(),
-            'global_world' => $u->globalWorld?->meta(),
             'last_login_at' => $u->last_login_at?->toIso8601String(),
             'created_at' => $u->created_at?->toIso8601String(),
         ];

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Device;
 use App\Models\Room;
 use App\Models\User;
+use App\Models\World;
+use App\Services\GlobalWorld;
 use App\Support\LoginWindow;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -13,7 +15,7 @@ use Inertia\Response;
 /** The admin front page: counts, and where to go next. */
 class DashboardController extends Controller
 {
-    public function __invoke(): Response
+    public function __invoke(GlobalWorld $global): Response
     {
         // no scheduler on shared hosting: opening the admin section is when stale devices are swept
         Device::pruneStale();
@@ -29,6 +31,7 @@ class DashboardController extends Controller
             ],
             'loginWindow' => $window->toArray(),
             'windowOpen' => $window->isOpen(now()),
+            'globalWorld' => ['save' => World::global()?->meta(), ...$global->presence()],
         ]);
     }
 }

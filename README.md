@@ -94,3 +94,16 @@ state/       zustand UI store (React never holds sim state)
 
 Dev builds expose `window.__game` (and `__gl`, `__composer`) in the console; `__game.dayNight.time = 299`
 jumps to the first sunset.
+
+
+------
+git fetch origin deploy/staging && git reset --hard origin/deploy/staging
+
+bash deploy/cpanel-deploy.sh
+
+rm -f bootstrap/cache/packages.php bootstrap/cache/services.php bootstrap/cache/config.php bootstrap/cache/routes-v7.php bootstrap/cache/events.php && php artisan package:discover && php artisan optimize:clear && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan event:cache && php artisan up
+
+php artisan tinker --execute='print_r(App\Models\User::where("is_admin", true)->get(["id","name","email","is_disabled","created_at"])->toArray());'
+
+php artisan migrate --force && php artisan admin:sync
+------

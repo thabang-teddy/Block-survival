@@ -11,10 +11,14 @@ import { CraftingPanel } from './CraftingPanel'
 import { MainMenu } from './MainMenu'
 import { InvitePanel } from './InvitePanel'
 import { formatTime } from '../game/score'
+import { savedPlayerOf } from '../game/saveState'
 import { api } from '../net/api'
+import { handover, liveDeps } from '../net/globalWorld'
 import { router } from '@inertiajs/react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './hud.css'
+
+const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
 function Slot({ stack, index, active }: { stack: ItemStack | null; index: number; active: boolean }) {
   const def = stack ? getItem(stack.id) : null
@@ -77,13 +81,43 @@ export function Hud() {
   const role = useUiStore(s => s.role)
   const netStatus = useUiStore(s => s.netStatus)
   const netError = useUiStore(s => s.netError)
+  const setNetStatus = useUiStore(s => s.setNetStatus)
   const [saving, setSaving] = useState('')
   const [leaving, setLeaving] = useState(false)
   const [inviting, setInviting] = useState(false)
+  const [handoverText, setHandoverText] = useState('')
+  const isGlobal = launch?.worldKind === 'global'
+
+  // the global world's host left: keep our seat and follow the queue — either we host
+  // now (with our own gear carried over) or we connect to whoever does. The old game
+  // stays on screen behind the overlay until the new launch replaces it.
+  useEffect(() => {
+    if (netStatus !== 'host-left' || !launch || launch.role !== 'client' || launch.worldKind !== 'global' || !game) return
+    setNetStatus('handover')
+    setHandoverText('Choosing the next host…')
+    const mine = api.user ? savedPlayerOf(game.local) : null
+    const deps = liveDeps({
+      onStatus: setHandoverText,
+      onClientStatus: (session, st) => {
+        if (st === 'host-left') setNetStatus('host-left')
+        else if (st === 'error') setNetStatus('error', session.error)
+      },
+      onHostLost: reason => setNetStatus('error', reason),
+    })
+    handover(launch.name, mine, launch.session.code, deps).then(
+      next => {
+        // the player may have gone back to the menu while we waited
+        if (useUiStore.getState().netStatus === 'handover') useUiStore.getState().start(next)
+        else next.session.dispose()
+      },
+      e => { if (useUiStore.getState().netStatus === 'handover') setNetStatus('error', errorText(e)) },
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per host-left
+  }, [netStatus])
 
   if (!launch) return <MainMenu />
 
-  /** back to the lobby: the host's world is uploaded first when anything changed */
+  /** back to the lobby: the host's world is uploaded first when anything changed; a seat in the global world is given up */
   const leave = async () => {
     if (game?.needsSave) {
       setLeaving(true)
@@ -94,6 +128,8 @@ export function Hud() {
       }
       setLeaving(false)
     }
+    // a global host's room closes with its game, which is leaving; a client says so itself
+    if (isGlobal && role === 'client') api.leaveGlobal().catch(() => {})
     restart()
   }
 
@@ -193,9 +229,15 @@ export function Hud() {
 
       {netStatus && (
         <div className="overlay netdown">
-          <h1>{netStatus === 'host-left' ? 'The host left' : 'Connection lost'}</h1>
-          <p>{netStatus === 'host-left' ? 'The match is over: the host was running the world.' : netError || 'The connection to the host dropped.'}</p>
-          <button className="restart" onClick={() => restart()}>Back to menu</button>
+          <h1>{netStatus === 'host-left' || netStatus === 'handover' ? 'The host left' : 'Connection lost'}</h1>
+          <p>
+            {netStatus === 'handover'
+              ? `The world moves to the next player in. ${handoverText}`
+              : netStatus === 'host-left'
+                ? 'The match is over: the host was running the world.'
+                : netError || 'The connection to the host dropped.'}
+          </p>
+          <button className="restart" onClick={() => void leave()}>Back to menu</button>
         </div>
       )}
 
@@ -215,7 +257,7 @@ export function Hud() {
                   {saving || 'Save world'}
                 </button>
               )}
-              {role === 'host' && roomCode && (
+              {role === 'host' && roomCode && !isGlobal && (
                 <button className="restart secondary" onClick={() => setInviting(v => !v)}>
                   {inviting ? 'Hide invitations' : 'Invite players'}
                 </button>
@@ -225,13 +267,18 @@ export function Hud() {
               </button>
             </div>
           )}
-          {role === 'host' && roomCode && inviting && (
+          {role === 'host' && roomCode && !isGlobal && inviting && (
             <InvitePanel code={roomCode} joinedNames={players.filter(p => !p.you).map(p => p.name)} onClose={() => setInviting(false)} />
           )}
           {role === 'host' && !roomCode && (
             <p className="fine">Want friends in? Start from the menu with <b>Host for friends</b>, then invite them from here.</p>
           )}
-          {role === 'client' && timeAlive > 2 && (
+          {isGlobal && (
+            <p className="fine">
+              {role === 'host' ? 'You are hosting the global world; anyone can enter it from the lobby, and the next player in takes over when you leave.' : 'Your gear and respawn point are saved with the world — it hands over to the next player in when the host leaves.'}
+            </p>
+          )}
+          {!isGlobal && role === 'client' && timeAlive > 2 && (
             <p className="fine">Your gear and respawn point are saved with the host's world — rejoin it to get them back.</p>
           )}
         </div>

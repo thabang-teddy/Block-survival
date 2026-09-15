@@ -29,8 +29,6 @@ export interface AdminUser {
   devices_count: number
   /** the player's own world, or null before their first save */
   world: AdminWorld | null
-  /** the player's copy of the shared global world */
-  global_world: AdminWorld | null
   last_login_at: string | null
   created_at: string | null
 }

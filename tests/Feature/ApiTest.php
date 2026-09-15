@@ -50,7 +50,7 @@ class ApiTest extends TestCase
     {
         $user = $this->user();
         World::create(['user_id' => $user->id, 'payload' => base64_encode(gzencode('{}')), 'size' => 22, 'night' => 3, 'seconds' => 1800]);
-        World::create(['user_id' => $user->id, 'kind' => 'global', 'payload' => base64_encode(gzencode('{}')), 'size' => 22, 'night' => 7, 'seconds' => 10]);
+        World::create(['user_id' => null, 'kind' => 'global', 'payload' => base64_encode(gzencode('{}')), 'size' => 22, 'night' => 7, 'seconds' => 10]);
 
         $this->actingAs($user)->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('Play')
@@ -58,7 +58,8 @@ class ApiTest extends TestCase
             ->has('leaderboard', 0)
             ->where('worlds.own.night', 3)
             ->where('worlds.own.kind', 'own')
-            ->where('worlds.global.night', 7));
+            ->where('worlds.global.night', 7)
+            ->where('presence.online', 0));
     }
 
     // ------------------------------------------------------------ session auth
@@ -115,8 +116,8 @@ class ApiTest extends TestCase
     public function test_rooms_can_be_created_resolved_refreshed_and_closed(): void
     {
         $this->actingAs($this->user());
-        $room = ['code' => 'ABCDEF', 'host_peer_id' => 'block-survival-ABCDEF', 'host_name' => 'Teddy', 'world_kind' => 'global'];
-        $this->postJson('/api/rooms', $room)->assertCreated()->assertJsonPath('room.code', 'ABCDEF')->assertJsonPath('room.world_kind', 'global');
+        $room = ['code' => 'ABCDEF', 'host_peer_id' => 'block-survival-ABCDEF', 'host_name' => 'Teddy', 'world_kind' => 'own'];
+        $this->postJson('/api/rooms', $room)->assertCreated()->assertJsonPath('room.code', 'ABCDEF')->assertJsonPath('room.world_kind', 'own');
         $this->getJson('/api/rooms/abcdef')->assertOk()
             ->assertJsonPath('room.host_peer_id', 'block-survival-ABCDEF')
             ->assertJsonPath('room.players', 1);
@@ -364,17 +365,19 @@ class ApiTest extends TestCase
         $a = $this->user();
         $own = gzencode(json_encode(['version' => 3, 'seed' => 123456, 'edits' => [], 'players' => []]));
         $global = gzencode(json_encode(['version' => 3, 'seed' => 11, 'edits' => [[1]], 'players' => []]));
+        $this->actingAs($a)->postJson('/api/global/join')->assertOk(); // the global world's host
 
         $this->putGzip($a, '/api/world/own?night=1', $own)->assertOk()->assertJsonPath('world.kind', 'own');
         $this->putGzip($a, '/api/world/global?night=9', $global)->assertOk()->assertJsonPath('world.kind', 'global');
         $this->putGzip($a, '/api/world/other', $global)->assertNotFound();
-        $this->assertSame(2, World::query()->where('user_id', $a->id)->count());
+        $this->assertSame(1, World::query()->where('user_id', $a->id)->count());
+        $this->assertSame(1, World::query()->whereNull('user_id')->count());
 
         $this->assertSame($own, $this->actingAs($a)->get('/api/world')->assertOk()->getContent());
         $this->assertSame($own, $this->actingAs($a)->get('/api/world/own')->assertOk()->getContent());
         $this->assertSame($global, $this->actingAs($a)->get('/api/world/global')->assertOk()->assertHeader('X-Save-Night', '9')->getContent());
 
-        // starting over in one world leaves the other alone
+        // starting over in the own world leaves the global one alone
         $this->actingAs($a)->deleteJson('/api/world/own')->assertOk();
         $this->actingAs($a)->getJson('/api/world/own')->assertNotFound();
         $this->actingAs($a)->get('/api/world/global')->assertOk();

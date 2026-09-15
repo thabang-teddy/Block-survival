@@ -8,9 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * A player's saved world: the gzipped save the host uploads (table `saves`). Every
- * player has up to two — their own world (`own`, a random seed) and their copy of the
- * shared global world (`global`, the classic seed; builds are per player).
+ * A saved world: the gzipped save the host uploads (table `saves`). Every player has
+ * their own world (`own`, a random seed, `user_id` set); the shared global world
+ * (`global`, the classic seed) is one row with no owner, uploaded by whoever hosts it.
  */
 #[Fillable(['user_id', 'kind', 'payload', 'size', 'night', 'seconds', 'players'])]
 #[Hidden(['payload'])]
@@ -30,6 +30,12 @@ class World extends Model
     public static function isKind(string $kind): bool
     {
         return in_array($kind, self::KINDS, true);
+    }
+
+    /** the shared global world's row, or null before its first save */
+    public static function global(): ?self
+    {
+        return static::query()->whereNull('user_id')->where('kind', self::GLOBAL)->first();
     }
 
     /** @return BelongsTo<User, $this> */

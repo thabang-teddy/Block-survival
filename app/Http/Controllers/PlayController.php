@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Score;
+use App\Services\GlobalWorld;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -12,7 +13,7 @@ class PlayController extends Controller
 {
     private const LEADERBOARD_SIZE = 8;
 
-    public function __invoke(Request $request): Response
+    public function __invoke(Request $request, GlobalWorld $global): Response
     {
         $user = $request->user();
 
@@ -27,6 +28,8 @@ class PlayController extends Controller
                 ->map(fn (Score $row) => ['name' => $row->user?->name ?? 'Unknown', 'score' => (int) $row->best])
                 ->values(),
             'worlds' => fn () => $user?->worldsMeta() ?? ['own' => null, 'global' => null],
+            // who is in the shared global world right now
+            'presence' => fn () => $global->presence(),
         ]);
     }
 }

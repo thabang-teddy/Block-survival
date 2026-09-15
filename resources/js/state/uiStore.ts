@@ -23,7 +23,7 @@ export interface ScoreRow {
 /** how the current run was started; null = main menu */
 export type Launch =
   | { role: 'host'; name: string; session: HostSession; restore?: SaveData; worldKind: WorldKind; seed: number }
-  | { role: 'client'; name: string; session: ClientSession }
+  | { role: 'client'; name: string; session: ClientSession; worldKind: WorldKind }
 
 export interface UiSnapshot {
   locked: boolean

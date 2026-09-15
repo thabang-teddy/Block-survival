@@ -51,6 +51,21 @@ export interface RoomInfo {
   expires_at: string
 }
 
+/** who is in the shared global world right now (the lobby card and the admin) */
+export interface GlobalPresence {
+  online: number
+  host_name: string | null
+}
+
+/**
+ * What the global world tells a player who is in it: open a room (`host`), connect to
+ * the host's (`client`), or wait for the chosen host to open theirs (`pending`).
+ */
+export type GlobalState =
+  | { status: 'host'; online: number }
+  | { status: 'client'; room: RoomInfo; online: number }
+  | { status: 'pending'; host_name: string; online: number }
+
 export interface LeaderboardRow {
   name: string
   score: number
@@ -160,12 +175,19 @@ export const api = {
 
   createRoom: (code: string, hostPeerId: string, hostName: string, worldKind: WorldKind = 'own') =>
     request<{ room: RoomInfo }>('POST', '/rooms', { code, host_peer_id: hostPeerId, host_name: hostName, world_kind: worldKind }),
-  refreshRoom: (code: string, hostPeerId: string, players: number) =>
-    request<{ room: unknown }>('PATCH', `/rooms/${code}`, { host_peer_id: hostPeerId, players }),
+  /** the host's heartbeat; in the global world the accounts it lists keep their seats */
+  refreshRoom: (code: string, hostPeerId: string, players: number, userIds: number[] = []) =>
+    request<{ room: unknown }>('PATCH', `/rooms/${code}`, { host_peer_id: hostPeerId, players, user_ids: userIds }),
   closeRoom: (code: string, hostPeerId: string) =>
     request<{ ok: boolean }>('DELETE', `/rooms/${code}`, { host_peer_id: hostPeerId }),
-  /** the host's peer id — only for the host and accepted invitees (issue #5) */
+  /** the host's peer id — only for the host and accepted invitees (issue #5), or anyone seated in the global world */
   resolveRoom: (code: string) => request<{ room: RoomInfo }>('GET', `/rooms/${code}`),
+  // ---- the shared global world: a queue of the players inside it, hosted by its front
+  /** enter from the lobby (at the back of the queue) */
+  joinGlobal: () => request<GlobalState>('POST', '/global/join'),
+  /** still inside, but the host went away: who hosts now? (keeps my seat fresh) */
+  claimGlobal: () => request<GlobalState>('POST', '/global/claim'),
+  leaveGlobal: () => request<{ ok: boolean }>('POST', '/global/leave').then(() => undefined),
   // ---- invitations (issue #5)
   /** every other player the host may invite */
   players: () => request<{ players: PlayerRow[] }>('GET', '/players').then(r => r.players),
@@ -189,7 +211,7 @@ export const api = {
   leaderboard: async (): Promise<LeaderboardRow[]> =>
     (await request<{ leaderboard: LeaderboardRow[] }>('GET', '/leaderboard')).leaderboard,
 
-  /** every player has one own world and one copy of the global world; saving replaces it */
+  /** every player has one own world; the global world is one shared save its host uploads. Saving replaces it */
   async saveWorld(data: SaveData, night: number, kind: WorldKind = 'own'): Promise<WorldMeta> {
     const bytes = await gzip(JSON.stringify(data))
     const q = `?night=${night}&seconds=${Math.floor(data.time)}`
@@ -212,7 +234,7 @@ export const api = {
     form.append('_token', pageCsrfToken())
     return navigator.sendBeacon(`/api/world/${kind}/beacon`, form)
   },
-  /** the saved world, or null when the player has not saved one yet */
+  /** the saved world, or null when nobody has saved one yet */
   async loadWorld(kind: WorldKind = 'own'): Promise<SaveData | null> {
     let res: Response
     try {
@@ -226,8 +248,8 @@ export const api = {
     if (!data) throw new ApiError(422, 'Unreadable save')
     return data
   },
-  /** start over: forget the saved world */
-  resetWorld: (kind: WorldKind = 'own') => request<{ ok: boolean }>('DELETE', `/world/${kind}`).then(() => undefined),
+  /** start over: forget the player's own world (an admin resets the global one) */
+  resetWorld: () => request<{ ok: boolean }>('DELETE', '/world/own').then(() => undefined),
 }
 
 async function gzip(text: string): Promise<Uint8Array> {

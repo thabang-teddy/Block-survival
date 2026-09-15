@@ -1,72 +1,98 @@
 /**
- * Lobby for the signed-in player. Two worlds to play — their own (a random seed) and
- * the shared global world (the classic seed; builds are per player) — each solo or
- * hosted for friends, plus the invitations other hosts have sent and the leaderboard.
- * The user, the leaderboard and the world summaries are Inertia props from
- * PlayController; invitations are polled from /api/invites (issue #5).
+ * Lobby for the signed-in player. Two worlds to play — their own (a random seed; solo
+ * or hosted for friends) and the shared global world (the classic seed, one save for
+ * everyone, hosted by whoever is in it — entering either hosts it or joins the host),
+ * plus the invitations other hosts have sent and the leaderboard. The user, the
+ * leaderboard, the world summaries and who is in the global world are Inertia props
+ * from PlayController; invitations are polled from /api/invites (issue #5).
  */
 import { useEffect, useState } from 'react'
 import { router, usePage } from '@inertiajs/react'
 import { useUiStore } from '../state/uiStore'
 import { HostSession } from '../net/HostSession'
-import { ClientSession } from '../net/ClientSession'
+import { ClientSession, type ClientStatus } from '../net/ClientSession'
 import { api, type Invite, type SaveData, type WorldMeta } from '../net/api'
 import type { PlayProps } from '../net/pageProps'
 import { formatTime, timeAgo } from '../game/score'
-import { GLOBAL_SEED, newWorldSeed, seedTag, type WorldKind } from '../world/seed'
+import { GLOBAL_SEED, newWorldSeed, seedTag } from '../world/seed'
 import { useInvites } from './useInvites'
 import { seatsText, worldLabel } from './invites'
+import { enterGlobal, liveDeps } from '../net/globalWorld'
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
-type Busy = '' | `host:${WorldKind}` | `solo:${WorldKind}` | `reset:${WorldKind}` | `join:${number}`
+type Busy = '' | 'host' | 'solo' | 'reset' | 'global' | `join:${number}`
 
 export function MainMenu() {
-  const { auth, leaderboard, worlds } = usePage<PlayProps>().props
+  const { auth, leaderboard, worlds, presence } = usePage<PlayProps>().props
   const user = auth.user
   const start = useUiStore(s => s.start)
   const setNetStatus = useUiStore(s => s.setNetStatus)
   const [busy, setBusy] = useState<Busy>('')
+  const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const invites = useInvites(!busy)
 
-  // the leaderboard and the worlds change while a run is in progress (autosaves,
-  // scores); pull fresh copies whenever the menu comes back
+  // the leaderboard, the worlds and who is in the global world change while a run is
+  // in progress (autosaves, scores); pull fresh copies whenever the menu comes back
   useEffect(() => {
-    router.reload({ only: ['leaderboard', 'worlds'] })
+    router.reload({ only: ['leaderboard', 'worlds', 'presence'] })
   }, [])
 
   const playerName = user.name
 
-  /** the saved world of that kind, if there is one; the host's game continues from it */
-  const restore = async (kind: WorldKind): Promise<SaveData | undefined> =>
-    worlds[kind] ? (await api.loadWorld(kind)) ?? undefined : undefined
+  /** the player's own saved world, if there is one; the host's game continues from it */
+  const restore = async (): Promise<SaveData | undefined> =>
+    worlds.own ? (await api.loadWorld('own')) ?? undefined : undefined
 
-  /** what a brand-new world of that kind is generated from */
-  const seedFor = (kind: WorldKind): number => (kind === 'global' ? GLOBAL_SEED : newWorldSeed())
+  /** a client hears about the end of the match through the net-status overlay */
+  const onClientStatus = (session: ClientSession, st: ClientStatus) => {
+    if (st === 'host-left') setNetStatus('host-left')
+    else if (st === 'error') setNetStatus('error', session.error)
+  }
+  const watch = (session: ClientSession) => { session.onStatus = st => onClientStatus(session, st) }
 
-  const solo = async (kind: WorldKind) => {
-    setBusy(`solo:${kind}`)
+  const solo = async () => {
+    setBusy('solo')
     setError('')
     try {
-      start({ role: 'host', name: playerName, session: new HostSession(), restore: await restore(kind), worldKind: kind, seed: seedFor(kind) })
+      start({ role: 'host', name: playerName, session: new HostSession(), restore: await restore(), worldKind: 'own', seed: newWorldSeed() })
     } catch (e) {
       setError(errorText(e))
       setBusy('')
     }
   }
 
-  const host = async (kind: WorldKind) => {
-    setBusy(`host:${kind}`)
+  const host = async () => {
+    setBusy('host')
     setError('')
     const session = new HostSession()
     try {
-      const saved = await restore(kind)
-      await session.listen(playerName, kind)
-      start({ role: 'host', name: playerName, session, restore: saved, worldKind: kind, seed: seedFor(kind) })
+      const saved = await restore()
+      await session.listen(playerName, 'own')
+      start({ role: 'host', name: playerName, session, restore: saved, worldKind: 'own', seed: newWorldSeed() })
     } catch (e) {
       setError(errorText(e))
       setBusy('')
+    }
+  }
+
+  /** the global world: host it if nobody is, otherwise join whoever is */
+  const enter = async () => {
+    setBusy('global')
+    setStatus('Entering…')
+    setError('')
+    try {
+      start(await enterGlobal(playerName, liveDeps({
+        onStatus: setStatus,
+        onClientStatus,
+        onHostLost: reason => setNetStatus('error', reason),
+      })))
+    } catch (e) {
+      setError(errorText(e))
+      setBusy('')
+      setStatus('')
+      router.reload({ only: ['presence'] })
     }
   }
 
@@ -74,15 +100,12 @@ export function MainMenu() {
     setBusy(`join:${invite.id}`)
     setError('')
     const session = new ClientSession(invite.code, playerName)
-    session.onStatus = st => {
-      if (st === 'host-left') setNetStatus('host-left')
-      else if (st === 'error') setNetStatus('error', session.error)
-    }
+    watch(session)
     try {
       // accepting is what unlocks the room's peer id and mailbox for us
       await api.acceptInvite(invite.id)
       await session.connect()
-      start({ role: 'client', name: playerName, session })
+      start({ role: 'client', name: playerName, session, worldKind: invite.world_kind })
     } catch (e) {
       session.dispose()
       setError(errorText(e))
@@ -100,13 +123,12 @@ export function MainMenu() {
     invites.refresh()
   }
 
-  const startOver = async (kind: WorldKind) => {
-    const what = kind === 'global' ? 'your builds in the global world' : 'your world'
-    if (!confirm(`Delete ${what} and start again? This cannot be undone.`)) return
-    setBusy(`reset:${kind}`)
+  const startOver = async () => {
+    if (!confirm('Delete your world and start again? This cannot be undone.')) return
+    setBusy('reset')
     setError('')
     try {
-      await api.resetWorld(kind)
+      await api.resetWorld()
       router.reload({ only: ['worlds'] })
     } catch (e) {
       setError(errorText(e))
@@ -119,29 +141,9 @@ export function MainMenu() {
       ? `Night ${w.night} · ${formatTime(w.seconds)} survived · ${w.players} player${w.players === 1 ? '' : 's'} have played · saved ${timeAgo(w.updated_at)}.`
       : fresh
 
-  const worldCard = (kind: WorldKind, title: string, blurb: string, fresh: string) => {
-    const w = worlds[kind]
-    return (
-      <section className="option" key={kind}>
-        <h3>{title}</h3>
-        <p>{blurb}</p>
-        <p className="fine">{summary(w, fresh)}</p>
-        <button className="wide primary" onClick={() => void solo(kind)} disabled={!!busy}>
-          {busy === `solo:${kind}` ? 'Loading…' : 'Play solo'}
-        </button>
-        <button className="wide" onClick={() => void host(kind)} disabled={!!busy}>
-          {busy === `host:${kind}` ? 'Opening room…' : 'Host for friends'}
-        </button>
-        {w && (
-          <p className="fine">
-            <button className="link" onClick={() => void startOver(kind)} disabled={!!busy}>
-              {busy === `reset:${kind}` ? 'Resetting…' : kind === 'global' ? 'Start over in the global world' : 'Start over with a new world'}
-            </button>
-          </p>
-        )}
-      </section>
-    )
-  }
+  const whoIsIn = presence.online > 0
+    ? `${presence.online} online now, hosted by ${presence.host_name ?? 'someone'} — you would join them.`
+    : 'Nobody is in it right now — you would host it.'
 
   return (
     <div className="menu">
@@ -156,10 +158,32 @@ export function MainMenu() {
         </p>
 
         <div className="lobby">
-          {worldCard('own', 'My world', 'Your own map, with its own seed — nobody visits without an invitation.',
-            'A fresh world with a new seed — it saves itself every minute, at dawn, and when you leave.')}
-          {worldCard('global', 'Global world', `The classic map (${seedTag(GLOBAL_SEED)}) everyone shares — the same terrain for all, your builds are yours.`,
-            'You have not played the global world yet.')}
+          <section className="option">
+            <h3>My world</h3>
+            <p>Your own map, with its own seed — nobody visits without an invitation.</p>
+            <p className="fine">{summary(worlds.own, 'A fresh world with a new seed — it saves itself every minute, at dawn, and when you leave.')}</p>
+            <button className="wide primary" onClick={() => void solo()} disabled={!!busy}>
+              {busy === 'solo' ? 'Loading…' : 'Play solo'}
+            </button>
+            <button className="wide" onClick={() => void host()} disabled={!!busy}>
+              {busy === 'host' ? 'Opening room…' : 'Host for friends'}
+            </button>
+            {worlds.own && (
+              <p className="fine">
+                <button className="link" onClick={() => void startOver()} disabled={!!busy}>
+                  {busy === 'reset' ? 'Resetting…' : 'Start over with a new world'}
+                </button>
+              </p>
+            )}
+          </section>
+          <section className="option">
+            <h3>Global world</h3>
+            <p>The classic map ({seedTag(GLOBAL_SEED)}) everyone builds in together. Whoever is in it hosts it; when they leave, the next player in takes over.</p>
+            <p className="fine">{summary(worlds.global, 'Nobody has played the global world yet.')} {whoIsIn}</p>
+            <button className="wide primary" onClick={() => void enter()} disabled={!!busy}>
+              {busy === 'global' ? status : 'Enter'}
+            </button>
+          </section>
 
           <section className="option">
             <h3>Invitations</h3>
@@ -193,7 +217,7 @@ export function MainMenu() {
             </ol>
           </div>
         )}
-        <p className="fine">Up to 4 players. The host&apos;s browser runs the world — if the host leaves, the match ends. Invite friends from the pause screen once you are hosting.</p>
+        <p className="fine">Up to 4 players. The host&apos;s browser runs the world — in your own world the match ends when you leave; in the global world the next player takes over. Invite friends from the pause screen once you are hosting your own world.</p>
       </div>
     </div>
   )

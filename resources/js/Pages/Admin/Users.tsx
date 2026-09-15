@@ -42,7 +42,6 @@ export default function Users() {
                     </td>
                     <td>
                       {u.world ? <>night {u.world.night}<small>{formatTime(u.world.seconds)} · saved {when(u.world.updated_at)}</small></> : <i>none yet</i>}
-                      {u.global_world && <small>global: night {u.global_world.night} · saved {when(u.global_world.updated_at)}</small>}
                     </td>
                     <td className="mono">{u.devices_count}</td>
                     <td>{when(u.last_login_at)}</td>

@@ -57,26 +57,18 @@ class User extends Authenticatable
         return $this->hasMany(World::class);
     }
 
-    /** @return HasOne<World, $this> the player's own world */
+    /** @return HasOne<World, $this> the player's own world (the global world has no owner) */
     public function world(): HasOne
     {
         return $this->hasOne(World::class)->where('kind', World::OWN);
     }
 
-    /** @return HasOne<World, $this> the player's copy of the shared global world */
-    public function globalWorld(): HasOne
-    {
-        return $this->hasOne(World::class)->where('kind', World::GLOBAL);
-    }
-
-    /** @return array{own: array<string, mixed>|null, global: array<string, mixed>|null} */
+    /** @return array{own: array<string, mixed>|null, global: array<string, mixed>|null} the player's own world and the shared global one */
     public function worldsMeta(): array
     {
-        $byKind = $this->worlds()->get()->keyBy('kind');
-
         return [
-            World::OWN => $byKind->get(World::OWN)?->meta(),
-            World::GLOBAL => $byKind->get(World::GLOBAL)?->meta(),
+            World::OWN => $this->world()->first()?->meta(),
+            World::GLOBAL => World::global()?->meta(),
         ];
     }
 

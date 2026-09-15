@@ -1,6 +1,6 @@
 /** Inertia props shared by HandleInertiaRequests and provided by PlayController. */
 import type { PageProps as InertiaPageProps } from '@inertiajs/core'
-import type { ApiUser, LeaderboardRow, WorldMeta } from './api'
+import type { ApiUser, GlobalPresence, LeaderboardRow, WorldMeta } from './api'
 import type { AdminDevice, AdminRoom, AdminUser, LoginWindowForm } from '../ui/admin/types'
 
 export interface SharedProps extends InertiaPageProps {
@@ -12,8 +12,10 @@ export interface SharedProps extends InertiaPageProps {
 export interface PlayProps extends SharedProps {
   auth: { user: ApiUser }
   leaderboard: LeaderboardRow[]
-  /** the player's own world and their copy of the global world; null before the first save of each */
+  /** the player's own world and the shared global world; null before the first save of each */
   worlds: { own: WorldMeta | null; global: WorldMeta | null }
+  /** who is in the shared global world right now */
+  presence: GlobalPresence
 }
 
 /** the browser is waiting for an admin to approve it (no session yet) */
@@ -31,6 +33,8 @@ export interface AdminDashboardProps extends AdminProps {
   counts: { pendingDevices: number; approvedDevices: number; users: number; disabledUsers: number; rooms: number }
   loginWindow: LoginWindowForm
   windowOpen: boolean
+  /** the shared global world: its save (null before the first) and who is in it */
+  globalWorld: { save: WorldMeta | null } & GlobalPresence
 }
 
 export interface AdminHoursProps extends AdminProps {
