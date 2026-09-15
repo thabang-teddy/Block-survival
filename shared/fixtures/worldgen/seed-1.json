@@ -1,0 +1,1742 @@
+{
+ "seed": 1,
+ "spawn": {
+  "x": 0.5,
+  "y": 37,
+  "z": 0.5
+ },
+ "padHeight": 36,
+ "heights": [
+  [
+   0,
+   0,
+   36
+  ],
+  [
+   8,
+   0,
+   36
+  ],
+  [
+   9,
+   0,
+   36
+  ],
+  [
+   12,
+   0,
+   36
+  ],
+  [
+   13,
+   0,
+   36
+  ],
+  [
+   -7,
+   7,
+   36
+  ],
+  [
+   40,
+   -40,
+   32
+  ],
+  [
+   -100,
+   250,
+   39
+  ],
+  [
+   1000,
+   1000,
+   34
+  ],
+  [
+   -1,
+   -1,
+   36
+  ],
+  [
+   16,
+   16,
+   33
+  ],
+  [
+   33,
+   -2,
+   29
+  ],
+  [
+   -17,
+   0,
+   36
+  ],
+  [
+   5,
+   11,
+   34
+  ]
+ ],
+ "naturalHeights": [
+  [
+   0,
+   0,
+   37
+  ],
+  [
+   8,
+   0,
+   36
+  ],
+  [
+   9,
+   0,
+   36
+  ],
+  [
+   12,
+   0,
+   36
+  ],
+  [
+   13,
+   0,
+   36
+  ],
+  [
+   -7,
+   7,
+   35
+  ],
+  [
+   40,
+   -40,
+   32
+  ],
+  [
+   -100,
+   250,
+   39
+  ],
+  [
+   1000,
+   1000,
+   34
+  ],
+  [
+   -1,
+   -1,
+   37
+  ],
+  [
+   16,
+   16,
+   33
+  ],
+  [
+   33,
+   -2,
+   29
+  ],
+  [
+   -17,
+   0,
+   36
+  ],
+  [
+   5,
+   11,
+   34
+  ]
+ ],
+ "trees": [
+  [
+   -63,
+   26,
+   5
+  ],
+  [
+   -62,
+   -49,
+   4
+  ],
+  [
+   -62,
+   -9,
+   5
+  ],
+  [
+   -61,
+   45,
+   6
+  ],
+  [
+   -58,
+   -56,
+   4
+  ],
+  [
+   -58,
+   -45,
+   6
+  ],
+  [
+   -56,
+   56,
+   6
+  ],
+  [
+   -51,
+   -44,
+   5
+  ],
+  [
+   -51,
+   -14,
+   5
+  ],
+  [
+   -49,
+   38,
+   6
+  ],
+  [
+   -45,
+   -17,
+   6
+  ],
+  [
+   -44,
+   -10,
+   5
+  ],
+  [
+   -44,
+   42,
+   4
+  ],
+  [
+   -38,
+   -48,
+   5
+  ],
+  [
+   -35,
+   -14,
+   5
+  ],
+  [
+   -35,
+   27,
+   4
+  ],
+  [
+   -33,
+   52,
+   5
+  ],
+  [
+   -30,
+   -21,
+   4
+  ],
+  [
+   -29,
+   -16,
+   5
+  ],
+  [
+   -27,
+   63,
+   4
+  ],
+  [
+   -26,
+   30,
+   4
+  ],
+  [
+   -26,
+   49,
+   4
+  ],
+  [
+   -25,
+   -21,
+   5
+  ],
+  [
+   -25,
+   53,
+   5
+  ],
+  [
+   -22,
+   16,
+   5
+  ],
+  [
+   -19,
+   -11,
+   5
+  ],
+  [
+   -17,
+   -30,
+   6
+  ],
+  [
+   -15,
+   -61,
+   5
+  ],
+  [
+   -14,
+   6,
+   6
+  ],
+  [
+   -11,
+   -60,
+   6
+  ],
+  [
+   -10,
+   -30,
+   5
+  ],
+  [
+   -8,
+   -49,
+   5
+  ],
+  [
+   -4,
+   -14,
+   4
+  ],
+  [
+   -3,
+   -62,
+   6
+  ],
+  [
+   -1,
+   61,
+   5
+  ],
+  [
+   1,
+   -62,
+   4
+  ],
+  [
+   3,
+   -58,
+   5
+  ],
+  [
+   3,
+   -40,
+   5
+  ],
+  [
+   4,
+   25,
+   5
+  ],
+  [
+   4,
+   52,
+   6
+  ],
+  [
+   8,
+   -26,
+   6
+  ],
+  [
+   10,
+   -36,
+   6
+  ],
+  [
+   11,
+   28,
+   5
+  ],
+  [
+   14,
+   8,
+   6
+  ],
+  [
+   14,
+   22,
+   4
+  ],
+  [
+   15,
+   54,
+   4
+  ],
+  [
+   16,
+   -30,
+   6
+  ],
+  [
+   35,
+   -29,
+   6
+  ],
+  [
+   45,
+   -32,
+   4
+  ],
+  [
+   54,
+   62,
+   4
+  ],
+  [
+   56,
+   -26,
+   4
+  ]
+ ],
+ "islands": [
+  {
+   "ix": -2,
+   "iz": -2,
+   "island": null
+  },
+  {
+   "ix": -2,
+   "iz": -1,
+   "island": null
+  },
+  {
+   "ix": -2,
+   "iz": 0,
+   "island": null
+  },
+  {
+   "ix": -2,
+   "iz": 1,
+   "island": null
+  },
+  {
+   "ix": -2,
+   "iz": 2,
+   "island": {
+    "ix": -2,
+    "iz": 2,
+    "x": -141,
+    "z": 250,
+    "baseY": 92,
+    "params": {
+     "size": 54,
+     "seed": 965279010,
+     "maxHeight": 7,
+     "depth": 11,
+     "padRadius": 0,
+     "lake": false,
+     "treeDensity": 0.022
+    }
+   }
+  },
+  {
+   "ix": -1,
+   "iz": -2,
+   "island": null
+  },
+  {
+   "ix": -1,
+   "iz": -1,
+   "island": {
+    "ix": -1,
+    "iz": -1,
+    "x": -40,
+    "z": -45,
+    "baseY": 91,
+    "params": {
+     "size": 24,
+     "seed": 4176316459,
+     "maxHeight": 5,
+     "depth": 9,
+     "padRadius": 0,
+     "lake": true,
+     "treeDensity": 0.022
+    }
+   }
+  },
+  {
+   "ix": -1,
+   "iz": 0,
+   "island": {
+    "ix": -1,
+    "iz": 0,
+    "x": -56,
+    "z": 58,
+    "baseY": 85,
+    "params": {
+     "size": 40,
+     "seed": 4010077992,
+     "maxHeight": 7,
+     "depth": 15,
+     "padRadius": 0,
+     "lake": true,
+     "treeDensity": 0.022
+    }
+   }
+  },
+  {
+   "ix": -1,
+   "iz": 1,
+   "island": null
+  },
+  {
+   "ix": -1,
+   "iz": 2,
+   "island": {
+    "ix": -1,
+    "iz": 2,
+    "x": -33,
+    "z": 233,
+    "baseY": 95,
+    "params": {
+     "size": 54,
+     "seed": 1138424762,
+     "maxHeight": 7,
+     "depth": 12,
+     "padRadius": 0,
+     "lake": false,
+     "treeDensity": 0.022
+    }
+   }
+  },
+  {
+   "ix": 0,
+   "iz": -2,
+   "island": {
+    "ix": 0,
+    "iz": -2,
+    "x": 55,
+    "z": -150,
+    "baseY": 83,
+    "params": {
+     "size": 50,
+     "seed": 1112684253,
+     "maxHeight": 9,
+     "depth": 10,
+     "padRadius": 0,
+     "lake": false,
+     "treeDensity": 0.022
+    }
+   }
+  },
+  {
+   "ix": 0,
+   "iz": -1,
+   "island": {
+    "ix": 0,
+    "iz": -1,
+    "x": 42,
+    "z": -62,
+    "baseY": 88,
+    "params": {
+     "size": 46,
+     "seed": 4018975719,
+     "maxHeight": 5,
+     "depth": 10,
+     "padRadius": 0,
+     "lake": false,
+     "treeDensity": 0.022
+    }
+   }
+  },
+  {
+   "ix": 0,
+   "iz": 0,
+   "island": {
+    "ix": 0,
+    "iz": 0,
+    "x": 0,
+    "z": 0,
+    "baseY": 80,
+    "params": {
+     "size": 56,
+     "seed": 11,
+     "maxHeight": 9,
+     "depth": 16,
+     "padRadius": 8,
+     "lake": true,
+     "treeDensity": 0.022
+    }
+   }
+  },
+  {
+   "ix": 0,
+   "iz": 1,
+   "island": null
+  },
+  {
+   "ix": 0,
+   "iz": 2,
+   "island": {
+    "ix": 0,
+    "iz": 2,
+    "x": 55,
+    "z": 253,
+    "baseY": 88,
+    "params": {
+     "size": 48,
+     "seed": 578122344,
+     "maxHeight": 6,
+     "depth": 13,
+     "padRadius": 0,
+     "lake": false,
+     "treeDensity": 0.022
+    }
+   }
+  },
+  {
+   "ix": 1,
+   "iz": -2,
+   "island": null
+  },
+  {
+   "ix": 1,
+   "iz": -1,
+   "island": {
+    "ix": 1,
+    "iz": -1,
+    "x": 153,
+    "z": -59,
+    "baseY": 96,
+    "params": {
+     "size": 40,
+     "seed": 1343395204,
+     "maxHeight": 7,
+     "depth": 16,
+     "padRadius": 0,
+     "lake": false,
+     "treeDensity": 0.022
+    }
+   }
+  },
+  {
+   "ix": 1,
+   "iz": 0,
+   "island": null
+  },
+  {
+   "ix": 1,
+   "iz": 1,
+   "island": null
+  },
+  {
+   "ix": 1,
+   "iz": 2,
+   "island": {
+    "ix": 1,
+    "iz": 2,
+    "x": 150,
+    "z": 242,
+    "baseY": 89,
+    "params": {
+     "size": 56,
+     "seed": 288518786,
+     "maxHeight": 9,
+     "depth": 14,
+     "padRadius": 0,
+     "lake": true,
+     "treeDensity": 0.022
+    }
+   }
+  },
+  {
+   "ix": 2,
+   "iz": -2,
+   "island": null
+  },
+  {
+   "ix": 2,
+   "iz": -1,
+   "island": {
+    "ix": 2,
+    "iz": -1,
+    "x": 237,
+    "z": -37,
+    "baseY": 83,
+    "params": {
+     "size": 30,
+     "seed": 2084807777,
+     "maxHeight": 8,
+     "depth": 15,
+     "padRadius": 0,
+     "lake": false,
+     "treeDensity": 0.022
+    }
+   }
+  },
+  {
+   "ix": 2,
+   "iz": 0,
+   "island": {
+    "ix": 2,
+    "iz": 0,
+    "x": 253,
+    "z": 44,
+    "baseY": 81,
+    "params": {
+     "size": 24,
+     "seed": 2926943493,
+     "maxHeight": 6,
+     "depth": 16,
+     "padRadius": 0,
+     "lake": false,
+     "treeDensity": 0.022
+    }
+   }
+  },
+  {
+   "ix": 2,
+   "iz": 1,
+   "island": {
+    "ix": 2,
+    "iz": 1,
+    "x": 246,
+    "z": 155,
+    "baseY": 91,
+    "params": {
+     "size": 54,
+     "seed": 3388661735,
+     "maxHeight": 5,
+     "depth": 10,
+     "padRadius": 0,
+     "lake": true,
+     "treeDensity": 0.022
+    }
+   }
+  },
+  {
+   "ix": 2,
+   "iz": 2,
+   "island": {
+    "ix": 2,
+    "iz": 2,
+    "x": 252,
+    "z": 228,
+    "baseY": 91,
+    "params": {
+     "size": 26,
+     "seed": 3662777347,
+     "maxHeight": 6,
+     "depth": 11,
+     "padRadius": 0,
+     "lake": false,
+     "treeDensity": 0.022
+    }
+   }
+  }
+ ],
+ "templates": [
+  {
+   "ix": -2,
+   "iz": 2,
+   "minX": -25,
+   "minY": -11,
+   "minZ": -27,
+   "maxX": 25,
+   "maxY": 14,
+   "maxZ": 28,
+   "padHeight": 2,
+   "voxelCount": 16589,
+   "sha256": "2536f49910e7132a25b7f3a20aadf8b922e36a39ad69ed2f7c5569acfa15576c"
+  },
+  {
+   "ix": -1,
+   "iz": -1,
+   "minX": -11,
+   "minY": -7,
+   "minZ": -10,
+   "maxX": 10,
+   "maxY": 12,
+   "maxZ": 11,
+   "padHeight": 2,
+   "voxelCount": 2351,
+   "sha256": "720588550902f3acd2266aa819d4a1ffab139c5475293785be5a90008c65e41a"
+  },
+  {
+   "ix": -1,
+   "iz": 0,
+   "minX": -19,
+   "minY": -16,
+   "minZ": -20,
+   "maxX": 17,
+   "maxY": 15,
+   "maxZ": 19,
+   "padHeight": 2,
+   "voxelCount": 11778,
+   "sha256": "dfd9ef0951e6642059ed01acd091594a41668c03c6d8c1f72b84ff81fdbc1422"
+  },
+  {
+   "ix": -1,
+   "iz": 2,
+   "minX": -23,
+   "minY": -13,
+   "minZ": -28,
+   "maxX": 27,
+   "maxY": 15,
+   "maxZ": 24,
+   "padHeight": 2,
+   "voxelCount": 15979,
+   "sha256": "c93467119ac3a87d77c0fe5e88297e421cd1d7754e7e318270aad9a87ff0b10f"
+  },
+  {
+   "ix": 0,
+   "iz": -2,
+   "minX": -23,
+   "minY": -10,
+   "minZ": -25,
+   "maxX": 23,
+   "maxY": 15,
+   "maxZ": 22,
+   "padHeight": 2,
+   "voxelCount": 14962,
+   "sha256": "cf48ba4450e9eb22e11fdec827797195feb9662491bc8be6bc4866214ad36d8c"
+  },
+  {
+   "ix": 0,
+   "iz": -1,
+   "minX": -24,
+   "minY": -10,
+   "minZ": -22,
+   "maxX": 21,
+   "maxY": 13,
+   "maxZ": 21,
+   "padHeight": 2,
+   "voxelCount": 10341,
+   "sha256": "5996467aeb435f30a1b63f56a28f7344c08cf5aeddfe030bc82636396c004130"
+  },
+  {
+   "ix": 0,
+   "iz": 0,
+   "minX": -26,
+   "minY": -16,
+   "minZ": -25,
+   "maxX": 26,
+   "maxY": 14,
+   "maxZ": 27,
+   "padHeight": 6,
+   "voxelCount": 21900,
+   "sha256": "1f60c2c8270504926a29066f65a30b91985fda74218f2f51332de4afbdbdb727"
+  },
+  {
+   "ix": 0,
+   "iz": 2,
+   "minX": -20,
+   "minY": -13,
+   "minZ": -25,
+   "maxX": 22,
+   "maxY": 13,
+   "maxZ": 24,
+   "padHeight": 2,
+   "voxelCount": 12740,
+   "sha256": "59bae6efa6c4f9464080b2f1554bcea13d5edb8e8559845b2846781dd7ee152c"
+  },
+  {
+   "ix": 1,
+   "iz": -1,
+   "minX": -20,
+   "minY": -16,
+   "minZ": -18,
+   "maxX": 17,
+   "maxY": 13,
+   "maxZ": 18,
+   "padHeight": 2,
+   "voxelCount": 11288,
+   "sha256": "f933bd019e04f60fb088121854671ba454340078bad3ce4763bec697c8c005cd"
+  },
+  {
+   "ix": 1,
+   "iz": 2,
+   "minX": -28,
+   "minY": -13,
+   "minZ": -25,
+   "maxX": 28,
+   "maxY": 15,
+   "maxZ": 29,
+   "padHeight": 2,
+   "voxelCount": 21854,
+   "sha256": "9872be7b5c5ce8606664551bb2643b2df47a198674c7858101308bc7cf6c886a"
+  },
+  {
+   "ix": 2,
+   "iz": -1,
+   "minX": -14,
+   "minY": -15,
+   "minZ": -15,
+   "maxX": 13,
+   "maxY": 13,
+   "maxZ": 15,
+   "padHeight": 2,
+   "voxelCount": 6343,
+   "sha256": "6d5eb40dad7f9090a7ef54e7e8d1af29964d1304cac643c8f6acdddea6950642"
+  },
+  {
+   "ix": 2,
+   "iz": 0,
+   "minX": -11,
+   "minY": -15,
+   "minZ": -12,
+   "maxX": 12,
+   "maxY": 12,
+   "maxZ": 12,
+   "padHeight": 2,
+   "voxelCount": 4223,
+   "sha256": "0096a94b9c0f024141f2e86a3bdceb532cb72ffb02b67554c68db78600c08b83"
+  },
+  {
+   "ix": 2,
+   "iz": 1,
+   "minX": -27,
+   "minY": -10,
+   "minZ": -25,
+   "maxX": 28,
+   "maxY": 13,
+   "maxZ": 25,
+   "padHeight": 2,
+   "voxelCount": 13375,
+   "sha256": "f10b1b1ab160254a8cc09226189e7bc2c235080b277d1dd06d5f4dc31b56950a"
+  },
+  {
+   "ix": 2,
+   "iz": 2,
+   "minX": -13,
+   "minY": -9,
+   "minZ": -12,
+   "maxX": 13,
+   "maxY": 13,
+   "maxZ": 12,
+   "padHeight": 2,
+   "voxelCount": 3488,
+   "sha256": "c8c023fee3ad95b25143511b5805d0ccbb9edc86f85655b3a75d7b0e8aaacc2e"
+  }
+ ],
+ "updrafts": [
+  {
+   "x": -112.5,
+   "z": 250.5,
+   "bottomY": 40,
+   "topY": 96,
+   "radius": 1.25,
+   "ix": -2,
+   "iz": 2
+  },
+  {
+   "x": -26.5,
+   "z": -44.5,
+   "bottomY": 34,
+   "topY": 95,
+   "radius": 1.25,
+   "ix": -1,
+   "iz": -1
+  },
+  {
+   "x": -35.5,
+   "z": 58.5,
+   "bottomY": 37,
+   "topY": 90,
+   "radius": 1.25,
+   "ix": -1,
+   "iz": 0
+  },
+  {
+   "x": -7.5,
+   "z": 233.5,
+   "bottomY": 40,
+   "topY": 100,
+   "radius": 1.25,
+   "ix": -1,
+   "iz": 2
+  },
+  {
+   "x": 81.5,
+   "z": -149.5,
+   "bottomY": 35,
+   "topY": 86,
+   "radius": 1.25,
+   "ix": 0,
+   "iz": -2
+  },
+  {
+   "x": 66.5,
+   "z": -61.5,
+   "bottomY": 37,
+   "topY": 91,
+   "radius": 1.25,
+   "ix": 0,
+   "iz": -1
+  },
+  {
+   "x": 27.5,
+   "z": 0.5,
+   "bottomY": 31,
+   "topY": 85,
+   "radius": 1.25,
+   "ix": 0,
+   "iz": 0
+  },
+  {
+   "x": 80.5,
+   "z": 253.5,
+   "bottomY": 32,
+   "topY": 92,
+   "radius": 1.25,
+   "ix": 0,
+   "iz": 2
+  },
+  {
+   "x": 173.5,
+   "z": -58.5,
+   "bottomY": 35,
+   "topY": 100,
+   "radius": 1.25,
+   "ix": 1,
+   "iz": -1
+  },
+  {
+   "x": 180.5,
+   "z": 242.5,
+   "bottomY": 39,
+   "topY": 93,
+   "radius": 1.25,
+   "ix": 1,
+   "iz": 2
+  },
+  {
+   "x": 253.5,
+   "z": -36.5,
+   "bottomY": 35,
+   "topY": 88,
+   "radius": 1.25,
+   "ix": 2,
+   "iz": -1
+  },
+  {
+   "x": 268.5,
+   "z": 44.5,
+   "bottomY": 36,
+   "topY": 86,
+   "radius": 1.25,
+   "ix": 2,
+   "iz": 0
+  },
+  {
+   "x": 274.5,
+   "z": 155.5,
+   "bottomY": 34,
+   "topY": 95,
+   "radius": 1.25,
+   "ix": 2,
+   "iz": 1
+  },
+  {
+   "x": 267.5,
+   "z": 228.5,
+   "bottomY": 37,
+   "topY": 94,
+   "radius": 1.25,
+   "ix": 2,
+   "iz": 2
+  }
+ ],
+ "updraftsNear": [
+  {
+   "x": -26.5,
+   "z": -44.5,
+   "bottomY": 34,
+   "topY": 95,
+   "radius": 1.25,
+   "ix": -1,
+   "iz": -1
+  },
+  {
+   "x": -35.5,
+   "z": 58.5,
+   "bottomY": 37,
+   "topY": 90,
+   "radius": 1.25,
+   "ix": -1,
+   "iz": 0
+  },
+  {
+   "x": 81.5,
+   "z": -149.5,
+   "bottomY": 35,
+   "topY": 86,
+   "radius": 1.25,
+   "ix": 0,
+   "iz": -2
+  },
+  {
+   "x": 66.5,
+   "z": -61.5,
+   "bottomY": 37,
+   "topY": 91,
+   "radius": 1.25,
+   "ix": 0,
+   "iz": -1
+  },
+  {
+   "x": 27.5,
+   "z": 0.5,
+   "bottomY": 31,
+   "topY": 85,
+   "radius": 1.25,
+   "ix": 0,
+   "iz": 0
+  }
+ ],
+ "islandsNear": [
+  [
+   -1,
+   -1
+  ],
+  [
+   -1,
+   0
+  ],
+  [
+   0,
+   -1
+  ],
+  [
+   0,
+   0
+  ]
+ ],
+ "chunks": [
+  {
+   "cx": -1,
+   "cy": 0,
+   "cz": -1,
+   "sha256": "2b4e5fecabdb046d279df687d5106228f8e6177a4bc73668352eb0f03ea1cb13",
+   "data": "H4sIAAAAAAAACu3PMQEAAAwCoGMR7N91txmEBiTtxsTf39/f39/ff4y/v7+//+b/AZ4ms28AEAAA"
+  },
+  {
+   "cx": -1,
+   "cy": 1,
+   "cz": -1,
+   "sha256": "4539cc1fbc3c22bb131672c62f20ff87f3f587ba2d3d4c5b161c271c98c07b38",
+   "data": "H4sIAAAAAAAACu3BMQ0AAADDoKP+Pc/HAhQAAADwbgkqIxoAEAAA"
+  },
+  {
+   "cx": -1,
+   "cy": 2,
+   "cz": -1,
+   "sha256": "3aa23637037ee267d08b8ce36bd8efef9c8bb0803d94efdee27f76d2b9cdeb2a",
+   "data": "H4sIAAAAAAAACu3TyQ6AIAwEUFoOpP//wyYmLgyLNIqyOCfKhbwBrM2GlSGIaT15/uz+4fm/f27+75+8gECs1BPoTVf6iJ9VfCY6LVdzV/yIn1VPn7YCDnRH+gb8IgKjv1E5KX8hf/cT+EvPR2/oxzaebSfx/0v5DHwK+Q5O9GcRB34XPAiTm2/2Ud+fz/j3f5Hm/v/L/o+zABRs00UAEAAA"
+  },
+  {
+   "cx": -1,
+   "cy": 3,
+   "cz": -1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": -1,
+   "cy": 4,
+   "cz": -1,
+   "sha256": "be0358892b8b34d4e6e3e934d0f6970bd9a3865ab94ded8148a9ac3947dff5aa",
+   "data": "H4sIAAAAAAAACs2W3ZbDIAiEPeXaef/H3bNtowzyUzfZtlx1Eqp8AobWPmlipIiRYqSwemhRZqQYKa3dYPy/xxJegYr3Fd7Dn/Gl3ex5fJHNeDi+rfxO9pgfyv9TqEYSL8Un0h3+UQ/jFVxeo0f6+5v5l1aH2n8CtayfEeRbv3/+AKeZ+XV9vAsftJ3Zn+MJ+RXvgWDzG9koIehq+kf+Z7YssMdf8PJ9XQLS8ZR2JTArWv56XsdyaLg+19GLl+7i/sbazxu8rlEdYH1kzuBSfjWdQK2vt26tmfkj4Z+efX2UmfKy8MZOEDv8s7/v1wyq/Af8KWSvsLJ/L+9O8C/TWpe+NPxD8byR8ec21gnxi3RbZ5zj9+fxqcd5YMwn9LWP+71n0oGs+wJyDAX42/efP2iWPz0P3i+miEN/3bact/gl4834eb8z4fq2rlGd7VEMW/3/u66SUPVd8895O4VwA+8+ZASvHiF3FPkB1MLg/wAQAAA="
+  },
+  {
+   "cx": -1,
+   "cy": 5,
+   "cz": -1,
+   "sha256": "201cb045424ba43c3e0b34e2d64910c6020aad57dfbf26778cb7bc64bf01daaa",
+   "data": "H4sIAAAAAAAACt2W4YrEMAiE1bCUHjTv/7hHEk10UvYWum13zx+FsSXlm2gikYhITiKPGkQsLX5qEBEzi/Cj65qi/xIFNZVQ/oafUjLeiu/9KCkRCavwAUfWdQUZE+eG4m9qQOOvhnT+mlEDyPCDAcwCBrxuB/LO/OjGO91R1hK58A/8ZoDVg1XAqIdhwFLxhwEL4C/wz6jXdQH+ZSoIeqYP+dFgszqQAn+xoB8Hpo2/FU1bhLsnfuGomXm/ST5m/2t01tweBmbvjX9o8iUhY92omZ8ZAPLC/k/a/J6/1UIefjhedttv/HyM/9ZIELv14JLMUSuZAC9q/lL+HGmV3+nRD44XdZsgAj/cn7dNFFr/edvnTwIJ5qiJXEE0XtXZ9CiQwI836D3FAbgTP0OCCr87Lxy/IaE2ftj/Rm8nnb26cvT5gz8rf/iEwJA+Dbl+R80u8P/TXX4xv0OpvBKU3gd5aB7zovpxLv+Zdz/tnH+efZv7P0dd5oOAL4AvgP+J+58R37V3PA+2oe0bwBfAF8Cf+VHfVv+TDTM/6O0N/C/EqfPhL2GU7wMAEAAA"
+  },
+  {
+   "cx": -1,
+   "cy": 6,
+   "cz": -1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": -1,
+   "cy": 7,
+   "cz": -1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": -1,
+   "cy": 0,
+   "cz": 0,
+   "sha256": "2b4e5fecabdb046d279df687d5106228f8e6177a4bc73668352eb0f03ea1cb13",
+   "data": "H4sIAAAAAAAACu3PMQEAAAwCoGMR7N91txmEBiTtxsTf39/f39/ff4y/v7+//+b/AZ4ms28AEAAA"
+  },
+  {
+   "cx": -1,
+   "cy": 1,
+   "cz": 0,
+   "sha256": "64c54082f8cdd9300068226cccf3751a9b918925716d11825184fac81acad086",
+   "data": "H4sIAAAAAAAACu3VwQkAQAjEQMj23/NxVfhIUoEDips3gOsZLrP7lz+/OPn94/aT3+wnv9pv33+93/7/8v8edRHvVwAQAAA="
+  },
+  {
+   "cx": -1,
+   "cy": 2,
+   "cz": 0,
+   "sha256": "48096df2b30b9080cc70a2d1d5bbcbae69275d19c2a16aa5debec5f42ae7539c",
+   "data": "H4sIAAAAAAAACu3V0QrDIAwFUG/yIP7/Dw/UOr2FEdHhMpqXmkJKz9VSVVUVWwFAWwAIIYS2WKmUErXjjS+W/oCfvXc/p7EvnQl+dnf87C6XSE+d61OK5I+3AxE+9Qt57PGv1eH9N/OrH+Rff4mz3/8MH7T9e/wHa8IP8uf5P/AbE8Dlr8syv+X/d7BUrQl0/tyU+f4seCy1BoDBL5cYzgNQawDklzoP5wGY/UL+8fz79xsPwLsv83AegN0v5G//v8f/+N36X9Ms5QkAEAAA"
+  },
+  {
+   "cx": -1,
+   "cy": 3,
+   "cz": 0,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": -1,
+   "cy": 4,
+   "cz": 0,
+   "sha256": "3318b41c41cc49373db685b12e94c561c76460575e51b519d1fec8e7f62d82f4",
+   "data": "H4sIAAAAAAAACs2W2xKDMAhEnfIM//+5ndaqZCGBxKjdmT4sWieHS5JleVZEhL6IEAR8T+iptEJGL/zSM8IV4JrW5YOv866e95jGd5LwPD/K5Y94VQzhPOZN8qf8tv8t/xar8vMaUajloz+pvzv/dr69eqN36n14aH5Rf7lVY/tdX783xt3oel70znyj1/xcRpr8tFsmkAncxt/JC4Emb7C/xZLp/Blezp/f47xS1pz1QKjRuIJ/xv0lt7+1VOv4IgvqZjHKK939zZl6i8lHyS/ql5d5+zx/6vxqefH4t6wafqmA/BRWHV7q5p3PXwRwYYZ/DHPa/o8Tg99gysx/dH9nl//jvbqH5737iL85CXnRO/VGf5qf/Pqjb/Ml3uAEf8wrTV6OeXXPHH1q+c+f9zYjb71A6VgAEAAA"
+  },
+  {
+   "cx": -1,
+   "cy": 5,
+   "cz": 0,
+   "sha256": "1ab76f5c39ac600b1b8dfd44340bde8d3f9fed50f3e9bf54027d10dd52663959",
+   "data": "H4sIAAAAAAAACs2V4a7DIAiFFWMWbmLf/3FvQFRA3e5yu67nx8Jpty7fQWjOOecEXT8kKqL2McYQWYGU6eMRrJ57xAfiEx+QLW59MN8+TXnHD44/ev73hIiNl4vhW8XO834GWonxm4QXHH83wp+zDuOP0viIC/5qwsUhaPwEkAg3HSkpflD8QD+RKIifI/BRnDIJUjvfL54ljV/7P+rKD2D7P+oK/e5ZMP1e+Jnvk/239ADNFMHshbS8ByPEAJYfwD5/EQxaYkScI7hMyQZQXBygjgKRwoiGyWIPRjjJ6+cvj8aNjkCjPer4uzjkyhh/7Wn8I7gAoAbQR17u/GMFrPx5eSSvMvMf6gyoW4zmXg3BDEffDu5Pb9h/dQxMAHYauu8B6OUQwtiO7fnr7YhTu789/yUt1HgLj8bED4OfCqYU3xef4/fH+EvUQ9TzY8UumKqY+cHxx1f80xjfgX+jYjai40+OHxw/OH4J4CX/la9+1n7600Fvus38l4lfKDu/6E3+y7Xv/4pX5xHd/q/Pe85/y/k30D4A1/+oPGOt338b/sXavxzY6RcHF6y3ABAAAA=="
+  },
+  {
+   "cx": -1,
+   "cy": 6,
+   "cz": 0,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": -1,
+   "cy": 7,
+   "cz": 0,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": -1,
+   "cy": 0,
+   "cz": 1,
+   "sha256": "2b4e5fecabdb046d279df687d5106228f8e6177a4bc73668352eb0f03ea1cb13",
+   "data": "H4sIAAAAAAAACu3PMQEAAAwCoGMR7N91txmEBiTtxsTf39/f39/ff4y/v7+//+b/AZ4ms28AEAAA"
+  },
+  {
+   "cx": -1,
+   "cy": 1,
+   "cz": 1,
+   "sha256": "2a214fcdc9a2e3bb628782bb66d6a728d083c96dc47f607ad8cb0fd6e27be406",
+   "data": "H4sIAAAAAAAACu3VoREAQAjEwJnQf88v4Ss4kYtCshhmXAGkd0hWv5pff/3pFaLV//l1x7h84y88Ytx+6jf6d6pf6D/VDzym4xwRABAAAA=="
+  },
+  {
+   "cx": -1,
+   "cy": 2,
+   "cz": 1,
+   "sha256": "99e084c62f356915efb5efef7ea14c0ad2296dc6d21871d41de3d2e62766b6b0",
+   "data": "H4sIAAAAAAAACu3UMQ7AIAwEQS//f3Ra20VwJEsW5Laju0GItd4D8GczM1x2eBu+/JG/El/+w5NffvnLfi77/gv+cBd4/vT2jj74Sf7p6S3V/ST/9PKe5N/44/Pnsucvfz1S09Nb+rv/AcqwyzYAEAAA"
+  },
+  {
+   "cx": -1,
+   "cy": 3,
+   "cz": 1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": -1,
+   "cy": 4,
+   "cz": 1,
+   "sha256": "6f872c42a7e3be0687ff1308f2b8b78deab0fde53caaa9077cc72a310d2c3eac",
+   "data": "H4sIAAAAAAAACuWWzQ6DMAyDq/pcv//jThU/XZy2MIkxheWEKw757KSQ0rMKtVS/HbAAOf+isy8VwBnvorPVsQ0w+WrgEAMgBlTB2AZMB3zAD6tj8cOqKT+7vG0ANv5IBnzC38+78TMgv6kT+17Uj0Lxg0/BH9z3h/PA2xq+uCx9SjVsz0/Rfh9uavfy0s4Vx91/XL54sO8j6gIc8a+6iBZ+hh2As/lr3tvBLoMOgNv/fv50vOtB449pgM/f/P6P81b+oAOgezuYh/0foD7wv/iZHC+H/C9xU24iABAAAA=="
+  },
+  {
+   "cx": -1,
+   "cy": 5,
+   "cz": 1,
+   "sha256": "063e5bc870454c6df36463533bd801e015a53e70e4bca58d6ff0b62cff4b8ebf",
+   "data": "H4sIAAAAAAAACs2WSxKDMAxDY3nBZNHe/7gdXCCxksKk4RPttCidZ8sCYFbYNDuR5EVyd75ijHHPh8g/OPf/oapAQrRx5Pze2kDcAyZ6YKOPE/Gz53GQ752HGn9CBJyt5AGUh754PL1/XQawesDykM2D8iCUh9B3H5X9nky4L1AAmF+IP/TzVzZ+K7LT/fzMW/JfHHmnMv+gPvAFIJUCaKu8SBXH/vLKc9JlAKvHIu+zPEjvG3HA/ase8IP4z6y8Z+/flp8dAAjYlu/33/vKG0p2/Cj5k/cbb2879s/tuqa3emBQAPr598vszluvyeKvaQCJXxZvXzyOP5/BYfcTL/syH+TbkZr0rb9XyQ/J/TaA1v4bf//rF8BV/OzHun9NAzD/gx/E//cbYCz6ED7dbrRfABAAAA=="
+  },
+  {
+   "cx": -1,
+   "cy": 6,
+   "cz": 1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": -1,
+   "cy": 7,
+   "cz": 1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 0,
+   "cy": 0,
+   "cz": -1,
+   "sha256": "2b4e5fecabdb046d279df687d5106228f8e6177a4bc73668352eb0f03ea1cb13",
+   "data": "H4sIAAAAAAAACu3PMQEAAAwCoGMR7N91txmEBiTtxsTf39/f39/ff4y/v7+//+b/AZ4ms28AEAAA"
+  },
+  {
+   "cx": 0,
+   "cy": 1,
+   "cz": -1,
+   "sha256": "b877bde562e69abc4e09277d8c40677e0c3ca52ba786bf62e20f15cdfd2ef794",
+   "data": "H4sIAAAAAAAACu3HsQkAAAgDMLD//ywUfEKSLQkAAADwz9RtASj+KPgAEAAA"
+  },
+  {
+   "cx": 0,
+   "cy": 2,
+   "cz": -1,
+   "sha256": "afa6bb3b1bc0d18da0e2e8b86d1fece759e7fffa5aab0796692376603c3d3390",
+   "data": "H4sIAAAAAAAACu3XwQrAIAwD0Db+/z8PZ3XqBrYnCTOX3govg+JSGgPAhi+qaqNERGxwJL39uYKIP1fQ+3MFu1nufPv90Sm7PdEc/7/9sIPn9asdvBqxg8fsR9DfF3AvOX5uP4L+roCy5fiPn9mPoP8pwNaw+xH0twLqHnY/gv5aQFvE7i8drPjjew8YvXx8WYKni9f+8Ei/95wLN/g+vgAQAAA="
+  },
+  {
+   "cx": 0,
+   "cy": 3,
+   "cz": -1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 0,
+   "cy": 4,
+   "cz": -1,
+   "sha256": "80a4853729b8fff8120674c3d447debdf0b599e12ba4d124a1eac20a36773a6f",
+   "data": "H4sIAAAAAAAACs2WyXLEIAxEXaWz+v8/N1UOizYQ2MMkfZixwAuvJWRf11SkAiIyIXQo5knG1NQi8G/cp5imSqbve6ZzXJ8r1zPBz/gnMVRcF6DM6PwoP7zEuYjsxOpszvl1/i/a8cP4W5Za66ZSdjfgwfeseHRNwm/tMH7ggR/lH5Z/CrCV5uSOkDN7/Kk9kR+qCYjyv2vd839MI8/kOAYknzKEpSuG/9YVrWpLtl6Wb1T342lRfw48/8iPRdoBVuAE/DEf4vfboIyo/l/8l0ig6+VeD9EnZx3hZ98H6xa4i0CsLsw/xpkTgS0FDg+nY2f4bRtkDj6MWmvUgJv9EI0LYmhDJ/jNV0P4Xgz8WOWXpFwSu79n+CC/88P3A2tH2x+t9l+1geWLv8JvtepHCtlTDzmcqzWD78MHsp+VnR+iXTjAJ5/HxsD/wd9VX5PyvyUqz+ZK7vUpf8xrJF+T3Ye6UJQqwNvuIPQDrKoSlwAQAAA="
+  },
+  {
+   "cx": 0,
+   "cy": 5,
+   "cz": -1,
+   "sha256": "bf4e5f5f855a58e3e77b60aa200b6d19d99f4871fbbad5decacf7df970741b9b",
+   "data": "H4sIAAAAAAAACt2X227DIAyGwb6IuID3f9yJAMb+OXRJlk2apUr50zbl87nMxqK6TomZiUjd4Wg0M3vvSZtzDrXX5i5byLbRzgX8xoWnx86mL0Q13gj6Cf8BZzU6WJ3vHMBvtRvcAXrrD6RXV42XOLFQU3FA1SnzZweIF1xxgHjBFQeIF/D3h7MOh303/jrfeWKKN438/Dp/gHiGCf8T+4DfQCXtUVdwKYMKLmVQwaUMrvK/bVv4DGpUYoJP2uoncqi9H+rf8KL+G/7IaGnGrxI/LvjhBrS/G/3/XVvFXXjBM9D+/w1/VC+T76v4/y5/GEbeDxWKgRmrAPgJxj+RxfXe8jsY/3dP+d4M1AvPrAkaXtL88dRm/TkJAd/N8Q84x163nadBV92dcHsH2sY7tkHXp55vuvf37oWCWKZg5y3j/zvBWFqNd+j8VgvfUq8M8GOdby0VEhFFloCWemcd4owuAS77LsnTiwsU+7Wwdx1q+A/gh89/3CYGfwh5m3dq0ZWK1/wt38vGw5mxxbryK17linoDf3+0Tav7mOXX28Ckv0dd6ba/MTvJ9M7fMr3xK9zr/NtWV7IA+B8NAuxzyN9bm4m/L7R6vxV+lZPnG/da3Uo/+7s32BezrI5eABAAAA=="
+  },
+  {
+   "cx": 0,
+   "cy": 6,
+   "cz": -1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 0,
+   "cy": 7,
+   "cz": -1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 0,
+   "cy": 0,
+   "cz": 0,
+   "sha256": "2b4e5fecabdb046d279df687d5106228f8e6177a4bc73668352eb0f03ea1cb13",
+   "data": "H4sIAAAAAAAACu3PMQEAAAwCoGMR7N91txmEBiTtxsTf39/f39/ff4y/v7+//+b/AZ4ms28AEAAA"
+  },
+  {
+   "cx": 0,
+   "cy": 1,
+   "cz": 0,
+   "sha256": "b86b076c5c7206b432ca6ff3e1c410f67571100bdbe57d9cea3f595f93320783",
+   "data": "H4sIAAAAAAAACu3PwQ0AIAyAwITuv7PxoSv0AUzAzWjjtj2xWP78Yj/5zX7ym/3kz58/v7T8Rv/3Pj4HvX1RLQAQAAA="
+  },
+  {
+   "cx": 0,
+   "cy": 2,
+   "cz": 0,
+   "sha256": "4ee4d2728a95ac1518dd4bd3740840320323f52e40da0b4092fe2eb91f6c96ea",
+   "data": "H4sIAAAAAAAACu3V3QqAIAwFYJeE7P1fOMKseYI62a/huVuw5NuMvE/p9iJjTOnGyBxXZXzzNz/FB7+A/21IYQ6u3/hj/1/85PplqWJ/5XzeL+Cf+pv/F36Wn/yzt3K+Iz/+3G/Adeujn+BnfgH/u4JzaX6Kb/0C/pJjVRXK/MFjIfnGL+AvORW9az9O467pcPrFnxLgPcdq1QD+sLoQbqu+bB7b6r7P+Vf9776z/wGOLznuABAAAA=="
+  },
+  {
+   "cx": 0,
+   "cy": 3,
+   "cz": 0,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 0,
+   "cy": 4,
+   "cz": 0,
+   "sha256": "79b771d0228b9eb2344ce63212ef32f5021dce8acf4a7281ddf931633340f43f",
+   "data": "H4sIAAAAAAAACr2XS5LDMAhEXdVruP9xp2ZUiukGfTy2wyoQgngtZCs42ACsfKgP8R3RN1jIQDfx+28gAQTj/BbCpvkwtuRPvCt+bPBCeZOf+aF+xV+BStzDh0PsP3oQv32ZV8zGCpSm/EmPpE/WAyFNC094of5foSFvF/YS3tj6AbppWuMOr5+8hi3rWmym5zS/y1/pEUvzbi3mudxaX6fUGZRqA5Xe41e/2v/JeVZQn3y3/mJoTyDXApyuhYCuPevNdMv28YYHQks8wU9lnCuHRZW/pTtHLpPO2B3leZAl7wuQ5AiFZSVdmjqvz4ff1GN6cp7gVzm4Lr9pZvxJD7RxKoZ584FfUpP3Ar9eonihTxdJj8ZvHIjt/t6jNwbh0kvxFf4kB+z0+jifXmwl6SEBbX8ggDwDsjigLr5prLvuROiu1KO4T/SQe8P++BU/y+CP3392BCAH/Iex9XX+YxT8I7Z/5HkgYkNxCuRW9FXyysBDGGfhyG+T6f2qOB9L+wGWx3lNABAAAA=="
+  },
+  {
+   "cx": 0,
+   "cy": 5,
+   "cz": 0,
+   "sha256": "19f3ee8c80d6d74a76c1f21527ec7bc7ff349bf551b86554da6c7d1ddbcf1ebe",
+   "data": "H4sIAAAAAAAACs2XUa/DIAiFOfTB+FD//8+9mYoCOpt1bnckS3Zs0vbjANrjMMFWcdFn+c/M0NcYIJYAAKKuqQQkiCjGGEmF10RODnp/HA1wwn9U/iT4nb9K0vhAIIsfSOFTjMHxW00+H5f52cU/9f9s/HKp85+1ALrfjIdUmjI0VAH8rv/F49H/rJOSsJIVr89HloofwCX/98P6PcS8H1Q+lvzs+PHOm06StyF7A3GygA7fa8sPx0+O/50X9bwj/63mGZHn+ZAtwKXD4QMOnxb44SX9GJZxoW8Oz5X5fmEz/2vxQf8X3rNOwYQfjp8+xv+t/vfAbJXRMI5XQIPvTkD/AHgRS/8Lb0UWLKULf02BEHJNgTxBNsGrN5kXuFnJq1bv4O8bXzvu5Z/Ynfp5p9l/ZvvJ2J8HlrI/a2X/nQGnlnJ6vDZ3uMmvDS/pSE/KH7DlT7S1/Gf+O78H7e9ygz9Z/rH72/kfULnJTHr2aXy5/4p+3fAjPzn+HeG3uCl/b38oBdjvP83fgJ/hxxpODjta9Ho7/2r2df7GqenV9M+EofaDAIeaAHlYb/gCGxx/1aXRW320QfiJz8E/gSsOHwAQAAA="
+  },
+  {
+   "cx": 0,
+   "cy": 6,
+   "cz": 0,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 0,
+   "cy": 7,
+   "cz": 0,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 0,
+   "cy": 0,
+   "cz": 1,
+   "sha256": "2b4e5fecabdb046d279df687d5106228f8e6177a4bc73668352eb0f03ea1cb13",
+   "data": "H4sIAAAAAAAACu3PMQEAAAwCoGMR7N91txmEBiTtxsTf39/f39/ff4y/v7+//+b/AZ4ms28AEAAA"
+  },
+  {
+   "cx": 0,
+   "cy": 1,
+   "cz": 1,
+   "sha256": "9d8d15a7ac6bb7b2fa4c546da2019acf4c3c26a571315b1a4ef2b340f003adb9",
+   "data": "H4sIAAAAAAAACu3XMQoAIQxEUcjc/85iIzpgSoX8vG66/YKwSlgx/f6I1/Zger/o/aL3+6wPF2y6n63vfzbr6/5s1hdxXwTnLy+yfx0B8v1jBu7re7wAEAAA"
+  },
+  {
+   "cx": 0,
+   "cy": 2,
+   "cz": 1,
+   "sha256": "3a73bc40e9f19c94cd7bf45f7569126ab29d47d991f7ca0d0bdf84d1a9ecb553",
+   "data": "H4sIAAAAAAAACt2XwQ6AIAxD5ziQ/f8Pe0HFOpEh6rC3EWPySseAuVoTiP6gS2gwgH5mgIWfgf+OASIC5X7hLZn4GfjbDUDeIz+68ZA7Nn4G/syACD8u1yIR+OMhEFSqe/lh5Gfgb03AqPvfi3/Q/u/H70UJK4QQaviX/udlHCYNa8WGrxug86diZW7KgosW+I7fxxHYM/8jjkAVOgeGCyC1XADVpLva/wL//gVAZH8BnJBmiwJfvXcOVPDn/Z6IbZc/H0nXVcd/b977SLquGeKV27QAEAAA"
+  },
+  {
+   "cx": 0,
+   "cy": 3,
+   "cz": 1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 0,
+   "cy": 4,
+   "cz": 1,
+   "sha256": "522ced889bb1a13edd9aa16e8fd2db7836729d15fd5faf7e27b5f900bd989b25",
+   "data": "H4sIAAAAAAAACt2WwQqEMAxEJT03//+5i2I1fRl29yDYdm6jCHl2knTb5lYp9Jd+eXuj3qd1UNX7J3iPG3nLtib/DRv56HH+zuBMooLId7CBj749YD5GF8tk6YLfVR7oR8VXvPSJv8In/hr560j4LMTFPO/fZ/74jUt+zoNxu1/sM3rw1z7/rnjFPhh0+ov806d+cNHflbynr4PzU//8jzwP91D03qP34jYJP6Xue/TMv6f8m83KT8k8qP636Ffi37ouOddbPv/Gb2Z7+lfhP/r6y/2G3preKfdxFYfHBeg6/+YX46fE/ccsrDvyfwBoav3DABAAAA=="
+  },
+  {
+   "cx": 0,
+   "cy": 5,
+   "cz": 1,
+   "sha256": "529a907bc96bf0dcc3b3df4a1f6f27a5f1b6a620d52778d7608ec2f70c936530",
+   "data": "H4sIAAAAAAAACt2WwQ7EIAhEAQ+Nl/7/525UYBXttqbdVju3YbNJnwMoEbkoIgIAoKjgCINHxFTCaKX0dakEW/I7/mlFWsufrPCj4QeUH7WAmwcwAb/kLz5UVj6Odv6v4nfMLz7yCz4IPhXtb/p/G7/SsPzqWeyVX/+BSY987fUq0+d9kOE20u/YfuOrWP7SD5T7NPzC2DX8E8i5tTgAYieMZLYfmrsAJp+FlP9a8NMOPxr++7/6Omn/6/53BXDj8jPE/fjee2P9Y9dCCN9Rzs/znvObdj8ZuOWt+W98NOh9Z/L+7rsG8HLKe78Y/qVqCPjlrzyPip+fN8rf97w5ojHzZ4/4//fNSPNv+cnwT73cDygOe7bi4qrP4n87/wcaEhkbABAAAA=="
+  },
+  {
+   "cx": 0,
+   "cy": 6,
+   "cz": 1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 0,
+   "cy": 7,
+   "cz": 1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 1,
+   "cy": 0,
+   "cz": -1,
+   "sha256": "2b4e5fecabdb046d279df687d5106228f8e6177a4bc73668352eb0f03ea1cb13",
+   "data": "H4sIAAAAAAAACu3PMQEAAAwCoGMR7N91txmEBiTtxsTf39/f39/ff4y/v7+//+b/AZ4ms28AEAAA"
+  },
+  {
+   "cx": 1,
+   "cy": 1,
+   "cz": -1,
+   "sha256": "8c4a851687b8b66f0a15c6291f3de9cc6a9ce5be645a7bfa032caf46e3484dd3",
+   "data": "H4sIAAAAAAAACuXXwQrAIAiAYTC6+P4PPNqMnINKGon2nzr6EQmldFbAsp5lX80KItu59sSt5/ml+AA/p/X5If2cN+AH9I/EEf2NMqfOpTB+3Y2TnrKe/YdW+AH8S3zn/vJ+dfa3H9FasBKAzv8sPa537CeTbuXfS7/hHfsra9afhR99+j//uCT/tIIt/FjP1X8BAhpYigAQAAA="
+  },
+  {
+   "cx": 1,
+   "cy": 2,
+   "cz": -1,
+   "sha256": "b015ef844611d23fd2b2bcce3e114866aed0b6f843867cf0e4e2216c263d8bfa",
+   "data": "H4sIAAAAAAAACu3W0QqAIAyFYRvsZu//wLGGtA3xzqQd/7sswa8SJJp3ufS6uXSs/byxmjn6zVrBmxvrre7vz2L4OVRPHHPkl2+3zL97gYtLX9zxn3gytUT5f+fy4piZRQPUm19cu9fzdYkP6JfjP35gP/r+x/ZTegFoB4Abue4CkAAQAAA="
+  },
+  {
+   "cx": 1,
+   "cy": 3,
+   "cz": -1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 1,
+   "cy": 4,
+   "cz": -1,
+   "sha256": "0ce2c5f289d15ac4069c8062d7d1323eca5454d794d773a9181a8252a55464d9",
+   "data": "H4sIAAAAAAAACu1Vuw7EIAyLyEz+/3NPtDxiV6XqDcDp8BI5WWwnCJGVoEpUfVVXC0TVPNeYK3Zr3/KkjKfYvAPpIX2mLg+Vqh9sIuUQoGm2nn+i0KB9tf2hfzm3bZBHbPOjhLDi/gmx618U9qfdPIiHkAOII/28xpf3IO4V5EEoN0D+l97/BaQ2HYCnnIe1e4B7r/7tx/w/IDlCCnkY8JzIWIVj0X8vZwAzdA3D9Tv1jeMRjBc1D7Tu5H+emBkgu/9mf2NjY8PjA2R5wEgAEAAA"
+  },
+  {
+   "cx": 1,
+   "cy": 5,
+   "cz": -1,
+   "sha256": "3b622c638e0d16e029fecc6517b5f83e3d9a7fd3f434ad5570efd0f198277c2d",
+   "data": "H4sIAAAAAAAACu2Vy67DIAxEZ5wFYnHz/59bGfOyk6aVml61amYRGAsQBxuyLCaR1mpPxNrWEyEtQGqPBLRdFkB7KNIhmMXg+8gDZdWBB3Kc8XDNAw3swS8D/48Nv/KDRZXW+DvcGfwIuFv+kzXjKk9Pd/WV1wLrmGcBuIDn3Z7HM/z/LncA5q3Kq6+7ZvNNGpC4ENwA6bwliZytBmJlvzfTd1TyHfixx7+ukV8e8Hdg4x3ZNz/z5sCfpy9C9GT5elff6328b6kEBl8K9Z58vtWDTG3fORU273NuHrUcvEc8j019nHceE28PiKvv7f2mhPt893rvv+ofkn9TwTt+z0iJk55dff9V/4j73ySBl6/wfqG+5Hf1Pv0Y7qVLly79tG5Qu0YeABAAAA=="
+  },
+  {
+   "cx": 1,
+   "cy": 6,
+   "cz": -1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 1,
+   "cy": 7,
+   "cz": -1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 1,
+   "cy": 0,
+   "cz": 0,
+   "sha256": "2b4e5fecabdb046d279df687d5106228f8e6177a4bc73668352eb0f03ea1cb13",
+   "data": "H4sIAAAAAAAACu3PMQEAAAwCoGMR7N91txmEBiTtxsTf39/f39/ff4y/v7+//+b/AZ4ms28AEAAA"
+  },
+  {
+   "cx": 1,
+   "cy": 1,
+   "cz": 0,
+   "sha256": "23806ed61dec1b7460d7bb585f724ee4a94a3ea75645a326c7f8aa8bc676f66b",
+   "data": "H4sIAAAAAAAACu3TQQqAMAxEUUiZTe5/YHGhBq1aNSFM61+luzxCSxkmmTOjeY+QVMveKrjVV9d37d+AZ/ie/Rfmbv2Lp9EuALJXdqvVbOyg999+7wPa0AGoZgs+9PLiBq+kfhe5MvrloR07u1o7nd/x7lT+ADePPxBP4I/V//4JAwCXhgAQAAA="
+  },
+  {
+   "cx": 1,
+   "cy": 2,
+   "cz": 0,
+   "sha256": "a3dfa7953ba6df4d9fdd1221b6ae9820b7c67374cd694fc1af714fce5f6501df",
+   "data": "H4sIAAAAAAAACu3SQQvAIAiG4Qo86P//wcNtNBVihzGF9D1Vp++BxlgG3HXsXOP6c/wSIpqrfnDrhQ99FjLv9yxa66HtrVd+mB/+tp/tjJd+MEUPc0rZiSiTnQNh56L3eCfoKf1kit7jXfnLX/7yl7/8Gf0HEOieVQAQAAA="
+  },
+  {
+   "cx": 1,
+   "cy": 3,
+   "cz": 0,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 1,
+   "cy": 4,
+   "cz": 0,
+   "sha256": "095370fb71de244ac8f9c442719ef25ee91000b7f95b16ad1edd3f4956334d54",
+   "data": "H4sIAAAAAAAACu2UUQ6AIAxDyfbN7n9cg5iIZRAxSqbu/XWQ0DZACLbgBGoGLQzr+w7Wkca8PMoE6OlUH9zvYwsf0xgqeTrOMOhpdQq6zl9oOQ5E6cNk8AY33If45vwIGh/vw+a9v4raRyd/fg80z+BkGDpR+/hu/Ir80ZeaiH6U33Ecx3GcmgUNtKPzABAAAA=="
+  },
+  {
+   "cx": 1,
+   "cy": 5,
+   "cz": 0,
+   "sha256": "a15a71e87b61d07c9a07263f29a6d631be83e8edac933546ad24ca2661050033",
+   "data": "H4sIAAAAAAAACu2TQQ6EIAxFP3VhutD7H3cCFKHFGZkRk1n0beQLMby2LouCjoWwqUSBJIYM5HXAikRIESgZ6VSTM8wrJ04yc1my7Omcn9x+DT8jujsRRS8YfeSSJN+kGbMYJq9YkhwzRKBQYzwUjHusRXXSmUstGiebUct2nr+pR/HVmZpM1AqSjsiToHyHMHfWs6A3be79bvZ/731rLvMtWF8yvlf63dVP7v6hNtNZtq1tN4w+jD6M/qWvpRvVx8zGkH4fedZ8v+PKf+JoD2H0YfRv99vyb/2nzn9uvy0j/7/jOI7jOM6TvABzCM6HABAAAA=="
+  },
+  {
+   "cx": 1,
+   "cy": 6,
+   "cz": 0,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 1,
+   "cy": 7,
+   "cz": 0,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 1,
+   "cy": 0,
+   "cz": 1,
+   "sha256": "2b4e5fecabdb046d279df687d5106228f8e6177a4bc73668352eb0f03ea1cb13",
+   "data": "H4sIAAAAAAAACu3PMQEAAAwCoGMR7N91txmEBiTtxsTf39/f39/ff4y/v7+//+b/AZ4ms28AEAAA"
+  },
+  {
+   "cx": 1,
+   "cy": 1,
+   "cz": 1,
+   "sha256": "5868337784e2ea7e51a2aec96bca2054cfcbaa35e7a2ab731b4489f549c4877a",
+   "data": "H4sIAAAAAAAACu3UOw7AIAwDUAmUhfsfuCoVn7iUwNKIgDeYeE6E97bjYuBYRfVxP+QFNu5H047+2raz/9ZZ9yMFeeilEmv+iJHmTcQb0H7/bHBzpX2HcbuQ89xpe2bT3/een8AfVve3/veen8AfC9D2SGHLPuBny168q/sdntPl17zBnwsIUICuTs7x8wJG/akA+O6P//iZ/wIfSgjiABAAAA=="
+  },
+  {
+   "cx": 1,
+   "cy": 2,
+   "cz": 1,
+   "sha256": "90c816965da030f70726f646e3a8b3e46b2a40817f5a711e01b3cb416522a7ed",
+   "data": "H4sIAAAAAAAACu2SMQrAQAgEL0IK7/8PDhHErKQKxC10OrXZ2TsR5DRiXMbhrE+oahpxQURe/QN2vr+B1xYR33Xyd9z/eeMlqwF/O/rfV1auKnZgBaRzJ39rgJ2nmp0KYOepZvyxAHaeasYfYeepZvzHf/z7+l9RckDSABAAAA=="
+  },
+  {
+   "cx": 1,
+   "cy": 3,
+   "cz": 1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 1,
+   "cy": 4,
+   "cz": 1,
+   "sha256": "f96d9adc535ee548998f8759d78ec250c7670a0495249a061386f28a52ecd9a8",
+   "data": "H4sIAAAAAAAACu3QsQ0AMAgDQYT33zkKRURYAAn+uu8wZrOotuTXa/ev54sHpF42PxbX3r6/6xIAAAAAnQ6UMgI7ABAAAA=="
+  },
+  {
+   "cx": 1,
+   "cy": 5,
+   "cz": 1,
+   "sha256": "15467b8710180d3f967b06a163078cedf29a119e28f9017bce044f21d24f0359",
+   "data": "H4sIAAAAAAAACu3QwQ0AIAgEQbn+izYSE8QSuJ0X91wkxbEu1Zn6migf8OyYn/wJv+TGPB8AAACAiQ30rY3fABAAAA=="
+  },
+  {
+   "cx": 1,
+   "cy": 6,
+   "cz": 1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 1,
+   "cy": 7,
+   "cz": 1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": -3,
+   "cy": 2,
+   "cz": 0,
+   "sha256": "cae75a3ba8de53d816174600acef221c5dcb10054f931463b31bcb40fe864404",
+   "data": "H4sIAAAAAAAACu3WsQrAMAgE0JyQ///lQkujZogZBEG9ySXgu0FCdMqcPAPAGFgZKXLkSz82f/TiTmn/uQDtR/tr+QnazwVEL+4U04816AsQvbhTbP/fALMzFXDj/xqQ6op+2vw5Cmh/+02/aOJ9lIff99/2Sz6S8cv//x6acAznABAAAA=="
+  },
+  {
+   "cx": -3,
+   "cy": 4,
+   "cz": 0,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": -3,
+   "cy": 5,
+   "cz": 0,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": -3,
+   "cy": 6,
+   "cz": 0,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 2,
+   "cy": 2,
+   "cz": 1,
+   "sha256": "3f6e50ecd0637d8bae7158e0970a1326388f3deeb106cd8bb158e84d8aa7e4a6",
+   "data": "H4sIAAAAAAAACu3PMQEAAAwCoN32D7zbDEIDknZj4u/v7+/v7+8/xt/f399/8/+QZtS+ABAAAA=="
+  },
+  {
+   "cx": 2,
+   "cy": 4,
+   "cz": 1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 2,
+   "cy": 5,
+   "cz": 1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 2,
+   "cy": 6,
+   "cz": 1,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 7,
+   "cy": 2,
+   "cz": -5,
+   "sha256": "072a8a2af0d915c9cd3391d466e866ac8322d14bec729b6a343c074ca7dfb00e",
+   "data": "H4sIAAAAAAAACu2Wyw6EIAxFaVkY/v+HJyp02gudwXkoJJ5dMcGcS6lytPAK1oUYI7ElEJFeCyuUKXWBiMJgGFnxdfyZI0EAAQLYdyVJAF43iT97/tz2J1VvSAAX672FIQDd621/G4C4Wn9J4FK5Dlz/vN7tn9fV1rP4s+O/PWj4mwCCue3jzztE93rrvFv+7ryfwBfRvd7tP/G8Q1SrH/GXAMo+s/t7897zn3XeI7f/iP2fUoLSLvwO0B9j/qFv7Y9pfJwO6Hf6P+t9l+r7t8BrjtUpLeC/VA0RXtX9efzJ/zvOPv/h/n/Ou/8PQ7xhLgAQAAA="
+  },
+  {
+   "cx": 7,
+   "cy": 4,
+   "cz": -5,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 7,
+   "cy": 5,
+   "cz": -5,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": 7,
+   "cy": 6,
+   "cz": -5,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": -9,
+   "cy": 4,
+   "cz": 15,
+   "sha256": null,
+   "data": null
+  },
+  {
+   "cx": -9,
+   "cy": 5,
+   "cz": 15,
+   "sha256": "c51bc6095f95e77c2db3184ee7c556cd467ebf4a58a56aeec317f9b261420090",
+   "data": "H4sIAAAAAAAACq2X2xqEIAiETa7l/R93vzQNBjy2XOw6pcaPY4cQtoPuANkCJBGxOTI70Y20PYLi2ypRJ+Ii9/ErYWmN+dm2d6kPh9FTLs1v9S47LngIOjNxNpHrBx+GNxfX9vbHR3GxKOpRa7OLDiaAenD2g8Rz+ddQsRcPZSey4e8fBl3zm0MrZK00f/L2Qzjbt9tjktMqLqcYY1eP8bnPX2Sy+yHUDIr/p/fH1pelILXCopVYHOBplTLvQA8Xnwz+cP2bZhYaCRRz+VvdzBArO+BZawYt8x3gG/6k4BsvaJEe8rs58wAnwf9mKFwGvbX+xdeA76w/zD/NkDX3IacaL2ZE3ke3HiP+oM++/fm9FpSj1aN2CTOg1JVzeye/izza4W8x5O/6QY+H+SQK62rUBL8u8lLki/T5S047/OiFNlzMD9I8H9ayJscY9qngWSQS+j/Kyfhav//9wQ8p++EfW9p9Q3Tsb+93GviCAnzhD4SvA9IQr7/U9Tp5O8GSXp0YjLd+1wW4+ZtOH/lNOdz3Ayknz4Pv94WbTr5IRfnZRxSvXICq+eT776we8P5kEj/5wGvQ7yQa9+G/YovrjvAe+AGZkvDIABAAAA=="
+  },
+  {
+   "cx": -9,
+   "cy": 6,
+   "cz": 15,
+   "sha256": "5ffb4a6b3c23c3217a93e5d84043f6465b815cd01f81376256f6a4fef0224d3c",
+   "data": "H4sIAAAAAAAACt2W3W7DMAiFAV8gpKzv/7iT/znY1dapXZOeiyYnjqN+gG1YJKUkIsJFNDxVMbcx6ppjVcdx0GWV6aoyowgNTwWVuKu8zT9+8GKa/CL5npwvmeYp4i2/mQWLD06tVt4u6/2n+wINVYCKvCu/uTHwJwhULnoGfhIFfmIN/ApfMNPAX/2As27NcKDfudkxHi+PT+H3NU+Ea4CIYQ2gNOR7+nrRAVHxp8+X5idrrIelPp4eD597SemLXO7ldkvkcs+482t+02zkU/NJMNK8LQv/xGzxyGf/k3/x/H7pN8+eH/Mvgkv4OKDqAchsAQ7r/y17AfCLiFL0DNIwX0OJaljc3tquwl+H9isV/trwzP0ffM07rH+3DAqUa4Du7/17/241/hT4b4FfAv8IQMF1HeAJjrTHFAJALQDOQwDqpE9qgTMd8FL0n84fzn+i6Nfz/9I9b1A/2rPG+ebxaYaguUd63r0/mZb+bjnnwN3veceDbafrZjz17/9d3w05NlIAEAAA"
+  },
+  {
+   "cx": -9,
+   "cy": 7,
+   "cz": 15,
+   "sha256": null,
+   "data": null
+  }
+ ]
+}
