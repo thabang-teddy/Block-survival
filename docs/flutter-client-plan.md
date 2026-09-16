@@ -1,6 +1,7 @@
 # Block Survival — native Flutter client: planning plan
 
-**Status:** draft, 2026-09-15. Nothing here is built yet.
+**Status:** spikes run, 2026-09-16 — results in §7. Step 0 is merged, S1–S5 have a
+verdict, the §3 documents exist under `client/docs/`, and P0 is mostly done on `dev`.
 **Goal of this document:** get from "we want a native client" to an implementation
 plan we trust, without guessing at the two things that could sink the project
 (3D rendering in Flutter, and cross-play with the browser client).
@@ -47,6 +48,8 @@ where the answer is not obvious, a time-boxed spike in §2 produces it.
 Recommendation: **A**, using `flutter_scene`'s source as reference for the glTF
 loader and skinning rather than depending on it. Spike S1 confirms or rejects.
 
+**Decided: A**, on Flutter 3.47.4 (see §7 S1 for why not 3.44).
+
 ### D2 — Authentication for a non-browser client
 
 `routes/web.php` is **session + CSRF + device approval** (`auth`, `access`
@@ -58,7 +61,9 @@ state → token), with the existing device-approval admin flow reused. Every
 
 Decide: Sanctum tokens (recommended) vs. cookie-jar emulation (fragile, CSRF).
 
-### D3 — Repository layout — **decided: monorepo, one folder per project**
+**Decided: Sanctum tokens** — built and merged on `dev` (§7 S5).
+
+### D3 — Repository layout — **decided: monorepo, one folder per project** (done: `c3d569f`)
 
 ```
 /server/                    Laravel app + web client (everything that is at the root today,
@@ -116,17 +121,23 @@ commit — decoupled cadence, but fixture drift becomes a cross-repo chore.
 - **Strict**: native and browser clients join the same room, same seed, identical chunks, identical protocol. (Recommended; it is the point of the port.)
 - **Loose**: native clients only play with native clients; browser rooms are separate. Halves the determinism work but splits the player base.
 
+**Decided: strict.** S2 shows it is achievable: worldgen and the wire protocol are byte-identical.
+
 ### D5 — Input model per platform
 
 - Desktop: keyboard + mouse-look. Flutter has **no built-in pointer lock**; mouse-look on Windows/Linux needs a plugin or platform channel that hides the cursor and streams relative deltas. Spike S3.
 - Android: on-screen joystick + look-drag + action buttons; optional Bluetooth gamepad.
 - Gamepad on desktop: nice-to-have, not v1.
 
+**Decided as above.** Desktop mouse-look is a runner-level platform channel (no plugin covers Windows/Linux — §7 S3).
+
 ### D6 — Feature scope of v1
 
 Recommendation: **everything the browser client has except the admin pages.**
 Admin stays web-only. Cut list if time is short (in this order): rifle FX polish,
 third-person camera, global shared world, invites UI (join by code only).
+
+**Decided as recommended**; the cut list is repeated in `client/docs/PRD.md`.
 
 ---
 
@@ -295,3 +306,115 @@ but ordinary engineering job.
 - [Flutter Scene — realtime 3D engine on Flutter GPU](https://fscene.dev/) and its [pub.dev package](https://pub.dev/packages/flutter_scene) — Impeller default on every native platform as of Flutter 3.47; flutter_scene needs the master channel today
 - [Getting started with Flutter GPU — Flutter blog](https://blog.flutter.dev/getting-started-with-flutter-gpu-f33d497b7c11)
 - [bdero/flutter_scene on GitHub](https://github.com/bdero/flutter_scene)
+
+---
+
+## 7. Spike results (2026-09-16)
+
+Everything below is on `dev`; the tests named are in `client/test/` and
+`server/tests/` and run in CI.
+
+### S1 — Render a real chunk: **GO on Windows; Android/Linux build-verified only**
+
+- Built: `lib/world/mesher.dart` (twin of `mesher.ts`), `shaders/chunk.{vert,frag}`
+  compiled by `hook/build.dart` with the SDK's `impellerc`, and
+  `lib/render/chunk_renderer.dart` on `flutter_gpu`. `lib/ui/spike_page.dart`
+  streams the real seed-11 world around the spawn pad with the day/night
+  palettes of `Lighting.tsx`.
+- Measured on Windows (Impeller OpenGL backend, 1265×700 window): **188 chunks,
+  212 draws, 148k triangles in 2.4 ms avg / 3.1 ms p95** per frame; meshing
+  0 ms per frame once streamed. Far above the 60 fps bar.
+- **Version blocker found and resolved:** on Flutter **3.44** the shader-bundle
+  loader leaves `float_type` unset, so every uniform binding fails on the GLES
+  backend (`Float uniform should have a float type`), and the Windows embedder
+  cannot enable Impeller for release builds. **3.47.4** (stable, 2026-09-11)
+  fixes both and makes Impeller the desktop default; Flutter GPU is switched on
+  per runner (`set_enable_flutter_gpu`, `fl_dart_project_set_enable_flutter_gpu`,
+  `EnableFlutterGPU` meta-data). The SDK on this machine was upgraded and the
+  version is pinned in `client.yml`. `flutter_gpu`'s API also changed between
+  the two (async `ShaderLibrary.fromAsset`, `drawIndexed`), confirming the
+  "wrap it behind one class" mitigation.
+- Not done: the GLB zombie with its animation (needs the glTF loader, P1); a
+  run on a mid-range Android phone and on Linux/Mesa (no device here — CI
+  builds both, a run is the first P1 task on those targets).
+- Note for testers: Smart App Control on Windows 11 blocks the unsigned debug
+  exe until allowed — MSIX signing is a P0 task, not a P5 one.
+- Vertex-coloured, not textured: the browser client has no texture atlas
+  either, so "textured" in the S1 brief was wrong; the palette is the look.
+
+### S2 — Bit-exact world generation: **GO**
+
+- `server/scripts/dump-worldgen-fixtures.ts` (`npm run fixtures:worldgen`)
+  writes `shared/fixtures/worldgen/` for seeds 11, 1, 12345, 987654321,
+  2147483646: primitive samples, heights, trees, island cells, island template
+  bounds + SHA-256, updrafts, and 88 whole chunks per seed (gzip+base64).
+- The Dart port (`client/lib/world/`) is **byte-identical on every fixture**:
+  440 chunks, 61 island templates, all trees and updrafts, first run.
+- Non-portable operations found and emulated in `lib/world/js_math.dart`:
+  32-bit `Math.imul`/`>>>` (Dart ints are 64-bit), `Math.round` (halves go
+  to +∞; Dart's go away from zero), **`Math.hypot`** (V8 scales by the max and
+  Kahan-sums — not `sqrt(x²+z²)`), and **`Math.sin`/`Math.cos`** (V8 uses
+  fdlibm; Windows CRT / glibc / bionic differ in the last bit and the island
+  lake position rounds `cos(angle)·dist`). Nothing on the TS side had to change
+  and no world-format version bump is needed.
+- Rule going forward: any change to `resources/js/world/*.ts` reruns the dump
+  in the same PR; `client.yml` fails on drift.
+
+### S3 — Desktop mouse-look and Android touch: **GO on Windows; Linux open; Android untested on device**
+
+- No plugin covers Windows/Linux (`pointer_lock` 0.4.1 is macOS + web only), so
+  the Windows runner implements the `block_survival/mouse` channel:
+  Raw Input (`WM_INPUT`), `ClipCursor` to the window centre, hidden cursor,
+  deltas batched at 125 Hz, released on focus loss. Verified by injecting
+  320 counts of relative motion with `SendInput`: the cursor stayed pinned, the
+  camera turned, Esc released it.
+- Android: `lib/input/touch_controls.dart` — joystick on the left half,
+  look-drag on the right, per-pointer so both work at once; unit + widget
+  tested, not yet felt on a phone.
+- Linux: the Dart side falls back to drag-to-look (`isSupported == false`).
+  X11 (`gdk_seat_grab` + XI2 raw motion) and Wayland (`zwp_relative_pointer_v1`,
+  which GTK 3 does not expose) remain to be written **on a Linux box**; this
+  is the one S3 pass criterion not met.
+
+### S4 — WebRTC handshake with a browser peer: **logic GO; live cross-play E2E pending**
+
+- `server/scripts/dump-protocol-fixtures.ts` (`npm run fixtures:protocol`)
+  writes every `protocol.ts` message shape as msgpackr bytes; the Dart codec
+  (`lib/net/msgpack.dart`, matching msgpackr's map16-for-objects and int/float
+  choices) and the typed messages (`lib/net/protocol.dart`) decode and
+  **re-encode all 24 byte for byte**.
+- `lib/net/signaller.dart` and `lib/net/transport.dart` are line-for-line
+  twins of `transport.ts` (cadence, backoff, 404 → "room gone", retries), over
+  an `RtcFactory` interface; `lib/net/rtc_flutter.dart` is the
+  `flutter_webrtc` 1.6 implementation, and it links into the Windows build.
+  Tests run the full offer/answer/candidate handshake through an in-memory
+  mailbox and exchange a `hello` and a `welcome`.
+- Not done: the live test against a browser tab, and the home-NAT check on all
+  three targets. Both need a running web client and a second machine; they are
+  the first P3 tasks and the STUN configuration is unchanged.
+
+### S5 — Token auth: **GO, merged**
+
+- Backend (`623b55a`): `POST /api/auth/token` (credentials + device token →
+  Sanctum token, or `pending: true` until an admin approves the device on
+  `/admin/devices`), `GET /api/auth/status`, `GET /api/auth/me`,
+  `POST /api/auth/logout`; every `/api` route on `auth:sanctum` (session first,
+  bearer second); tokens die with their device; CSRF skipped only for bearer
+  calls without a session login. 78/78 PHPUnit, browser flow unchanged.
+- Two things the unit suite could not see, caught by running the Dart client
+  against a real `php -S` server: the token endpoint itself needed a CSRF
+  exemption (CSRF is off under the test runner), and Laravel 13 renamed the
+  CSRF middleware to `PreventRequestForgery`, so the `replace:` had matched
+  nothing. Both fixed; `test/api/live_server_test.dart` signs in, reads
+  `/api/auth/me` and `/api/leaderboard` and signs out over real HTTP.
+
+### What changed in the plan
+
+- §6 effort: the spikes took one working session rather than 3–5 weeks
+  because the fixtures did most of the arguing. P0 is largely done; P1 has
+  started (worldgen, world, mesher, renderer). `client/docs/tasks.md` is the
+  live list.
+- New P0 item: Windows code signing (Smart App Control).
+- New P1 item: glTF loader + skinning (the S1 zombie), first Android/Linux runs.
+- New P3/P4 items: Linux mouse capture; live cross-play E2E with a Playwright
+  browser peer.
