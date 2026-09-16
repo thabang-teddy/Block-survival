@@ -97,7 +97,8 @@ PlacedIsland? islandAtCell(int seed, int ix, int iz) {
 }
 
 /// Islands whose footprint may overlap the block range [x0, x1] × [z0, z1].
-List<PlacedIsland> islandsNear(int seed, int x0, int z0, int x1, int z1) {
+/// The player controller passes fractional positions, so the bounds are num.
+List<PlacedIsland> islandsNear(int seed, num x0, num z0, num x1, num z1) {
   final out = <PlacedIsland>[];
   // `/` then floor, not `~/`: the range goes negative
   final ix0 = ((x0 - maxHalfExtent) / islandCell).floor();

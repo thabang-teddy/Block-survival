@@ -78,7 +78,7 @@ final class TerrainGenerator {
   );
 
   /// shafts whose axis lies inside the block range [x0, x1] × [z0, z1]
-  List<Updraft> updraftsNear(int x0, int z0, int x1, int z1) {
+  List<Updraft> updraftsNear(num x0, num z0, num x1, num z1) {
     final out = <Updraft>[];
     for (final island in islandsNear(
       seed,

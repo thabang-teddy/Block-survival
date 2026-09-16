@@ -11,6 +11,7 @@ import 'dart:ui' as ui;
 
 import 'package:block_survival/input/mouse_capture.dart';
 import 'package:block_survival/input/touch_controls.dart';
+import 'package:block_survival/physics/player_controller.dart';
 import 'package:block_survival/render/camera.dart';
 import 'package:block_survival/render/chunk_renderer.dart';
 import 'package:block_survival/render/lighting.dart';
@@ -41,6 +42,9 @@ class _SpikePageState extends State<SpikePage>
   late final World _world;
   late final TerrainGenerator _generator;
   late final Camera _camera;
+  late final PlayerController _player;
+  double _accumulator = 0;
+  static const double _fixedDt = 1 / 60;
   ChunkRenderer? _renderer;
   String? _error;
 
@@ -66,10 +70,11 @@ class _SpikePageState extends State<SpikePage>
       ..setGenerator(_generator.generateChunk, worldChunksY)
       ..trackEdits = true;
     final spawn = _generator.spawn();
+    _player = PlayerController(_world, spawn.x, spawn.y, spawn.z)
+      ..updrafts = (x, z) =>
+          _generator.updraftsNear(x - 3, z - 3, x + 3, z + 3);
     _camera = Camera(
-      position: vm.Vector3(spawn.x, spawn.y + 1.6, spawn.z + 6),
-      yaw: 0,
-      pitch: -0.15,
+      position: vm.Vector3(spawn.x, spawn.y + PlayerTuning.eyeHeight, spawn.z),
     );
     ChunkRenderer.create().then(
       (r) => setState(() => _renderer = r),
@@ -127,37 +132,48 @@ class _SpikePageState extends State<SpikePage>
     _last = elapsed;
     final look = _mouse.takeDelta();
     final touch = _touch.take();
-    final angles = lookToAngles(look + touch.look);
-    _camera.look(angles.dx, angles.dy);
-    _move(dt, touch.move);
+    // the controller has its own sensitivity (PlayerTuning.mouseSensitivity)
+    _player.look(look.dx + touch.look.dx, look.dy + touch.look.dy);
+    if (_down(LogicalKeyboardKey.space)) _player.queueJump();
+    // fixed 60 Hz steps, as the browser client
+    _accumulator += dt > 0.25 ? 0.25 : dt;
+    final input = KeySetInput(_keyCodes(touch.move));
+    while (_accumulator >= _fixedDt) {
+      _player.update(_fixedDt, input);
+      _accumulator -= _fixedDt;
+    }
+    final s = _player.state;
+    _camera
+      ..position = vm.Vector3(s.x, s.y + PlayerTuning.eyeHeight, s.z)
+      ..yaw = s.yaw
+      ..pitch = s.pitch;
     _streamAround();
     _phase = (_phase + dt / 120) % 1.0; // a two-minute day for the demo
     setState(() {});
   }
 
-  void _move(double dt, Offset stick) {
-    const speed = 8.0;
-    var dir = vm.Vector3.zero();
-    dir += _camera.flatForward * stick.dy + _camera.right * stick.dx;
-    if (_down(LogicalKeyboardKey.keyW) || _down(LogicalKeyboardKey.arrowUp)) {
-      dir += _camera.flatForward;
-    }
-    if (_down(LogicalKeyboardKey.keyS) || _down(LogicalKeyboardKey.arrowDown)) {
-      dir -= _camera.flatForward;
-    }
+  /// browser KeyboardEvent.code names for the held keys; the touch stick maps
+  /// to the four directions above a dead zone (analog movement is a P4 item)
+  Set<String> _keyCodes(Offset stick) => {
+    if (_down(LogicalKeyboardKey.keyW) ||
+        _down(LogicalKeyboardKey.arrowUp) ||
+        stick.dy > 0.3)
+      'KeyW',
+    if (_down(LogicalKeyboardKey.keyS) ||
+        _down(LogicalKeyboardKey.arrowDown) ||
+        stick.dy < -0.3)
+      'KeyS',
     if (_down(LogicalKeyboardKey.keyD) ||
-        _down(LogicalKeyboardKey.arrowRight)) {
-      dir += _camera.right;
-    }
-    if (_down(LogicalKeyboardKey.keyA) || _down(LogicalKeyboardKey.arrowLeft)) {
-      dir -= _camera.right;
-    }
-    if (_down(LogicalKeyboardKey.space)) dir += vm.Vector3(0, 1, 0);
-    if (_down(LogicalKeyboardKey.shiftLeft)) dir -= vm.Vector3(0, 1, 0);
-    if (dir.length2 > 0) {
-      _camera.position += dir.normalized() * (speed * dt);
-    }
-  }
+        _down(LogicalKeyboardKey.arrowRight) ||
+        stick.dx > 0.3)
+      'KeyD',
+    if (_down(LogicalKeyboardKey.keyA) ||
+        _down(LogicalKeyboardKey.arrowLeft) ||
+        stick.dx < -0.3)
+      'KeyA',
+    if (_down(LogicalKeyboardKey.shiftLeft)) 'ShiftLeft',
+    if (_down(LogicalKeyboardKey.space)) 'Space',
+  };
 
   bool _down(LogicalKeyboardKey key) => _keys.contains(key);
 
@@ -312,9 +328,9 @@ class _Hud extends StatelessWidget {
                 ? 'left: joystick  right: look'
                 : state._mouseSupported
                 ? (state._mouse.state == CaptureState.captured
-                      ? 'mouse captured — Esc releases  WASD: move'
+                      ? 'mouse captured — Esc releases  WASD: move  space: jump'
                       : 'click: capture mouse  WASD: move')
-                : 'drag: look  WASD: move  space/shift: up/down',
+                : 'drag: look  WASD: move  space: jump  shift: sprint',
           ),
         ],
       ),

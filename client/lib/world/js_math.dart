@@ -35,20 +35,36 @@ int jsRound(double x) {
 /// `Math.trunc` for finite input.
 int jsTrunc(double x) => x.truncate();
 
-/// `Math.hypot(x, z)` exactly as V8 computes it: scale by the larger magnitude,
-/// Kahan-sum the squares, then `sqrt(sum) * max`. A plain `sqrt(x*x + z*z)` can
-/// differ in the last bit, and the generator rounds these values.
-double hypot(double x, double z) {
-  final ax = x.abs();
-  final az = z.abs();
-  if (ax.isNaN || az.isNaN) return double.nan;
-  final max = ax > az ? ax : az;
+/// `Math.hypot(x, z)` exactly as V8 computes it: scale by the largest
+/// magnitude, Kahan-sum the squares, then `sqrt(sum) * max`. A plain
+/// `sqrt(x*x + z*z)` can differ in the last bit, and the generator rounds
+/// these values.
+double hypot(double x, double z) => hypotN([x, z]);
+
+/// three-argument form (raycast direction length)
+double hypot3(double x, double y, double z) => hypotN([x, y, z]);
+
+double hypotN(List<double> values) {
+  var max = 0.0;
+  var anyNaN = false;
+  final abs = List<double>.filled(values.length, 0);
+  for (var i = 0; i < values.length; i++) {
+    final v = values[i];
+    if (v.isNaN) {
+      anyNaN = true;
+      continue;
+    }
+    final a = v.abs();
+    abs[i] = a;
+    if (a > max) max = a;
+  }
   if (max == double.infinity) return double.infinity;
+  if (anyNaN) return double.nan;
   if (max == 0) return 0;
   var sum = 0.0;
   var compensation = 0.0;
-  for (final v in [ax, az]) {
-    final n = v / max;
+  for (final a in abs) {
+    final n = a / max;
     final summand = n * n - compensation;
     final preliminary = sum + summand;
     compensation = (preliminary - sum) - summand;
@@ -56,6 +72,9 @@ double hypot(double x, double z) {
   }
   return math.sqrt(sum) * max;
 }
+
+///  for finite doubles (-1, 0 or 1; 0 stays 0)
+double jsSign(double x) => x > 0 ? 1 : (x < 0 ? -1 : 0);
 
 // ---------------------------------------------------------------------------
 // fdlibm sin / cos — the implementation behind V8's Math.sin / Math.cos

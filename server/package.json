@@ -10,7 +10,8 @@
     "typecheck": "tsc -b",
     "fixtures:worldgen": "tsx scripts/dump-worldgen-fixtures.ts",
     "fixtures:protocol": "tsx scripts/dump-protocol-fixtures.ts",
-    "fixtures": "npm run fixtures:worldgen && npm run fixtures:protocol"
+    "fixtures": "npm run fixtures:worldgen && npm run fixtures:protocol && npm run fixtures:physics",
+    "fixtures:physics": "tsx scripts/dump-physics-fixtures.ts"
   },
   "dependencies": {
     "@inertiajs/react": "^2.0.0",
