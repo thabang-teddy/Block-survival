@@ -155,21 +155,18 @@ void main() {
     },
   );
 
-  test(
-    'sign-out revokes on the server and forgets locally even when the server is down',
-    () async {
-      await store.writeAccessToken('1|abc');
-      server.routes['POST /api/auth/logout'] = (_) => http.Response('', 204);
-      await auth.signOut();
-      expect(server.requests.single.headers['Authorization'], 'Bearer 1|abc');
-      expect(await store.readAccessToken(), isNull);
+  test('sign-out revokes on the server and forgets locally even when the server is down', () async {
+    await store.writeAccessToken('1|abc');
+    server.routes['POST /api/auth/logout'] = (_) => http.Response('', 204);
+    await auth.signOut();
+    expect(server.requests.single.headers['Authorization'], 'Bearer 1|abc');
+    expect(await store.readAccessToken(), isNull);
 
-      await store.writeAccessToken('2|def');
-      server.routes['POST /api/auth/logout'] = (_) => http.Response('', 500);
-      await auth.signOut();
-      expect(await store.readAccessToken(), isNull);
-    },
-  );
+    await store.writeAccessToken('2|def');
+    server.routes['POST /api/auth/logout'] = (_) => http.Response('', 500);
+    await auth.signOut();
+    expect(await store.readAccessToken(), isNull);
+  });
 
   test('device tokens look like the server expects', () {
     final token = newDeviceToken();

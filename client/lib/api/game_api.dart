@@ -11,7 +11,24 @@ import 'package:block_survival/api/api_client.dart';
 import 'package:block_survival/api/models.dart';
 import 'package:block_survival/world/seed.dart';
 
-final class GameApi {
+/// the endpoints the WebRTC transport needs, so it can be tested with a fake
+abstract interface class GameApiSignals {
+  Future<RoomInfo> resolveRoom(String code);
+  Future<void> signal(
+    String code, {
+    required String from,
+    required String to,
+    required String type,
+    required Map<String, dynamic> data,
+  });
+  Future<List<SignalRow>> signals(
+    String code, {
+    required String to,
+    required int after,
+  });
+}
+
+final class GameApi implements GameApiSignals {
   const GameApi(this._client);
 
   final ApiClient _client;
@@ -48,6 +65,7 @@ final class GameApi {
       _client.delete('/rooms/$code', {'host_peer_id': hostPeerId});
 
   /// the host's peer id — only for the host and accepted invitees, or anyone seated in the global world
+  @override
   Future<RoomInfo> resolveRoom(String code) async => RoomInfo.fromJson(
     (await _client.get('/rooms/$code')).json!['room'] as Map<String, dynamic>,
   );
@@ -94,6 +112,7 @@ final class GameApi {
   Future<void> declineInvite(int id) => _client.post('/invites/$id/decline');
 
   // ---- WebRTC signalling mailbox
+  @override
   Future<void> signal(
     String code, {
     required String from,
@@ -108,6 +127,7 @@ final class GameApi {
   });
 
   /// everything addressed to `to` with an id past `after`, oldest first
+  @override
   Future<List<SignalRow>> signals(
     String code, {
     required String to,

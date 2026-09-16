@@ -20,7 +20,7 @@ permissions:
 
 env:
   # pinned: flutter_gpu is preview API, a channel bump is a deliberate change (client/docs/tech.md)
-  FLUTTER_VERSION: '3.44.0'
+  FLUTTER_VERSION: '3.47.4'
 
 defaults:
   run:

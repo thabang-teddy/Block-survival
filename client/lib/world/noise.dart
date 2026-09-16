@@ -146,8 +146,12 @@ final class PerlinNoise {
 }
 
 /// 2-D fractal noise in roughly -1.5..1.5; `seed` picks a slice
-typedef Fractal2 =
-    double Function(double x, double z, double seed, double freq);
+typedef Fractal2 = double Function(
+  double x,
+  double z,
+  double seed,
+  double freq,
+);
 
 Fractal2 fractal2(PerlinNoise perlin) {
   return (x, z, seed, freq) {

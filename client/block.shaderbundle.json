@@ -1,0 +1,4 @@
+{
+  "ChunkVertex": { "type": "vertex", "file": "shaders/chunk.vert" },
+  "ChunkFragment": { "type": "fragment", "file": "shaders/chunk.frag" }
+}

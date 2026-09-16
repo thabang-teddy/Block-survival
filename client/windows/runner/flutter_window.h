@@ -6,6 +6,8 @@
 
 #include <memory>
 
+#include "mouse_capture.h"
+
 #include "win32_window.h"
 
 // A window that does nothing but host a Flutter view.
@@ -28,6 +30,9 @@ class FlutterWindow : public Win32Window {
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
+
+  // first-person mouse look (S3); lives as long as the engine does
+  std::unique_ptr<MouseCapture> mouse_capture_;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_
