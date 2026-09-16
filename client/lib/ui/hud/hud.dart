@@ -458,7 +458,9 @@ class _HudLayerState extends State<HudLayer> {
                           Text(
                             'WASD move · Shift sprint · Space jump · V camera · Tab scores',
                           ),
-                          Text('Left dig · Right place · 1–9 select · Q drop'),
+                          Text(
+                            'Left dig / swing · Right place · 1–9 select · Q drop',
+                          ),
                           Text(
                             'E inventory & crafting · F workbench / bed / loot · R reload · Esc pause',
                           ),

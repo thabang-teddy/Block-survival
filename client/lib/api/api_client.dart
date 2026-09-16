@@ -37,14 +37,14 @@ typedef TokenProvider = Future<String?> Function();
 
 final class ApiClient {
   ApiClient({
-    required Uri baseUrl,
+    required this.baseUrl,
     required this._token,
     http.Client? client,
     this.timeout = const Duration(seconds: 20),
-  }) : _base = baseUrl,
-       _http = client ?? http.Client();
+  }) : _http = client ?? http.Client();
 
-  final Uri _base;
+  /// the server's origin; the sign-in page can point the app elsewhere
+  Uri baseUrl;
   final TokenProvider _token;
   final http.Client _http;
   final Duration timeout;
@@ -52,8 +52,8 @@ final class ApiClient {
   /// called with 401 responses so the app can drop a token the server no longer honours
   void Function()? onUnauthenticated;
 
-  Uri url(String path, [Map<String, String>? query]) => _base.replace(
-    path: '${_base.path.replaceAll(RegExp(r'/$'), '')}/api$path',
+  Uri url(String path, [Map<String, String>? query]) => baseUrl.replace(
+    path: '${baseUrl.path.replaceAll(RegExp(r'/$'), '')}/api$path',
     queryParameters: query,
   );
 

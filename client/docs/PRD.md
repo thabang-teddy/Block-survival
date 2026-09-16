@@ -50,7 +50,7 @@ accounts, in the same rooms.
 | Global world | join / claim / leave queue | P3 |
 | UI | main menu, HUD, crafting panel, invites, pause, scoreboard, chat | P4 |
 | Input | desktop mouse look (captured) + keyboard; touch joystick + look-drag + buttons | Windows done, Android layer done, Linux backend pending (S3) |
-| Settings | render distance, sensitivity, server URL (dev) | P0/P4 |
+| Settings | render distance, sensitivity, server URL (on the sign-in page) | P0/P4 |
 
 **Cut list if time is short (in order):** rifle FX polish, third-person camera,
 global shared world, invites UI (join by code only).

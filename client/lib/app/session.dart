@@ -11,6 +11,7 @@ import 'package:block_survival/api/auth_api.dart';
 import 'package:block_survival/api/game_api.dart';
 import 'package:block_survival/api/models.dart';
 import 'package:block_survival/api/token_store.dart';
+import 'package:block_survival/app/settings.dart';
 import 'package:block_survival/world/seed.dart';
 import 'package:flutter/foundation.dart';
 
@@ -35,17 +36,22 @@ final class AppSession extends ChangeNotifier {
     required Uri serverUrl,
     required String deviceName,
     TokenStore? store,
+    SettingsStore? settings,
     ApiClient? client,
   }) : serverUrl = serverUrl,
-       _store = store ?? SecureTokenStore() {
+       _store = store ?? SecureTokenStore(),
+       _settings = settings ?? PrefsSettingsStore() {
     _client =
         client ?? ApiClient(baseUrl: serverUrl, token: _store.readAccessToken);
     auth = AuthApi(_client, _store, deviceName: deviceName);
     api = GameApi(_client);
   }
 
-  final Uri serverUrl;
+  /// the server this session talks to (the build default until a player
+  /// types another on the sign-in page; the choice is kept between launches)
+  Uri serverUrl;
   final TokenStore _store;
+  final SettingsStore _settings;
   late final ApiClient _client;
   late final AuthApi auth;
   late final GameApi api;
@@ -69,8 +75,26 @@ final class AppSession extends ChangeNotifier {
   WorldMeta? get ownWorld => worlds['own'];
   WorldMeta? get globalWorld => worlds['global'];
 
-  /// on launch: a stored token that the server still honours skips the sign-in page
+  /// Point the session at another server: the address is kept for next
+  /// time, and a token from the previous server is forgotten.
+  Future<void> setServerUrl(Uri url) async {
+    if (url == serverUrl) return;
+    serverUrl = url;
+    _client.baseUrl = url;
+    await _settings.writeServerUrl(url.toString());
+    await _store.writeAccessToken(null);
+    notifyListeners();
+  }
+
+  /// on launch: the server picked last time, then a stored token that it
+  /// still honours skips the sign-in page
   Future<void> restore() async {
+    final saved = await _settings.readServerUrl();
+    final savedUrl = saved == null ? null : Uri.tryParse(saved);
+    if (savedUrl != null && savedUrl != serverUrl) {
+      serverUrl = savedUrl;
+      _client.baseUrl = savedUrl;
+    }
     try {
       final me = await auth.me();
       if (me == null) {

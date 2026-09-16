@@ -5,6 +5,7 @@
 library;
 
 import 'package:block_survival/app/session.dart';
+import 'package:block_survival/app/settings.dart';
 import 'package:block_survival/ui/theme.dart';
 import 'package:flutter/material.dart';
 
@@ -20,21 +21,40 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+  late final _server = TextEditingController(
+    text: widget.session.serverUrl.toString(),
+  );
   bool _busy = false;
+  String _serverError = '';
 
   @override
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _server.dispose();
     super.dispose();
   }
 
   bool get _canSubmit =>
-      !_busy && _email.text.isNotEmpty && _password.text.isNotEmpty;
+      !_busy &&
+      _email.text.isNotEmpty &&
+      _password.text.isNotEmpty &&
+      _server.text.trim().isNotEmpty;
 
   Future<void> _submit() async {
     if (!_canSubmit) return;
-    setState(() => _busy = true);
+    final url = parseServerUrl(_server.text);
+    if (url == null) {
+      setState(
+        () => _serverError = 'Enter the server as http(s)://host[:port]',
+      );
+      return;
+    }
+    setState(() {
+      _serverError = '';
+      _busy = true;
+    });
+    await widget.session.setServerUrl(url);
     await widget.session.signIn(
       email: _email.text.trim(),
       password: _password.text,
@@ -89,7 +109,22 @@ class _LoginPageState extends State<LoginPage> {
           builder: (_, _) => ErrorLine(widget.session.lastError),
         ),
         const SizedBox(height: 16),
-        Fine('Server: ${widget.session.serverUrl}'),
+        const Fine('Server'),
+        const SizedBox(height: 4),
+        TextField(
+          controller: _server,
+          keyboardType: TextInputType.url,
+          autocorrect: false,
+          decoration: const InputDecoration(
+            hintText: 'https://your-server.example',
+          ),
+          onChanged: (_) => setState(() {}),
+          onSubmitted: (_) => _submit(),
+        ),
+        ErrorLine(_serverError),
+        const Fine(
+          'Where the game is hosted — the address you open in the browser.',
+        ),
       ],
     );
   }

@@ -330,15 +330,16 @@ final class Game implements SimHost {
     }
   }
 
-  /// Primary: weapons swing / fire; everything else digs the targeted block.
+  /// Primary: the rifle fires; anything else swings at what is in front (the
+  /// sword hard, hands and tools weakly) and, unless it is the sword, digs.
   void useItem() {
     final item = held?.id;
     if (item == 'rifle') {
       fire();
       return;
     }
+    act(Swing(viewRay()));
     if (item == 'sword') {
-      act(Swing(viewRay()));
       _swing();
       return;
     }

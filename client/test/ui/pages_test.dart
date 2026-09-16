@@ -9,6 +9,7 @@ import 'package:block_survival/api/api_client.dart';
 import 'package:block_survival/api/token_store.dart';
 import 'package:block_survival/app/launch.dart';
 import 'package:block_survival/app/session.dart';
+import 'package:block_survival/app/settings.dart';
 import 'package:block_survival/game/game.dart';
 import 'package:block_survival/game/ui_state.dart';
 import 'package:block_survival/net/host_session.dart';
@@ -50,6 +51,7 @@ AppSession _session(Map<String, http.Response Function(http.Request)> routes) {
     serverUrl: Uri.parse('https://game.test'),
     deviceName: 'test',
     store: store,
+    settings: MemorySettingsStore(),
     client: client,
   );
 }
@@ -110,13 +112,44 @@ void main() {
     });
     await tester.pumpWidget(_wrap(LoginPage(session: s)));
     expect(find.text('Sign in'), findsOneWidget);
-    await tester.enterText(find.byType(TextField).first, 't@example.com');
-    await tester.enterText(find.byType(TextField).last, 'nope');
+    await tester.enterText(find.byType(TextField).at(0), 't@example.com');
+    await tester.enterText(find.byType(TextField).at(1), 'nope');
     await tester.pump(); // the button enables once both fields have text
     await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await tester.pumpAndSettle();
     expect(find.text('Wrong email or password.'), findsOneWidget);
     expect(s.state, isNot(AuthState.signedIn));
+  });
+
+  testWidgets('the server field points the session at another host', (
+    tester,
+  ) async {
+    final s = _session({
+      'POST /api/auth/token': (_) =>
+          _ok({'message': 'Wrong email or password.'}, 422),
+    });
+    await tester.pumpWidget(_wrap(LoginPage(session: s)));
+    final server = find.byType(TextField).at(2);
+    expect(
+      tester.widget<TextField>(server).controller!.text,
+      'https://game.test',
+    );
+    await tester.enterText(find.byType(TextField).at(0), 't@example.com');
+    await tester.enterText(find.byType(TextField).at(1), 'pw');
+    // a bad address is refused before anything is sent
+    await tester.enterText(server, 'not a url');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Enter the server as'), findsOneWidget);
+    expect(s.serverUrl.toString(), 'https://game.test');
+    // a bare host becomes an http origin and is remembered
+    await tester.enterText(server, 'play.example.com/');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await tester.pumpAndSettle();
+    expect(s.serverUrl.toString(), 'http://play.example.com');
+    expect(await s.auth.me(), isNull); // the old token was dropped
   });
 
   testWidgets('a device waiting for approval parks on the approval page', (

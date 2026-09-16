@@ -108,19 +108,37 @@ void main() {
         final z = s.zombies.spawn(ZombieKind.basic, 2.5, 1, 0.5);
         s.apply(me, Swing(rayPlusX(me)));
         expect(z.hp, 10);
-        expect(z.vx, SwordTuning.knockback);
+        expect(z.vx, swordTuning.knockback);
         // behind us: untouched
         final behind = s.zombies.spawn(ZombieKind.basic, -1.5, 1, 0.5);
         s.apply(me, Swing(rayPlusX(me)));
         expect(behind.hp, 30);
         expect(z.state, ZombieState.dead);
         expect(me.kills, 1);
-        // no sword in hand: nothing happens
+        // no sword in hand: nothing happens behind us either way
         me.slot = 1;
         s.apply(me, Swing(rayPlusX(me)));
         expect(behind.hp, 30);
       },
     );
+
+    test('bare hands and tools still hit, weakly and only up close', () {
+      final (s, h) = sim();
+      final me = h.localAvatar;
+      final near = s.zombies.spawn(ZombieKind.basic, 1.9, 1, 0.5);
+      final far = s.zombies.spawn(ZombieKind.basic, 2.9, 1, 0.5);
+      s.apply(me, Swing(rayPlusX(me)));
+      expect(near.hp, 30 - fistsTuning.damage);
+      expect(near.vx, fistsTuning.knockback);
+      expect(far.hp, 30); // within a sword's reach, not a fist's
+      me.inventory.add('pickaxe_wood', 1);
+      s.apply(me, Swing(rayPlusX(me)));
+      expect(near.hp, 30 - 2 * fistsTuning.damage);
+      // the rifle never swings
+      me.inventory.replace([const ItemStack('rifle', 1)]);
+      s.apply(me, Swing(rayPlusX(me)));
+      expect(near.hp, 30 - 2 * fistsTuning.damage);
+    });
 
     test('the rifle needs a loaded magazine, reloads from ammo and hits the first zombie on the ray', () {
       final (s, h) = sim();

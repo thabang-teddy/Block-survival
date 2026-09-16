@@ -87,8 +87,10 @@ reference for ours), `pointer_lock` (macOS/web only — our runners implement th
 - Windows MSIX: a code-signing certificate (or Azure Trusted Signing) as a
   secret; unsigned builds are blocked by Smart App Control on stock Windows 11
   (seen during S1 — testers must allow the exe or receive a signed build).
-- No secrets in Dart source; the server URL is a `--dart-define`
-  (`BS_SERVER_URL`) with a dev default.
+- No secrets in Dart source; the server URL defaults to the `--dart-define`
+  (`BS_SERVER_URL`, dev default the Herd site) and the player can change it
+  on the sign-in page (kept in `shared_preferences`; changing it drops the
+  token from the previous server).
 
 ## Packaging
 

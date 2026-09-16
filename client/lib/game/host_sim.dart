@@ -38,11 +38,31 @@ abstract final class RifleTuning {
   static const double kick = 0.012;
 }
 
-abstract final class SwordTuning {
-  static const double damage = 20;
-  static const double reach = 2.5;
-  static const double knockback = 6;
+/// what a swing does; the sword hits hard, bare hands and tools weakly
+final class MeleeTuning {
+  const MeleeTuning({
+    required this.damage,
+    required this.reach,
+    required this.knockback,
+  });
+
+  final double damage;
+  final double reach;
+  final double knockback;
 }
+
+const MeleeTuning swordTuning = MeleeTuning(
+  damage: 20,
+  reach: 2.5,
+  knockback: 6,
+);
+
+/// bare hands or whatever tool is held: you can always fight back, just not well
+const MeleeTuning fistsTuning = MeleeTuning(
+  damage: 5,
+  reach: 2.0,
+  knockback: 3,
+);
 
 /// cos(π/6): the half-angle a swing covers
 final double swordArcCos = math.cos(math.pi / 6);
@@ -486,7 +506,8 @@ final class HostSim implements ZombieHost {
   }
 
   void doSwing(Avatar a, Ray r) {
-    if (a.dead || a.heldItem != 'sword') return;
+    if (a.dead || a.heldItem == 'rifle') return;
+    final m = a.heldItem == 'sword' ? swordTuning : fistsTuning;
     final o = r.origin;
     final d = r.direction;
     for (final z in zombies.zombies) {
@@ -495,16 +516,16 @@ final class HostSim implements ZombieHost {
       final vy = z.y + 1 - o.y;
       final vz = z.z - o.z;
       final dist = hypot3(vx, vy, vz);
-      if (dist > SwordTuning.reach) continue;
+      if (dist > m.reach) continue;
       if ((vx * d.x + vy * d.y + vz * d.z) / (dist == 0 ? 1 : dist) <
           swordArcCos) {
         continue;
       }
       if (zombies.damage(
         z,
-        SwordTuning.damage,
-        knockX: d.x * SwordTuning.knockback,
-        knockZ: d.z * SwordTuning.knockback,
+        m.damage,
+        knockX: d.x * m.knockback,
+        knockZ: d.z * m.knockback,
       )) {
         a.kills++;
       }

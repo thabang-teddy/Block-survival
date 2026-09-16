@@ -59,6 +59,8 @@ export const BENCH_REACH = 3
 const MESSAGE_SECONDS = 2.5
 const RIFLE = { damage: 12, headshot: 2, interval: 0.12, reloadSeconds: 2, range: 80, kick: 0.012 } as const
 const SWORD = { damage: 20, reach: 2.5, arcCos: Math.cos(Math.PI / 6), knockback: 6 } as const
+/** bare hands or whatever tool is held: you can always fight back, just not well */
+const FISTS = { damage: 5, reach: 2.0, arcCos: Math.cos(Math.PI / 6), knockback: 3 } as const
 const ADS = { fov: 20, normalFov: 75, speed: 12 } as const
 const POISON = { seconds: 5, dps: 2 } as const
 /** groups arrive during the first 70 % of the night */
@@ -718,16 +720,17 @@ export class Game {
   }
 
   private doSwing(a: Avatar, r: Ray): void {
-    if (a.dead || a.heldItem !== 'sword') return
+    if (a.dead || a.heldItem === 'rifle') return
+    const m = a.heldItem === 'sword' ? SWORD : FISTS
     for (const z of this.zombies.zombies) {
       if (z.state !== 'chase' && z.state !== 'attack') continue
       const vx = z.x - r.ox
       const vy = z.y + 1 - r.oy
       const vz = z.z - r.oz
       const d = Math.hypot(vx, vy, vz)
-      if (d > SWORD.reach) continue
-      if ((vx * r.dx + vy * r.dy + vz * r.dz) / (d || 1) < SWORD.arcCos) continue
-      if (this.zombies.damage(z, SWORD.damage, r.dx * SWORD.knockback, r.dz * SWORD.knockback)) a.kills++
+      if (d > m.reach) continue
+      if ((vx * r.dx + vy * r.dy + vz * r.dz) / (d || 1) < m.arcCos) continue
+      if (this.zombies.damage(z, m.damage, r.dx * m.knockback, r.dz * m.knockback)) a.kills++
     }
   }
 
@@ -922,11 +925,11 @@ export class Game {
     else if (t.block === BLOCK.bed) this.act({ t: 'interact', x: t.x, y: t.y, z: t.z, block: t.block, crate: null })
   }
 
-  /** Left click: weapons swing/fire; everything else digs (hold to continue). */
+  /** Left click: the rifle fires; anything else swings at what is in front (the sword hard, hands and tools weakly) and, unless it is the sword, digs while held. */
   private useItem(): void {
     const held = this.heldItem
     if (held === 'rifle') { this.fire(); return }
-    if (held === 'sword') this.act({ t: 'swing', ...this.viewRay() })
+    this.act({ t: 'swing', ...this.viewRay() })
     this.swing()
   }
 

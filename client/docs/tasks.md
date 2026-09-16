@@ -17,7 +17,7 @@ same PR and `client.yml` fails on drift.
 | ✅ | Protocol fixtures + msgpack codec | `test/net/protocol_fixtures_test.dart` |
 | ✅ | Shader build hook (`impellerc` via `flutter_gpu_shaders`) | Windows build produces the bundle |
 | ✅ | Flutter version pinned (3.47.4), Impeller + Flutter GPU switched on per runner | app starts on Windows |
-| ⬜ | Settings storage (`shared_preferences`): render distance, sensitivity, server URL | unit test with in-memory prefs |
+| ◐ | Settings storage (`shared_preferences`): render distance, sensitivity, server URL | server URL typed on the sign-in page, kept in `SettingsStore` (`lib/app/settings.dart`); ⬜ render distance, sensitivity |
 | ⬜ | Play Console app + upload key; MSIX signing decision | secrets in place, dry-run release job |
 | ⬜ | Sentry wired, off in debug | crash in a debug build not reported |
 
