@@ -46,6 +46,12 @@ class GlobalWorldTest extends TestCase
     }
 
     // ------------------------------------------------------------ entering
+    public function test_presence_is_readable_by_any_signed_in_player(): void
+    {
+        $this->signIn($this->player('Ann'))->getJson('/api/global/presence')
+            ->assertOk()->assertExactJson(['online' => 0, 'host_name' => null]);
+    }
+
     public function test_the_first_player_in_hosts_and_the_next_joins_their_room(): void
     {
         $ana = $this->player('Ana');

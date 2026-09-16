@@ -28,7 +28,8 @@ abstract interface class GameApiSignals {
   });
 }
 
-final class GameApi implements GameApiSignals {
+// not final: tests implement it with a fake
+class GameApi implements GameApiSignals {
   const GameApi(this._client);
 
   final ApiClient _client;
@@ -71,6 +72,8 @@ final class GameApi implements GameApiSignals {
   );
 
   // ---- the shared global world
+  Future<GlobalPresence> presence() async =>
+      GlobalPresence.fromJson((await _client.get('/global/presence')).json!);
   Future<GlobalState> joinGlobal() async =>
       GlobalState.fromJson((await _client.post('/global/join')).json!);
   Future<GlobalState> claimGlobal() async =>

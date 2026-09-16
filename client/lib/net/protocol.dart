@@ -8,7 +8,10 @@ library;
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:block_survival/items/inventory.dart';
 import 'package:block_survival/net/msgpack.dart';
+
+export 'package:block_survival/items/inventory.dart' show ItemStack;
 
 const int protocolVersion = 1;
 const int inputHz = 30;
@@ -285,18 +288,6 @@ final class BlockEdit {
     'id': id,
     if (meta != null) 'meta': meta!.toMap(),
   };
-}
-
-final class ItemStack {
-  const ItemStack(this.id, this.count);
-
-  factory ItemStack.fromMap(Json j) =>
-      ItemStack(j['id'] as String, _i(j['count']));
-
-  final String id;
-  final int count;
-
-  Json toMap() => {'id': id, 'count': count};
 }
 
 final class Fx {
@@ -703,7 +694,7 @@ final class PrivateState extends HostMessage {
   factory PrivateState.fromMap(Json j) => PrivateState(
     inventory: j.containsKey('inventory')
         ? (j['inventory'] as List)
-              .map((s) => s == null ? null : ItemStack.fromMap(s as Json))
+              .map((s) => s == null ? null : ItemStack.fromJson(s as Json))
               .toList()
         : null,
     magazine: j['magazine'] == null ? null : _i(j['magazine']),
@@ -742,7 +733,7 @@ final class PrivateState extends HostMessage {
   Json toMap() {
     final fields = <String, Object?>{
       if (inventory != null)
-        'inventory': inventory!.map((s) => s?.toMap()).toList(),
+        'inventory': inventory!.map((s) => s?.toJson()).toList(),
       if (magazine != null) 'magazine': magazine,
       if (reloading != null) 'reloading': reloading,
       if (health != null) 'health': health,

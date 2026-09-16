@@ -166,6 +166,21 @@ final class GlobalPending extends GlobalState {
   final String hostName;
 }
 
+/// who is in the shared global world right now (the lobby card)
+final class GlobalPresence {
+  const GlobalPresence({required this.online, this.hostName});
+
+  factory GlobalPresence.fromJson(Map<String, dynamic> j) => GlobalPresence(
+    online: j['online'] as int,
+    hostName: j['host_name'] as String?,
+  );
+
+  static const empty = GlobalPresence(online: 0);
+
+  final int online;
+  final String? hostName;
+}
+
 final class LeaderboardRow {
   const LeaderboardRow({required this.name, required this.score});
 

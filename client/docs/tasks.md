@@ -37,22 +37,22 @@ The code review of the token flow suggested that a sign-in on an *already approv
 | ⬜ | Meshing on an isolate; main-isolate re-mesh for edits | frame-time p95 unchanged with 6-chunk radius |
 | ✅ | `raycast.ts` port (dig/place targeting) | `fixtures/physics/raycast.json`, 224 rays |
 | ✅ | `aabb.ts` + `playerController.ts` port, same fixed timestep, updraft lift | `npm run fixtures:physics`: 828 scripted ticks, byte-identical |
-| ⬜ | `DayNight` clock → lighting phase, sun direction | unit test on phase boundaries |
+| ✅ | `DayNight` clock → lighting phase, sun direction | `test/game/day_night_test.dart` |
 | ⬜ | glTF loader (meshes, skins, animations) + skinned shader; zombie GLB playing its clip (the S1 item not yet done) | golden render test on Windows CI |
 | ⬜ | Keyboard bindings (`Input.ts` twin), gamepad stub | unit tests |
-| ◐ | Walk on the real world with collision, dig and place a block | walking works in the spike page (controller-driven); dig/place + integration test open |
+| ◐ | Walk on the real world with collision, dig and place a block | walk, dig (drops to inventory) and place (from the hotbar) work in the play page; ⬜ hardness-timed breaking, integration test |
 
 ## P2 — Game rules
 
 | | Task | Test |
 |---|---|---|
 | ⬜ | Move `items/registry.ts` + `recipes.ts` tables to `shared/data/{items,recipes}.json`; both clients load them | Vitest + Dart tests read the same files |
-| ⬜ | Inventory, hotbar, crafting | port `items/__tests__` |
+| ✅ | Inventory, hotbar, crafting (Dart tables for now) | `test/items/items_test.dart` |
 | ⬜ | Drops, crates | port `entities/__tests__` |
 | ⬜ | Zombies + pathfinding, spawning at night | port tests; determinism fixture for pathfinding |
 | ⬜ | Combat: sword swing, rifle fire/reload, damage, poison | port tests |
 | ⬜ | Death → crate → respawn, score, leaderboard post | port `game/__tests__` |
-| ⬜ | Save v3 (`saveState.ts`, `saveMigrate.ts`), autosave, local cache, `PUT /api/world` on pause | round-trip fixtures against the TS save; live save/load test |
+| ◐ | Save v3 (`saveState.ts`, `saveMigrate.ts`), autosave, local cache, `PUT /api/world` on pause | `lib/game/save.dart` parses/builds v3 and carries unknown parts through; autosave every 60 s and on leave; ⬜ round-trip fixtures, local cache |
 | ⬜ | `Game.ts` split into loop / session / save / score / visitors | each ≤ 400 lines |
 
 ## P3 — Multiplayer
@@ -61,10 +61,10 @@ The code review of the token flow suggested that a sign-in on an *already approv
 |---|---|---|
 | ✅ | Signaller + Host/Client transports on `flutter_webrtc` | in-memory handshake tests |
 | ⬜ | `SnapshotBuffer` (interpolation delay 100 ms) | port `net.test.ts` cases |
-| ⬜ | `HostSession` / `ClientSession` (hello/welcome/full, input @30 Hz, snap @20 Hz, private state, blocks, chat) | protocol fixtures + session tests |
-| ⬜ | Rooms: create, heartbeat, close; invites: list, send, accept, decline | API tests with scripted client |
+| ◐ | `HostSession` / `ClientSession` (hello/welcome/full, input @30 Hz, snap @20 Hz, private state, blocks, chat) | hello/welcome/full/bye, blocks, snapshots with players, chat; ⬜ zombies/drops/crates in snapshots, per-client inventory, session tests |
+| ✅ | Rooms: create, heartbeat, close; invites: list, send, accept, decline | `Launcher` + `InvitePanel`; page tests against a scripted server |
 | ⬜ | Remote player rendering (animated avatars) | golden render |
-| ⬜ | Global world join/claim/leave + host handover | tests against `GlobalWorldTest` semantics |
+| ◐ | Global world join/claim/leave + host handover | `Launcher.enterGlobal/handover` mirror globalWorld.ts; ⬜ the HUD does not yet trigger the handover on host-left |
 | ⬜ | **Cross-play E2E**: browser peer (Playwright) + native peer in one room, both see one block edit | manual first, then CI |
 | ⬜ | NAT check: desktop behind a home router reaches a browser host (STUN only) | manual, documented |
 
@@ -72,11 +72,11 @@ The code review of the token flow suggested that a sign-in on an *already approv
 
 | | Task | Test |
 |---|---|---|
-| ⬜ | Riverpod state (`uiStore.ts` twin) | unit tests |
-| ⬜ | Main menu (sign-in, pending approval, worlds, rooms, invites) | widget tests + goldens at phone / 1080p / small laptop |
-| ⬜ | HUD (health, hotbar, crosshair, night counter, chat) | goldens |
-| ⬜ | Crafting panel, invite panel, pause, scoreboard | goldens |
-| ⬜ | Touch action buttons (jump, dig, place, interact, hotbar) | widget tests |
+| ✅ | UI state (`uiStore.ts` twin) — `GameUiState` + `AppSession` on ChangeNotifier (no Riverpod needed yet) | page tests |
+| ✅ | Sign-in, pending approval, lobby (worlds, global world, invitations, leaderboard) | `test/ui/pages_test.dart`; ⬜ goldens at three breakpoints |
+| ✅ | HUD (logo, room code, timer, position, health/stamina, ammo, toast, crosshair, hotbar, death, scoreboard, connection overlay) | page test; ⬜ goldens |
+| ✅ | Crafting panel, invite panel, pause, scoreboard | page test; ⬜ goldens |
+| ✅ | Touch controls with visible indicators: resting joystick, outlined look zone, labelled jump/sprint/dig/place/use, ☰ pause | `test/input/touch_controls_test.dart`; ⬜ hotbar tap-to-select on touch |
 | ⬜ | Linux mouse capture backend (X11 first, Wayland shim) | manual on Linux, both sessions |
 | ⬜ | Accessibility pass: text scale, contrast, reduced motion for updraft FX | manual checklist |
 

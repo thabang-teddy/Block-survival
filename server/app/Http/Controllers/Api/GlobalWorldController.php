@@ -17,6 +17,12 @@ class GlobalWorldController extends Controller
 {
     public function __construct(private readonly GlobalWorld $world) {}
 
+    /** who is in the shared world right now — the lobby card (the web page gets this as an Inertia prop) */
+    public function presence(): JsonResponse
+    {
+        return response()->json($this->world->presence());
+    }
+
     public function join(Request $request): JsonResponse
     {
         return $this->answer(fn () => $this->world->join($request->user()));

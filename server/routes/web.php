@@ -79,6 +79,7 @@ Route::middleware(['auth:sanctum', 'access'])->group(function () {
         Route::get('/leaderboard', [ScoreController::class, 'leaderboard']);
         Route::post('/scores', [ScoreController::class, 'store']);
         // the shared global world: enter its queue, ask who hosts now, leave
+        Route::get('/global/presence', [GlobalWorldController::class, 'presence']);
         Route::post('/global/join', [GlobalWorldController::class, 'join']);
         Route::post('/global/claim', [GlobalWorldController::class, 'claim']);
         Route::post('/global/leave', [GlobalWorldController::class, 'leave']);

@@ -1,5 +1,5 @@
 import 'package:block_survival/input/touch_controls.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -55,27 +55,100 @@ void main() {
     expect(a.dy, closeTo(0.5, 1e-9)); // drag up looks up
   });
 
-  testWidgets('the overlay routes pointer events and draws the joystick', (
+  test('buttons: sprint is held, the others are taps that drain on take', () {
+    final c = TouchControls();
+    c.press(TouchAction.sprint);
+    c.press(TouchAction.jump);
+    c.press(TouchAction.dig);
+    var input = c.take();
+    expect(input.held, {TouchAction.sprint});
+    expect(input.taps, [TouchAction.jump, TouchAction.dig]);
+    input = c.take();
+    expect(input.held, {TouchAction.sprint}, reason: 'still held');
+    expect(input.taps, isEmpty, reason: 'taps drained');
+    c.release(TouchAction.sprint);
+    expect(c.take().held, isEmpty);
+  });
+
+  testWidgets('every control is visible while idle, with labels', (
     tester,
   ) async {
     final controls = TouchControls();
     await tester.pumpWidget(
-      Directionality(
-        textDirection: TextDirection.ltr,
-        child: SizedBox(
+      MaterialApp(
+        home: SizedBox(
           width: 800,
           height: 400,
           child: TouchControlsLayer(controls: controls),
         ),
       ),
     );
-    final gesture = await tester.startGesture(const Offset(100, 300));
-    await gesture.moveTo(const Offset(140, 300));
+    for (final label in [
+      'move',
+      'swipe here to look',
+      'jump',
+      'sprint',
+      'dig',
+      'place',
+      'use',
+    ]) {
+      expect(find.text(label), findsOneWidget, reason: label);
+    }
+  });
+
+  testWidgets('the overlay routes pointer events and draws the joystick', (
+    tester,
+  ) async {
+    final controls = TouchControls();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SizedBox(
+          width: 800,
+          height: 400,
+          child: TouchControlsLayer(controls: controls),
+        ),
+      ),
+    );
+    final gesture = await tester.startGesture(const Offset(100, 200));
+    await gesture.moveTo(const Offset(140, 200));
     await tester.pump();
     expect(controls.take().move.dx, greaterThan(0.5));
-    expect(find.byType(CustomPaint), findsWidgets);
+    expect(controls.joystickOrigin, const Offset(100, 200));
     await gesture.up();
     await tester.pump();
     expect(controls.joystickOrigin, isNull);
+  });
+
+  testWidgets('buttons feed the controls and do not start a look drag', (
+    tester,
+  ) async {
+    final controls = TouchControls();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SizedBox(
+          width: 800,
+          height: 400,
+          child: TouchControlsLayer(controls: controls),
+        ),
+      ),
+    );
+    await tester.tap(find.text('jump'));
+    await tester.pump();
+    expect(controls.take().taps, [TouchAction.jump]);
+
+    final sprint = await tester.startGesture(
+      tester.getCenter(find.text('sprint')),
+    );
+    await tester.pump();
+    expect(controls.take().held, {TouchAction.sprint});
+    expect(
+      controls.isLooking,
+      isFalse,
+      reason: 'a button press is not a look drag',
+    );
+    await sprint.up();
+    await tester.pump();
+    expect(controls.take().held, isEmpty);
+    expect(find.text('sprinting'), findsNothing);
   });
 }

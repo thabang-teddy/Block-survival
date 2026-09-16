@@ -34,8 +34,43 @@ final class FakeMailbox {
       rows.where((r) => r.id > after && _to[r.id] == to).take(page).toList();
 }
 
-/// only the endpoints the transport uses
-final class FakeSignalApi implements GameApiSignals {
+/// the endpoints the transport and the sessions use; anything else throws
+final class FakeSignalApi implements GameApi {
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('FakeSignalApi: ${invocation.memberName}');
+
+  final List<String> rooms = [];
+
+  @override
+  Future<RoomInfo> createRoom(
+    String code,
+    String hostPeerId,
+    String hostName, {
+    WorldKind worldKind = WorldKind.own,
+  }) async {
+    rooms.add(code);
+    return RoomInfo(
+      code: code,
+      hostPeerId: hostPeerId,
+      hostName: hostName,
+      worldKind: worldKind,
+      players: 1,
+      expiresAt: '',
+    );
+  }
+
+  @override
+  Future<void> refreshRoom(
+    String code,
+    String hostPeerId,
+    int players, {
+    List<int> userIds = const [],
+  }) async {}
+
+  @override
+  Future<void> closeRoom(String code, String hostPeerId) async {}
+
   FakeSignalApi(this.mailbox, {this.hostPeerId = 'hostAAAAAAAA'});
 
   final FakeMailbox mailbox;

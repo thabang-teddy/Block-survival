@@ -23,22 +23,22 @@ the fixtures in `shared/`; Flutter-facing code sits under `lib/render`,
 | `world/chunkStreamer.ts` | `lib/world/chunk_streamer.dart` | P1 | the spike page has an inline version |
 | `world/raycast.ts` | `lib/world/raycast.dart` | P1 | |
 | `physics/aabb.ts`, `playerController.ts` | `lib/physics/` | P1 | same fixed timestep; add fixtures (`npm run fixtures:physics`) |
-| `game/DayNight.ts` | `lib/game/day_night.dart` | P1 | |
+| `game/DayNight.ts` | `lib/game/day_night.dart` | done | |
 | `entities/zombies.ts`, `pathfinding.ts`, `drops.ts`, `crates.ts` | `lib/entities/` | P2 | |
-| `items/registry.ts`, `recipes.ts`, `inventory.ts` | `lib/items/` | P2 | registry + recipes to move into `shared/data/*.json` for both clients |
-| `game/Game.ts` (1063 lines) | `lib/game/{loop,session,save,score,visitors}.dart` | P2/P3 | never one file |
-| `game/saveState.ts`, `autosave.ts`, `net/saveMigrate.ts` | `lib/game/save*.dart` | P2 | save version 3, gzipped JSON |
+| `items/registry.ts`, `recipes.ts`, `inventory.ts` | `lib/items/` | done | registry + recipes still to move into `shared/data/*.json` for both clients |
+| `game/Game.ts` (1063 lines) | `lib/game/game.dart` (world, player, clock, inventory, dig/place/craft, saves, UI snapshot) + `lib/net/*_session.dart` | partial | zombies, combat, drops, crates are P2 |
+| `game/saveState.ts`, `autosave.ts`, `net/saveMigrate.ts` | `lib/game/save.dart`, autosave in `play_page.dart` | partial | v3 only (the browser migrates older saves before upload) |
 | `net/protocol.ts` | `lib/net/protocol.dart`, `lib/net/msgpack.dart` | done | byte-identical to msgpackr |
 | `net/transport.ts` | `lib/net/signaller.dart`, `lib/net/transport.dart`, `lib/net/rtc*.dart` | done | `flutter_webrtc` behind `RtcFactory` |
 | `net/SnapshotBuffer.ts` | `lib/net/snapshot_buffer.dart` | P3 | |
-| `net/HostSession.ts`, `ClientSession.ts` | `lib/net/host_session.dart`, `client_session.dart` | P3 | |
+| `net/HostSession.ts`, `ClientSession.ts` | `lib/net/host_session.dart`, `client_session.dart` | partial | hello/welcome, blocks, snapshots, chat; the sim parts come with P2 |
 | `net/api.ts` | `lib/api/{api_client,auth_api,game_api,models,token_store}.dart` | done | bearer token instead of session |
-| `net/globalWorld.ts` | `lib/api/game_api.dart` (join/claim/leave) + `lib/game/global_world.dart` | P3 | |
+| `net/globalWorld.ts` | `lib/app/launch.dart` (`Launcher.enterGlobal/handover`) | done | |
 | `render/ChunkRenderer.ts`, `Lighting.tsx` | `lib/render/chunk_renderer.dart`, `lighting.dart`, `camera.dart` | done | flutter_gpu; shaders in `shaders/` |
 | `render/ZombieRenderer.ts`, `RemotePlayerRenderer.ts`, `PropRenderer.ts`, `PlayerBody.tsx`, `ViewModel.ts` | `lib/render/gltf/`, `lib/render/skinned_renderer.dart` | P1/P2 | own glTF loader + skinning (flutter_scene's source as reference) |
 | `render/UpdraftRenderer.ts`, `CombatFx.ts`, `Effects.tsx` | `lib/render/fx/` | P2 | |
 | `input/Input.ts` | `lib/input/mouse_capture.dart`, `touch_controls.dart`, `lib/input/bindings.dart` | done / P1 | per-platform adapters |
-| `ui/*`, `state/uiStore.ts` | `lib/ui/` with **Riverpod** | P4 | chosen over Bloc: less ceremony for a game HUD that reads many small pieces of state |
+| `ui/*`, `state/uiStore.ts` | `lib/ui/pages`, `lib/ui/hud`, `lib/game/ui_state.dart`, `lib/app/session.dart` | done | plain `ChangeNotifier` + `ListenableBuilder`: two notifiers cover it, no Riverpod yet |
 
 ## Threading
 

@@ -7,6 +7,9 @@ import 'package:block_survival/api/api_client.dart';
 import 'package:block_survival/api/models.dart';
 import 'package:block_survival/api/token_store.dart';
 
+/// what `GET /api/auth/me` returns: the account and its two world summaries
+typedef Me = ({ApiUser user, Map<String, WorldMeta?> worlds});
+
 /// what sign-in produced
 sealed class SignInResult {
   const SignInResult();
@@ -76,11 +79,23 @@ final class AuthApi {
   }
 
   /// who the stored token belongs to, or null when there is no usable token
-  Future<ApiUser?> me() async {
+  Future<ApiUser?> me() async => (await meWithWorlds())?.user;
+
+  /// the account plus the lobby's world summaries (own / global)
+  Future<Me?> meWithWorlds() async {
     if (await _store.readAccessToken() == null) return null;
     try {
-      final res = await _client.get('/auth/me');
-      return ApiUser.fromJson(res.json!['user'] as Map<String, dynamic>);
+      final json = (await _client.get('/auth/me')).json!;
+      final worlds = (json['worlds'] as Map<String, dynamic>? ?? const {});
+      return (
+        user: ApiUser.fromJson(json['user'] as Map<String, dynamic>),
+        worlds: {
+          for (final k in const ['own', 'global'])
+            k: worlds[k] == null
+                ? null
+                : WorldMeta.fromJson(worlds[k] as Map<String, dynamic>),
+        },
+      );
     } on ApiError catch (e) {
       if (e.unauthenticated || e.status == 403) {
         await _store.writeAccessToken(null);
