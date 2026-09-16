@@ -8,6 +8,7 @@ import 'package:block_survival/api/api_client.dart';
 import 'package:block_survival/api/game_api.dart';
 import 'package:block_survival/api/models.dart';
 import 'package:block_survival/game/game.dart';
+import 'package:block_survival/game/rules.dart';
 import 'package:block_survival/game/save.dart';
 import 'package:block_survival/game/ui_state.dart';
 import 'package:block_survival/net/client_session.dart';
@@ -60,6 +61,16 @@ final class Launcher {
   final Future<void> Function(Duration) _sleep;
   final DateTime Function() _now;
 
+  /// the admin's clock and zombie schedule; a server without the endpoint
+  /// (or a failed call) means the defaults
+  Future<GameRules> _rules() async {
+    try {
+      return await api.rules();
+    } on ApiError {
+      return GameRules.defaults;
+    }
+  }
+
   /// the player's own saved world, if there is one; the host continues from it
   Future<SaveData?> _restoreOwn(bool hasSave) async {
     if (!hasSave) return null;
@@ -74,6 +85,7 @@ final class Launcher {
       local: player,
       role: Role.host,
       worldKind: WorldKind.own,
+      rules: await _rules(),
       restore: restore,
     );
     final session = HostSession(api, rtc)..attach(game);
@@ -89,6 +101,7 @@ final class Launcher {
       local: player,
       role: Role.host,
       worldKind: WorldKind.own,
+      rules: await _rules(),
       restore: restore,
     );
     session.attach(game);
@@ -121,6 +134,7 @@ final class Launcher {
       local: player,
       role: Role.client,
       worldKind: worldKind,
+      rules: welcome.rules ?? await _rules(),
     );
     game.dayNight.time = welcome.time;
     for (final e in welcome.edits) {
@@ -204,6 +218,7 @@ final class Launcher {
       local: player,
       role: Role.host,
       worldKind: WorldKind.global,
+      rules: await _rules(),
       restore: restore,
     );
     session.attach(game);

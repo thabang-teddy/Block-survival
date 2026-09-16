@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Score;
 use App\Services\GlobalWorld;
+use App\Support\GameRules;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -30,6 +31,8 @@ class PlayController extends Controller
             'worlds' => fn () => $user?->worldsMeta() ?? ['own' => null, 'global' => null],
             // who is in the shared global world right now
             'presence' => fn () => $global->presence(),
+            // the admin's day/night clock and zombie schedule
+            'rules' => GameRules::fromSettings()->toArray(),
         ]);
     }
 }

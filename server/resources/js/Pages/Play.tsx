@@ -8,12 +8,15 @@ import { usePage } from '@inertiajs/react'
 import { Scene } from '../render/Scene'
 import { Hud } from '../ui/Hud'
 import { api } from '../net/api'
+import { parseRules, setCurrentRules } from '../game/rules'
 import type { PlayProps } from '../net/pageProps'
 
 export default function Play() {
-  const { auth } = usePage<PlayProps>().props
+  const { auth, rules } = usePage<PlayProps>().props
   // the game's API client needs to know whether it may post scores / autosave
   useEffect(() => { api.setUser(auth.user) }, [auth.user])
+  // the admin's clock and zombie schedule, before any Game is built
+  setCurrentRules(parseRules(rules))
 
   return (
     <>

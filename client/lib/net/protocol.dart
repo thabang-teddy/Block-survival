@@ -8,6 +8,7 @@ library;
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:block_survival/game/rules.dart';
 import 'package:block_survival/items/inventory.dart';
 import 'package:block_survival/net/msgpack.dart';
 
@@ -593,6 +594,9 @@ sealed class HostMessage {
       time: _d(j['time']),
       edits: _edits(j['edits']),
       spawn: Vec3.fromMap(j['spawn'] as Json),
+      rules: j['rules'] == null
+          ? null
+          : GameRules.fromJson((j['rules'] as Map).cast<String, dynamic>()),
     ),
     'snap' => Snapshot(
       time: _d(j['time']),
@@ -625,6 +629,7 @@ final class Welcome extends HostMessage {
     required this.time,
     required this.edits,
     required this.spawn,
+    this.rules,
   });
 
   final int v;
@@ -633,6 +638,9 @@ final class Welcome extends HostMessage {
   final double time;
   final List<BlockEdit> edits;
   final Vec3 spawn;
+
+  /// the host's game rules (absent from hosts older than the rules feature)
+  final GameRules? rules;
 
   @override
   Json toMap() => {
@@ -643,6 +651,7 @@ final class Welcome extends HostMessage {
     'time': time,
     'edits': edits.map((e) => e.toMap()).toList(),
     'spawn': spawn.toMap(),
+    if (rules != null) 'rules': rules!.toJson(),
   };
 }
 

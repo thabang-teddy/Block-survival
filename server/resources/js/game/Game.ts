@@ -32,7 +32,8 @@ import { CrateManager, type LootCrate } from '../entities/crates'
 import { kindsForNight, ZombieManager, ZOMBIE, ZOMBIE_STATS, zombiesForNight, type Zombie } from '../entities/zombies'
 import { makeRng } from '../world/noise'
 import { Avatar, AVATAR, type Spawn } from './Avatar'
-import { DayNight, NIGHT_SECONDS } from './DayNight'
+import { DayNight } from './DayNight'
+import { currentRules, parseRules, type GameRules } from './rules'
 import { computeScore, loadBest, nightsSurvived, saveBest } from './score'
 import type { HostSession } from '../net/HostSession'
 import type { ClientSession } from '../net/ClientSession'
@@ -64,7 +65,6 @@ const FISTS = { damage: 5, reach: 2.0, arcCos: Math.cos(Math.PI / 6), knockback:
 const ADS = { fov: 20, normalFov: 75, speed: 12 } as const
 const POISON = { seconds: 5, dps: 2 } as const
 /** groups arrive during the first 70 % of the night */
-const SPAWN_WINDOW = 0.7
 const RESPAWN_SECONDS = 5
 /** requests from clients must originate within this distance of their avatar's eye */
 const ACTION_REACH = REACH + 1.5
@@ -107,7 +107,8 @@ export class Game {
   readonly zombieRenderer = new ZombieRenderer()
   readonly remotePlayers = new RemotePlayerRenderer()
   readonly viewModel = new ViewModel()
-  readonly dayNight = new DayNight()
+  readonly rules: GameRules
+  readonly dayNight: DayNight
   readonly fx = new CombatFx()
   readonly camera: THREE.PerspectiveCamera
   /** wireframe cube on the targeted block */
@@ -167,6 +168,10 @@ export class Game {
   constructor(canvas: HTMLCanvasElement, camera: THREE.PerspectiveCamera, opts: GameOptions) {
     this.role = opts.role
     this.session = opts.session
+    // a joiner plays by the host's rules; a host by the ones the page loaded with
+    const welcome = opts.session.role === 'client' ? opts.session.welcome : null
+    this.rules = welcome?.rules ? parseRules(welcome.rules) : currentRules()
+    this.dayNight = new DayNight(this.rules)
     this.camera = camera
     this.camera.rotation.order = 'YXZ'
     this.camera.add(this.viewModel.group)
@@ -551,10 +556,11 @@ export class Game {
 
   /** Split the night's zombie count into groups of 3–6 spread over the spawn window. */
   private scheduleNight(night: number): void {
-    const total = zombiesForNight(night)
+    const total = zombiesForNight(night, this.rules.zombiesFirstNight, this.rules.zombiesPerNight)
+    if (total <= 0) { this.spawnTimes = []; return }
     const groups = Math.max(1, Math.round(total / 4.5))
-    const window = NIGHT_SECONDS * SPAWN_WINDOW
-    this.spawnTimes = Array.from({ length: groups }, (_, i) => this.dayNight.time + 2 + (i * window) / groups)
+    const window = this.rules.nightSeconds * this.rules.spawnWindow
+    this.spawnTimes = Array.from({ length: groups }, (_, i) => this.dayNight.time + this.rules.spawnDelaySeconds + (i * window) / groups)
     this.broadcastMessage(`Night ${night} — they are coming`)
   }
 

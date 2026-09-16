@@ -13,6 +13,7 @@ import 'package:block_survival/entities/crates.dart';
 import 'package:block_survival/game/avatar.dart';
 import 'package:block_survival/game/day_night.dart';
 import 'package:block_survival/game/host_sim.dart';
+import 'package:block_survival/game/rules.dart';
 import 'package:block_survival/game/save.dart';
 import 'package:block_survival/game/score.dart';
 import 'package:block_survival/game/ui_state.dart';
@@ -106,8 +107,10 @@ final class Game implements SimHost {
     required this.local,
     required this.role,
     required this.worldKind,
+    this.rules = GameRules.defaults,
     SaveData? restore,
-  }) : terrain = TerrainGenerator(seed) {
+  }) : terrain = TerrainGenerator(seed),
+       dayNight = DayNight(rules) {
     world = World()
       ..setGenerator(terrain.generateChunk, worldChunksY)
       ..trackEdits = true;
@@ -140,7 +143,11 @@ final class Game implements SimHost {
   late final PlayerController player;
   late final Camera camera;
   @override
-  final DayNight dayNight = DayNight();
+  final DayNight dayNight;
+
+  /// the admin's clock and zombie schedule (a joiner takes the host's)
+  @override
+  final GameRules rules;
   final GameUiState ui = GameUiState();
 
   /// the local player's authoritative state (on a client: the host's view of it)

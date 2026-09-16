@@ -4,6 +4,7 @@
  * authoritative Game and broadcasts snapshots at SNAPSHOT_HZ.
  */
 import type { Game } from '../game/Game'
+import { rulesToWire } from '../game/rules'
 import type { WorldKind } from '../world/seed'
 import { HostTransport, type Link } from './transport'
 import {
@@ -135,7 +136,7 @@ export class HostSession {
       const avatar = game.addRemoteAvatar(link.id, msg.name.slice(0, 16) || 'Player', typeof msg.userId === 'number' ? msg.userId : null)
       const welcome: Welcome = {
         t: 'welcome', v: PROTOCOL_VERSION, you: avatar.id, seed: game.seed, time: game.dayNight.time,
-        edits: game.worldEdits(), spawn: avatar.spawn,
+        edits: game.worldEdits(), spawn: avatar.spawn, rules: rulesToWire(game.rules),
       }
       this.send(link, welcome)
       avatar.push({ inventory: avatar.inventory.all(), magazine: avatar.magazine, health: avatar.health, spawn: avatar.spawn })

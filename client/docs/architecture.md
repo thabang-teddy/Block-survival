@@ -23,7 +23,7 @@ the fixtures in `shared/`; Flutter-facing code sits under `lib/render`,
 | `world/chunkStreamer.ts` | `lib/world/chunk_streamer.dart` | P1 | the spike page has an inline version |
 | `world/raycast.ts` | `lib/world/raycast.dart` | P1 | |
 | `physics/aabb.ts`, `playerController.ts` | `lib/physics/` | P1 | same fixed timestep; add fixtures (`npm run fixtures:physics`) |
-| `game/DayNight.ts` | `lib/game/day_night.dart` | done | |
+| `game/DayNight.ts`, `game/rules.ts` | `lib/game/day_night.dart`, `lib/game/rules.dart` | done | day/night lengths and the zombie schedule are the admin's (`/admin/rules`); loaded from `GET /api/rules`, a joiner takes the host's from the welcome |
 | `entities/zombies.ts`, `pathfinding.ts`, `drops.ts`, `crates.ts` | `lib/entities/` | done | same tuning tables; tests are twins of `entities/__tests__` |
 | `items/registry.ts`, `recipes.ts`, `inventory.ts` | `lib/items/` | done | registry + recipes still to move into `shared/data/*.json` for both clients |
 | `game/Game.ts` (1063 lines), `game/Avatar.ts` | `lib/game/game.dart` (loop, local actions, streaming, saves, UI snapshot), `lib/game/host_sim.dart` (night schedule, zombies/drops/crates, vitals, host-authoritative actions), `lib/game/avatar.dart` + `lib/net/*_session.dart` | mostly | hardness-timed digging still open |

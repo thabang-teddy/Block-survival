@@ -8,6 +8,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:block_survival/api/api_client.dart';
+import 'package:block_survival/game/rules.dart';
 import 'package:block_survival/api/models.dart';
 import 'package:block_survival/world/seed.dart';
 
@@ -69,6 +70,11 @@ class GameApi implements GameApiSignals {
   @override
   Future<RoomInfo> resolveRoom(String code) async => RoomInfo.fromJson(
     (await _client.get('/rooms/$code')).json!['room'] as Map<String, dynamic>,
+  );
+
+  // ---- the admin's game rules
+  Future<GameRules> rules() async => GameRules.fromJson(
+    (await _client.get('/rules')).json!['rules'] as Map<String, dynamic>?,
   );
 
   // ---- the shared global world

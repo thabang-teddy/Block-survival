@@ -163,6 +163,7 @@ final class HostSession implements TransportEvents {
                 .map((e) => BlockEdit(x: e.x, y: e.y, z: e.z, id: e.id))
                 .toList(),
             spawn: game.spawn,
+            rules: game.rules,
           ),
         ),
       );

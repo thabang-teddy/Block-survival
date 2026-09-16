@@ -4,6 +4,7 @@ import 'package:block_survival/entities/zombies.dart';
 import 'package:block_survival/game/avatar.dart';
 import 'package:block_survival/game/day_night.dart';
 import 'package:block_survival/game/host_sim.dart';
+import 'package:block_survival/game/rules.dart';
 import 'package:block_survival/net/protocol.dart';
 import 'package:block_survival/world/noise.dart';
 import 'package:block_survival/world/palette.dart';
@@ -22,7 +23,16 @@ final class _Host implements SimHost {
   @override
   final World world;
   @override
-  final DayNight dayNight = DayNight();
+  DayNight dayNight = DayNight();
+  @override
+  GameRules rules = GameRules.defaults;
+
+  /// the game builds its clock from the rules; the fake does the same on demand
+  void useRules(GameRules r) {
+    rules = r;
+    dayNight = DayNight(r);
+  }
+
   @override
   final Avatar localAvatar;
   final edits = <(int, int, int)>[];
@@ -96,6 +106,40 @@ void main() {
       expect(s.zombies.liveCount, 0);
       expect(s.spawnTimes, isEmpty);
     });
+  });
+
+  test('the admin schedule sets when and how many zombies come', () {
+    final (s, h) = sim();
+    h.useRules(
+      const GameRules(
+        daySeconds: 60,
+        nightSeconds: 40,
+        zombiesFirstNight: 20,
+        zombiesPerNight: 0,
+        spawnDelaySeconds: 10,
+        spawnWindow: 0.5,
+      ),
+    );
+    h.dayNight.time = 59.9;
+    run(s, 0.2);
+    expect(h.broadcasts, ['Night 1 — they are coming']);
+    // 20 zombies → round(20 / 4.5) = 4 groups, the first 10 s after sunset,
+    // the rest over half of a 40 s night
+    expect(s.spawnTimes, hasLength(4));
+    expect(s.spawnTimes.first, closeTo(60 + 10, 0.05));
+    expect(s.spawnTimes.last, closeTo(60 + 10 + 15, 0.05));
+    run(s, 9);
+    expect(s.zombies.liveCount, 0);
+    run(s, 2);
+    expect(s.zombies.liveCount, greaterThan(0));
+
+    // no zombies at all: nothing is scheduled
+    final (s2, h2) = sim();
+    h2.useRules(const GameRules(zombiesFirstNight: 0, zombiesPerNight: 0));
+    h2.dayNight.time = daySeconds - 0.1;
+    run(s2, 1);
+    expect(s2.spawnTimes, isEmpty);
+    expect(h2.broadcasts, isEmpty);
   });
 
   group('combat', () {

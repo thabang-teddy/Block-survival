@@ -108,7 +108,10 @@ List<ZombieKind> kindsForNight(int night) => [
   if (night >= 4) ZombieKind.toxic,
 ];
 
-int zombiesForNight(int night) => 8 + 6 * (night - 1);
+/// how many zombies a night brings: the first night's count plus the
+/// per-night increase (the admin's rules; the defaults are 8 and 6)
+int zombiesForNight(int night, {int firstNight = 8, int perNight = 6}) =>
+    math.max(0, firstNight + perNight * (night - 1));
 
 enum ZombieState {
   chase('chase'),

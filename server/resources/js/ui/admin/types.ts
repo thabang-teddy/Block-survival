@@ -8,6 +8,16 @@ export interface LoginWindowForm {
   timezone: string
 }
 
+/** the admin form for App\Support\GameRules (snake_case, as the settings keys) */
+export interface GameRulesForm {
+  day_seconds: number
+  night_seconds: number
+  zombies_first_night: number
+  zombies_per_night: number
+  spawn_delay_seconds: number
+  spawn_window_percent: number
+}
+
 export interface AdminDevice {
   id: number
   label: string | null

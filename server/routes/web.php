@@ -2,11 +2,13 @@
 
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DeviceController;
+use App\Http\Controllers\Admin\GameRulesController as AdminGameRulesController;
 use App\Http\Controllers\Admin\GlobalWorldController as AdminGlobalWorldController;
 use App\Http\Controllers\Admin\LoginWindowController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Api\AuthController as ApiAuthController;
+use App\Http\Controllers\Api\GameRulesController;
 use App\Http\Controllers\Api\GlobalWorldController;
 use App\Http\Controllers\Api\InviteController;
 use App\Http\Controllers\Api\RoomController;
@@ -80,6 +82,7 @@ Route::middleware(['auth:sanctum', 'access'])->group(function () {
         Route::post('/scores', [ScoreController::class, 'store']);
         // the shared global world: enter its queue, ask who hosts now, leave
         Route::get('/global/presence', [GlobalWorldController::class, 'presence']);
+        Route::get('/rules', GameRulesController::class);
         Route::post('/global/join', [GlobalWorldController::class, 'join']);
         Route::post('/global/claim', [GlobalWorldController::class, 'claim']);
         Route::post('/global/leave', [GlobalWorldController::class, 'leave']);
@@ -100,6 +103,8 @@ Route::middleware(['auth', 'access'])->group(function () {
         Route::get('/', DashboardController::class)->name('index');
         Route::get('/hours', [LoginWindowController::class, 'show'])->name('hours');
         Route::put('/hours', [LoginWindowController::class, 'update'])->name('hours.update');
+        Route::get('/rules', [AdminGameRulesController::class, 'show'])->name('rules');
+        Route::put('/rules', [AdminGameRulesController::class, 'update'])->name('rules.update');
         Route::get('/devices', [DeviceController::class, 'index'])->name('devices.index');
         Route::post('/devices/{device}/approve', [DeviceController::class, 'approve'])->name('devices.approve');
         Route::patch('/devices/{device}', [DeviceController::class, 'update'])->name('devices.update');

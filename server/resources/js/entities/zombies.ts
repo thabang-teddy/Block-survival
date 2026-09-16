@@ -50,7 +50,8 @@ export function kindsForNight(night: number): ZombieKind[] {
   return kinds
 }
 
-export const zombiesForNight = (night: number): number => 8 + 6 * (night - 1)
+/** how many zombies a night brings: the first night's count plus the per-night increase (game/rules.ts) */
+export const zombiesForNight = (night: number, firstNight = 8, perNight = 6): number => Math.max(0, firstNight + perNight * (night - 1))
 
 export interface Zombie {
   id: number

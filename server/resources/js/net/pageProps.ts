@@ -1,7 +1,8 @@
 /** Inertia props shared by HandleInertiaRequests and provided by PlayController. */
 import type { PageProps as InertiaPageProps } from '@inertiajs/core'
 import type { ApiUser, GlobalPresence, LeaderboardRow, WorldMeta } from './api'
-import type { AdminDevice, AdminRoom, AdminUser, LoginWindowForm } from '../ui/admin/types'
+import type { AdminDevice, AdminRoom, AdminUser, GameRulesForm, LoginWindowForm } from '../ui/admin/types'
+import type { GameRulesWire as GameRules } from '../game/rules'
 
 export interface SharedProps extends InertiaPageProps {
   auth: { user: ApiUser | null }
@@ -16,6 +17,8 @@ export interface PlayProps extends SharedProps {
   worlds: { own: WorldMeta | null; global: WorldMeta | null }
   /** who is in the shared global world right now */
   presence: GlobalPresence
+  /** the admin's day/night clock and zombie schedule */
+  rules: GameRules
 }
 
 /** the browser is waiting for an admin to approve it (no session yet) */
@@ -40,6 +43,12 @@ export interface AdminDashboardProps extends AdminProps {
 export interface AdminHoursProps extends AdminProps {
   loginWindow: LoginWindowForm
   timezones: string[]
+}
+
+export interface AdminRulesProps extends AdminProps {
+  rules: GameRulesForm
+  defaults: GameRulesForm
+  bounds: Record<keyof GameRulesForm, [number, number]>
 }
 
 export interface AdminDevicesProps extends AdminProps {

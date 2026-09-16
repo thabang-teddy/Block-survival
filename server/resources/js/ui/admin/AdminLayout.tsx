@@ -16,6 +16,7 @@ const SECTIONS = [
   { href: '/admin/devices', label: 'PCs' },
   { href: '/admin/users', label: 'Players' },
   { href: '/admin/hours', label: 'Hours' },
+  { href: '/admin/rules', label: 'Rules' },
   { href: '/admin/rooms', label: 'Rooms' },
 ] as const
 

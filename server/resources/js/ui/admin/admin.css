@@ -106,6 +106,9 @@ body:has(.admin) { user-select: text; }
 .admin .days button.on { background: rgba(232,178,58,.2); border-color: var(--hud-accent); color: var(--hud-accent); }
 .admin .hours .error { margin: 0; color: #ff8a7a; font-size: 13px; }
 .admin .hours button[type="submit"] { justify-self: start; padding: 9px 16px; font-size: 13px; }
+.admin .rules .row label { width: 200px; }
+.admin .rules .row label .hint { font-weight: 500; opacity: .8; }
+.admin .rules input[type="number"] { font-size: 14px; }
 
 @media (max-width: 700px) {
   .admin-bar, .admin main, .admin .flash { padding-left: 14px; padding-right: 14px; margin-left: 0; margin-right: 0; }

@@ -12,6 +12,7 @@ import 'package:block_survival/entities/drops.dart';
 import 'package:block_survival/entities/zombies.dart';
 import 'package:block_survival/game/avatar.dart';
 import 'package:block_survival/game/day_night.dart';
+import 'package:block_survival/game/rules.dart';
 import 'package:block_survival/game/save.dart';
 import 'package:block_survival/items/recipes.dart';
 import 'package:block_survival/items/registry.dart';
@@ -72,8 +73,6 @@ abstract final class PoisonTuning {
   static const double dps = 2;
 }
 
-/// fraction of the night over which the zombie groups arrive
-const double spawnWindow = 0.7;
 const double respawnSeconds = 5;
 
 /// how far an avatar can act on a block
@@ -84,6 +83,9 @@ const double benchReach = 4;
 abstract interface class SimHost {
   World get world;
   DayNight get dayNight;
+
+  /// the admin's clock and zombie schedule this match runs on
+  GameRules get rules;
 
   /// the host's own avatar
   Avatar get localAvatar;
@@ -236,11 +238,21 @@ final class HostSim implements ZombieHost {
 
   /// Split the night's zombie count into groups of 3–6 spread over the spawn window.
   void _scheduleNight(int night) {
-    final total = zombiesForNight(night);
+    final r = _host.rules;
+    final total = zombiesForNight(
+      night,
+      firstNight: r.zombiesFirstNight,
+      perNight: r.zombiesPerNight,
+    );
+    if (total <= 0) {
+      spawnTimes = [];
+      return;
+    }
     final groups = math.max(1, jsRound(total / 4.5));
-    final window = nightSeconds * spawnWindow;
+    final window = r.nightSeconds * r.spawnWindow;
     spawnTimes = [
-      for (var i = 0; i < groups; i++) time + 2 + (i * window) / groups,
+      for (var i = 0; i < groups; i++)
+        time + r.spawnDelaySeconds + (i * window) / groups,
     ];
     _host.broadcastMessage('Night $night — they are coming');
   }

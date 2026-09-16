@@ -1,11 +1,14 @@
-/// The 20-minute day/night clock — twin of `game/DayNight.ts`: 15 min day →
-/// sunset → 5 min night → dawn. The first sunset is when zombies first appear.
+/// The day/night clock — twin of `game/DayNight.ts`: day → sunset → night →
+/// dawn, by default 15 and 5 minutes; the admin can change both (rules.dart).
+/// The first sunset is when zombies first appear.
 library;
 
 import 'dart:math' as math;
 
+import 'package:block_survival/game/rules.dart';
 import 'package:block_survival/world/js_math.dart';
 
+/// the default lengths
 const double daySeconds = 900;
 const double nightSeconds = 300;
 const double cycleSeconds = daySeconds + nightSeconds;
@@ -43,6 +46,15 @@ double _smoothstep(double a, double b, double x) {
 }
 
 final class DayNight {
+  DayNight([GameRules rules = GameRules.defaults])
+    : daySeconds = rules.daySeconds,
+      nightSeconds = rules.nightSeconds,
+      cycleSeconds = rules.cycleSeconds;
+
+  final double daySeconds;
+  final double nightSeconds;
+  final double cycleSeconds;
+
   /// seconds since the game started
   double time = 0;
   Phase phase = Phase.day;

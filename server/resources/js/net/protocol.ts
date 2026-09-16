@@ -3,6 +3,7 @@
  * Messages are plain objects packed with msgpackr and sent over PeerJS DataChannels.
  */
 import { pack, unpack } from 'msgpackr'
+import type { GameRulesWire } from '../game/rules'
 import type { ItemStack } from '../items/inventory'
 import type { PropMeta } from '../world/chunkStore'
 import type { AnimName } from '../game/Game'
@@ -96,6 +97,8 @@ export interface Welcome {
   time: number
   edits: BlockEdit[]
   spawn: { x: number; y: number; z: number }
+  /** the host's game rules (absent from hosts older than the rules feature: defaults apply) */
+  rules?: GameRulesWire
 }
 
 export interface Snapshot {
