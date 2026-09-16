@@ -21,6 +21,10 @@ same PR and `client.yml` fails on drift.
 | ⬜ | Play Console app + upload key; MSIX signing decision | secrets in place, dry-run release job |
 | ⬜ | Sentry wired, off in debug | crash in a debug build not reported |
 
+## Open decision from the review
+
+The code review of the token flow suggested that a sign-in on an *already approved* device by a *different* account should require re-approval (today the device stays approved and moves to the new account — the same semantics as a shared browser). That is a product call; it is not implemented.
+
 ## P1 — World
 
 | | Task | Test |
@@ -31,12 +35,12 @@ same PR and `client.yml` fails on drift.
 | ✅ | `flutter_gpu` chunk renderer, fog, day/night palettes | spike: 188 chunks in 2.4 ms |
 | ⬜ | `ChunkStreamer` port (load radius, unload, priority by distance) | `streaming.test.ts` twins |
 | ⬜ | Meshing on an isolate; main-isolate re-mesh for edits | frame-time p95 unchanged with 6-chunk radius |
-| ⬜ | `raycast.ts` port (dig/place targeting) | unit tests + fixture |
-| ⬜ | `aabb.ts` + `playerController.ts` port, same fixed timestep, updraft lift | `npm run fixtures:physics`: scripted inputs → positions, byte-identical |
+| ✅ | `raycast.ts` port (dig/place targeting) | `fixtures/physics/raycast.json`, 224 rays |
+| ✅ | `aabb.ts` + `playerController.ts` port, same fixed timestep, updraft lift | `npm run fixtures:physics`: 828 scripted ticks, byte-identical |
 | ⬜ | `DayNight` clock → lighting phase, sun direction | unit test on phase boundaries |
 | ⬜ | glTF loader (meshes, skins, animations) + skinned shader; zombie GLB playing its clip (the S1 item not yet done) | golden render test on Windows CI |
 | ⬜ | Keyboard bindings (`Input.ts` twin), gamepad stub | unit tests |
-| ⬜ | Walk on the real world with collision, dig and place a block | integration test on Windows: launch, walk, dig, place |
+| ◐ | Walk on the real world with collision, dig and place a block | walking works in the spike page (controller-driven); dig/place + integration test open |
 
 ## P2 — Game rules
 
