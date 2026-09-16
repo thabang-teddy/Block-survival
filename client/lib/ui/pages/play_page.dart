@@ -9,12 +9,14 @@ import 'dart:ui' as ui;
 import 'package:block_survival/api/api_client.dart';
 import 'package:block_survival/api/game_api.dart';
 import 'package:block_survival/app/launch.dart';
+import 'package:block_survival/game/day_night.dart';
 import 'package:block_survival/game/game.dart';
 import 'package:block_survival/game/ui_state.dart';
 import 'package:block_survival/input/mouse_capture.dart';
 import 'package:block_survival/input/touch_controls.dart';
 import 'package:block_survival/net/client_session.dart';
 import 'package:block_survival/render/chunk_renderer.dart';
+import 'package:block_survival/render/entity_mesh.dart';
 import 'package:block_survival/ui/hud/hud.dart';
 import 'package:block_survival/world/seed.dart';
 import 'package:flutter/foundation.dart';
@@ -66,7 +68,11 @@ class _PlayPageState extends State<PlayPage>
   bool _paused = true;
   bool _togglePanel = false;
   bool _dig = false;
+  bool _primaryDown = false;
   bool _place = false;
+  bool _interact = false;
+  bool _reload = false;
+  bool _dropHeld = false;
   int? _selectSlot;
   Timer? _autosave;
   bool _exiting = false;
@@ -96,6 +102,7 @@ class _PlayPageState extends State<PlayPage>
         game.ui.setNetStatus(NetStatus.error, reason);
     if (widget.launch.role == Role.host) {
       _autosave = Timer.periodic(autosaveEvery, (_) => _autosaveTick());
+      game.onDawnBroke = (_) => unawaited(_dawn());
     }
     _ticker = createTicker(_tick)..start();
   }
@@ -149,14 +156,22 @@ class _PlayPageState extends State<PlayPage>
           (_down(LogicalKeyboardKey.space) ||
               touch.taps.contains(TouchAction.jump)),
       dig: playing && (_dig || touch.taps.contains(TouchAction.dig)),
+      primaryHeld:
+          playing && (_primaryDown || touch.held.contains(TouchAction.dig)),
       place: playing && (_place || touch.taps.contains(TouchAction.place)),
-      interact: playing && touch.taps.contains(TouchAction.interact),
+      interact:
+          playing && (_interact || touch.taps.contains(TouchAction.interact)),
+      reload: playing && _reload,
+      dropHeld: playing && _dropHeld,
       togglePanel: _togglePanel,
       selectSlot: _selectSlot,
       scoreboard: _down(LogicalKeyboardKey.tab),
     );
     _dig = false;
     _place = false;
+    _interact = false;
+    _reload = false;
+    _dropHeld = false;
     _togglePanel = false;
     _selectSlot = null;
     game.update(dt, input);
@@ -203,7 +218,17 @@ class _PlayPageState extends State<PlayPage>
       } else if (key == LogicalKeyboardKey.keyE) {
         _togglePanel = true;
       } else if (key == LogicalKeyboardKey.keyF) {
-        if (game.target()?.block == 16) _togglePanel = true; // workbench
+        _interact = true;
+      } else if (key == LogicalKeyboardKey.keyR) {
+        _reload = true;
+      } else if (key == LogicalKeyboardKey.keyQ) {
+        _dropHeld = true;
+      } else if (kDebugMode &&
+          key == LogicalKeyboardKey.keyN &&
+          game.isHost &&
+          game.dayNight.phase == Phase.day) {
+        // dev: skip to the next sunset
+        game.dayNight.time += game.dayNight.secondsToTransition - 3;
       } else {
         final digit = key.keyId - LogicalKeyboardKey.digit1.keyId;
         if (digit >= 0 && digit < 9) _selectSlot = digit;
@@ -221,7 +246,12 @@ class _PlayPageState extends State<PlayPage>
       _place = true;
     } else if (e.buttons & kPrimaryMouseButton != 0) {
       _dig = true;
+      _primaryDown = true;
     }
+  }
+
+  void _onMouseUp(PointerUpEvent e) {
+    if (e.buttons & kPrimaryMouseButton == 0) _primaryDown = false;
   }
 
   /// drag-to-look where the pointer cannot be captured
@@ -242,6 +272,7 @@ class _PlayPageState extends State<PlayPage>
 
   void _pause() {
     setState(() => _paused = true);
+    _primaryDown = false;
     _mouse.release();
   }
 
@@ -263,6 +294,22 @@ class _PlayPageState extends State<PlayPage>
     } on Object {
       return 'Save failed';
     }
+  }
+
+  /// dawn on the host: the run goes on the leaderboard and the world is saved
+  Future<void> _dawn() async {
+    try {
+      final r = await widget.api.postScore(
+        nights: game.nightsSurvived,
+        kills: game.kills,
+        deaths: game.deaths,
+        seconds: game.dayNight.time.floor(),
+      );
+      if (r.best > game.bestScore) game.bestScore = r.best;
+    } on Object {
+      // offline or signed out: the score stays local
+    }
+    await _saveWorld();
   }
 
   Future<void> _autosaveTick() async {
@@ -300,6 +347,8 @@ class _PlayPageState extends State<PlayPage>
         onKeyEvent: _onKey,
         child: Listener(
           onPointerDown: _onMouseDown,
+          onPointerUp: _onMouseUp,
+          onPointerCancel: (_) => _primaryDown = false,
           child: GestureDetector(
             onPanUpdate: _touchUi ? null : _onDrag,
             child: Stack(
@@ -361,11 +410,23 @@ class _PlayPageState extends State<PlayPage>
     if (renderer == null || width == 0 || height == 0) return null;
     final sw = Stopwatch()..start();
     renderer.sync(game.world);
+    final entities = EntityMeshBuilder();
+    for (final z in game.sim.zombies.zombies) {
+      entities.zombie(z);
+    }
+    for (final d in game.sim.drops.drops) {
+      entities.drop(d, game.time);
+    }
+    for (final c in game.sim.crates.crates) {
+      entities.crate(c, game.time);
+    }
+    final mesh = entities.build();
     final (image, _) = renderer.render(
       game.camera,
       game.lighting(),
       width,
       height,
+      dynamic: mesh == null ? const [] : [mesh],
     );
     sw.stop();
     _frameTimes.add(sw.elapsedMicroseconds / 1000);

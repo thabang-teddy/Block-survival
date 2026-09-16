@@ -9,6 +9,8 @@ import 'dart:typed_data';
 
 import 'package:block_survival/api/game_api.dart';
 import 'package:block_survival/game/game.dart';
+import 'package:block_survival/game/host_sim.dart';
+import 'package:block_survival/game/score.dart';
 import 'package:block_survival/game/ui_state.dart';
 import 'package:block_survival/net/protocol.dart';
 import 'package:block_survival/net/rtc.dart';
@@ -31,6 +33,9 @@ final class ClientSession implements TransportEvents {
   String error = '';
   double _inputTimer = 0;
   Completer<Welcome>? _welcome;
+
+  /// the id the host gave us (`welcome.you`); snapshots list us under it
+  String? _you;
 
   void Function(ClientStatus status)? onStatus;
 
@@ -63,7 +68,7 @@ final class ClientSession implements TransportEvents {
 
   void attach(Game game) {
     _game = game;
-    game.onEdit = (e) => _send(BreakBlock(e.x, e.y, e.z));
+    game.onAction = _send;
   }
 
   void tick(double dt) {
@@ -80,9 +85,9 @@ final class ClientSession implements TransportEvents {
         z: s.z,
         yaw: s.yaw,
         pitch: s.pitch,
-        anim: s.sprinting ? 'Run' : 'Idle',
+        anim: game.me.anim,
         slot: game.hotbarSlot,
-        aiming: false,
+        aiming: game.me.aiming,
       ),
     );
   }
@@ -122,6 +127,7 @@ final class ClientSession implements TransportEvents {
           return;
         }
         _setStatus(ClientStatus.joined);
+        _you = msg.you;
         final w = _welcome;
         if (w != null && !w.isCompleted) w.complete(msg);
       case Full():
@@ -134,29 +140,39 @@ final class ClientSession implements TransportEvents {
       case Snapshot(:final players, :final time):
         if (game == null) return;
         game.dayNight.time = time;
+        game.sim.applySnapshot(msg);
         this.players = [
           for (final p in players)
-            if (p.id != link.id)
+            if (p.id != _you)
               ScoreRow(
                 id: p.id,
                 name: p.name,
-                score: 0,
+                score: computeScore(game.nightsSurvived, p.kills),
                 kills: p.kills,
                 deaths: p.deaths,
                 you: false,
+              )
+            else
+              // the host's word on our own score
+              ScoreRow(
+                id: p.id,
+                name: p.name,
+                score: computeScore(game.nightsSurvived, p.kills),
+                kills: p.kills,
+                deaths: p.deaths,
+                you: true,
               ),
         ];
-        game.remotePlayers = this.players;
+        final mine = this.players.where((p) => p.you).firstOrNull;
+        if (mine != null) {
+          game.me
+            ..kills = mine.kills
+            ..deaths = mine.deaths;
+        }
+        game.remotePlayers = this.players.where((p) => !p.you).toList();
       case PrivateState():
         if (game == null) return;
-        if (msg.inventory != null) game.inventory.replace(msg.inventory!);
-        if (msg.health != null) game.health = msg.health!;
-        if (msg.spawn != null) game.spawn = msg.spawn!;
-        if (msg.teleport != null) {
-          final t = msg.teleport!;
-          game.player.teleport(t.x, t.y, t.z);
-        }
-        if (msg.message != null) game.toast(msg.message!);
+        _applyPrivate(game, msg);
       case Blocks(:final edits):
         if (game == null) return;
         for (final e in edits) {
@@ -165,6 +181,39 @@ final class ClientSession implements TransportEvents {
       case HostChat(:final from, :final text):
         game?.toast('$from: $text');
     }
+  }
+
+  /// what the host tells only us (Avatar.push on the host side)
+  void _applyPrivate(Game game, PrivateState msg) {
+    final me = game.me;
+    final inventory = msg.inventory;
+    if (inventory != null) me.inventory.replace(inventory);
+    final magazine = msg.magazine;
+    if (magazine != null) me.magazine = magazine;
+    final reloading = msg.reloading;
+    if (reloading != null) {
+      me.reloadUntil = reloading ? game.time + RifleTuning.reloadSeconds : 0;
+    }
+    final health = msg.health;
+    if (health != null) me.health = health;
+    final poisoned = msg.poisoned;
+    if (poisoned != null) {
+      me.poisonUntil = poisoned ? game.time + PoisonTuning.seconds : 0;
+    }
+    if (msg.hurtAt != null) me.hurtAt = game.time;
+    final dead = msg.dead;
+    if (dead != null) {
+      if (dead && !me.dead) game.onLocalDeath();
+      me.dead = dead;
+    }
+    final respawnIn = msg.respawnIn;
+    if (respawnIn != null) me.respawnAt = game.time + respawnIn;
+    final spawn = msg.spawn;
+    if (spawn != null) me.spawn = spawn;
+    final teleport = msg.teleport;
+    if (teleport != null) game.onLocalRespawn(teleport);
+    final message = msg.message;
+    if (message != null) game.toast(message);
   }
 
   @override

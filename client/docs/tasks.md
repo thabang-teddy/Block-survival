@@ -48,12 +48,12 @@ The code review of the token flow suggested that a sign-in on an *already approv
 |---|---|---|
 | ⬜ | Move `items/registry.ts` + `recipes.ts` tables to `shared/data/{items,recipes}.json`; both clients load them | Vitest + Dart tests read the same files |
 | ✅ | Inventory, hotbar, crafting (Dart tables for now) | `test/items/items_test.dart` |
-| ⬜ | Drops, crates | port `entities/__tests__` |
-| ⬜ | Zombies + pathfinding, spawning at night | port tests; determinism fixture for pathfinding |
-| ⬜ | Combat: sword swing, rifle fire/reload, damage, poison | port tests |
-| ⬜ | Death → crate → respawn, score, leaderboard post | port `game/__tests__` |
-| ◐ | Save v3 (`saveState.ts`, `saveMigrate.ts`), autosave, local cache, `PUT /api/world` on pause | `lib/game/save.dart` parses/builds v3 and carries unknown parts through; autosave every 60 s and on leave; ⬜ round-trip fixtures, local cache |
-| ⬜ | `Game.ts` split into loop / session / save / score / visitors | each ≤ 400 lines |
+| ✅ | Drops, crates | `test/entities/crates_drops_test.dart` (twin of `entities/__tests__/{crates,drops}.test.ts`) |
+| ✅ | Zombies + pathfinding, spawning at night | `test/entities/zombies_test.dart` (twin of `zombies.test.ts`); night schedule in `test/game/host_sim_test.dart`; ⬜ determinism fixture for pathfinding |
+| ✅ | Combat: sword swing, rifle fire/reload, damage, poison, regen | `test/game/host_sim_test.dart`, `test/game/game_combat_test.dart` |
+| ✅ | Death → crate → respawn, score, leaderboard post at dawn | `host_sim_test.dart` (local + remote avatars), `game_combat_test.dart`; the post itself is in `play_page._dawn` |
+| ◐ | Save v3 (`saveState.ts`, `saveMigrate.ts`), autosave, local cache, `PUT /api/world` on pause | `lib/game/save.dart` builds/parses v3 with typed zombies/drops/crates and visitors; autosave every 60 s, at dawn and on leave; `game_combat_test.dart` round-trips the entities; ⬜ fixtures against the TS save, local cache |
+| ◐ | `Game.ts` split into loop / session / save / score / visitors | `game.dart` (loop, actions, saves, UI) + `host_sim.dart` (night, entities, vitals, host-authoritative actions) + `avatar.dart` + `lib/net/*_session.dart`; ⬜ hardness-timed digging with progress ring |
 
 ## P3 — Multiplayer
 
@@ -61,9 +61,9 @@ The code review of the token flow suggested that a sign-in on an *already approv
 |---|---|---|
 | ✅ | Signaller + Host/Client transports on `flutter_webrtc` | in-memory handshake tests |
 | ⬜ | `SnapshotBuffer` (interpolation delay 100 ms) | port `net.test.ts` cases |
-| ◐ | `HostSession` / `ClientSession` (hello/welcome/full, input @30 Hz, snap @20 Hz, private state, blocks, chat) | hello/welcome/full/bye, blocks, snapshots with players, chat; ⬜ zombies/drops/crates in snapshots, per-client inventory, session tests |
+| ◐ | `HostSession` / `ClientSession` (hello/welcome/full, input @30 Hz, snap @20 Hz, private state, blocks, chat) | hello/welcome/full/bye, block edits with prop meta, snapshots with players/zombies/drops/crates, per-client private state (inventory, vitals, magazine, teleport, messages), every client action applied by the host sim, chat; `test/net/session_test.dart` runs a joiner end to end over the fake transport |
 | ✅ | Rooms: create, heartbeat, close; invites: list, send, accept, decline | `Launcher` + `InvitePanel`; page tests against a scripted server |
-| ⬜ | Remote player rendering (animated avatars) | golden render |
+| ◐ | Remote player / zombie / drop / crate rendering | zombies, drops and crates are vertex-coloured boxes (`lib/render/entity_mesh.dart`) until the glTF loader lands; ⬜ remote players, animated avatars, golden render |
 | ◐ | Global world join/claim/leave + host handover | `Launcher.enterGlobal/handover` mirror globalWorld.ts; ⬜ the HUD does not yet trigger the handover on host-left |
 | ⬜ | **Cross-play E2E**: browser peer (Playwright) + native peer in one room, both see one block edit | manual first, then CI |
 | ⬜ | NAT check: desktop behind a home router reaches a browser host (STUN only) | manual, documented |

@@ -31,8 +31,8 @@ final class PropMeta {
   final int y;
   final int z;
 
-  /// facing, multiples of π/2
-  final int yaw;
+  /// facing in radians, a multiple of π/2
+  final double yaw;
 
   /// for multi-cell props: the other cell; `primary` cells own the model
   final (int, int, int)? partner;

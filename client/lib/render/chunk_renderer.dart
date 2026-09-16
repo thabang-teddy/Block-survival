@@ -92,6 +92,9 @@ final class ChunkRenderer {
   final gpu.UniformSlot _lightSlot;
   final gpu.HostBuffer _uniforms = gpu.gpuContext.createHostBuffer();
 
+  /// per-frame geometry (entities), rebuilt and re-uploaded every frame
+  final gpu.HostBuffer _dynamic = gpu.gpuContext.createHostBuffer();
+
   final Map<ChunkKey, _ChunkGeometry> _geometry = {};
   gpu.Texture? _color;
   gpu.Texture? _depth;
@@ -139,14 +142,17 @@ final class ChunkRenderer {
   }
 
   /// Render one frame and return it as an image the widget layer can draw.
+  /// [dynamic] meshes (entities) are drawn with the opaque chunks.
   (ui.Image, RenderStats) render(
     Camera camera,
     Lighting lighting,
     int width,
-    int height,
-  ) {
+    int height, {
+    List<MeshData> dynamic = const [],
+  }) {
     _ensureTargets(width, height);
     _uniforms.reset();
+    _dynamic.reset();
     final sky = lighting.palette.sky;
     final target = gpu.RenderTarget.singleColor(
       gpu.ColorAttachment(
@@ -188,6 +194,16 @@ final class ChunkRenderer {
     pass.setColorBlendEnable(false);
     for (final g in _geometry.values) {
       if (g.opaque != null) draw(g.opaque!);
+    }
+    for (final m in dynamic) {
+      pass.bindVertexBuffer(_dynamic.emplace(ByteData.sublistView(m.vertices)));
+      pass.bindIndexBuffer(
+        _dynamic.emplace(ByteData.sublistView(m.indices)),
+        gpu.IndexType.int32,
+      );
+      pass.drawIndexed(m.indices.length);
+      draws++;
+      triangles += m.indices.length ~/ 3;
     }
 
     pass.setDepthWriteEnable(false);

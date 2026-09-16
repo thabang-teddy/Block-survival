@@ -24,18 +24,18 @@ the fixtures in `shared/`; Flutter-facing code sits under `lib/render`,
 | `world/raycast.ts` | `lib/world/raycast.dart` | P1 | |
 | `physics/aabb.ts`, `playerController.ts` | `lib/physics/` | P1 | same fixed timestep; add fixtures (`npm run fixtures:physics`) |
 | `game/DayNight.ts` | `lib/game/day_night.dart` | done | |
-| `entities/zombies.ts`, `pathfinding.ts`, `drops.ts`, `crates.ts` | `lib/entities/` | P2 | |
+| `entities/zombies.ts`, `pathfinding.ts`, `drops.ts`, `crates.ts` | `lib/entities/` | done | same tuning tables; tests are twins of `entities/__tests__` |
 | `items/registry.ts`, `recipes.ts`, `inventory.ts` | `lib/items/` | done | registry + recipes still to move into `shared/data/*.json` for both clients |
-| `game/Game.ts` (1063 lines) | `lib/game/game.dart` (world, player, clock, inventory, dig/place/craft, saves, UI snapshot) + `lib/net/*_session.dart` | partial | zombies, combat, drops, crates are P2 |
+| `game/Game.ts` (1063 lines), `game/Avatar.ts` | `lib/game/game.dart` (loop, local actions, streaming, saves, UI snapshot), `lib/game/host_sim.dart` (night schedule, zombies/drops/crates, vitals, host-authoritative actions), `lib/game/avatar.dart` + `lib/net/*_session.dart` | mostly | hardness-timed digging still open |
 | `game/saveState.ts`, `autosave.ts`, `net/saveMigrate.ts` | `lib/game/save.dart`, autosave in `play_page.dart` | partial | v3 only (the browser migrates older saves before upload) |
 | `net/protocol.ts` | `lib/net/protocol.dart`, `lib/net/msgpack.dart` | done | byte-identical to msgpackr |
 | `net/transport.ts` | `lib/net/signaller.dart`, `lib/net/transport.dart`, `lib/net/rtc*.dart` | done | `flutter_webrtc` behind `RtcFactory` |
 | `net/SnapshotBuffer.ts` | `lib/net/snapshot_buffer.dart` | P3 | |
-| `net/HostSession.ts`, `ClientSession.ts` | `lib/net/host_session.dart`, `client_session.dart` | partial | hello/welcome, blocks, snapshots, chat; the sim parts come with P2 |
+| `net/HostSession.ts`, `ClientSession.ts` | `lib/net/host_session.dart`, `client_session.dart` | done | joiners get an `Avatar` in the host sim; private state per client; the client mirrors entities from snapshots |
 | `net/api.ts` | `lib/api/{api_client,auth_api,game_api,models,token_store}.dart` | done | bearer token instead of session |
 | `net/globalWorld.ts` | `lib/app/launch.dart` (`Launcher.enterGlobal/handover`) | done | |
 | `render/ChunkRenderer.ts`, `Lighting.tsx` | `lib/render/chunk_renderer.dart`, `lighting.dart`, `camera.dart` | done | flutter_gpu; shaders in `shaders/` |
-| `render/ZombieRenderer.ts`, `RemotePlayerRenderer.ts`, `PropRenderer.ts`, `PlayerBody.tsx`, `ViewModel.ts` | `lib/render/gltf/`, `lib/render/skinned_renderer.dart` | P1/P2 | own glTF loader + skinning (flutter_scene's source as reference) |
+| `render/ZombieRenderer.ts`, `RemotePlayerRenderer.ts`, `PropRenderer.ts`, `PlayerBody.tsx`, `ViewModel.ts` | `lib/render/entity_mesh.dart` now; `lib/render/gltf/`, `skinned_renderer.dart` later | stand-in | zombies, drops and crates are coloured boxes drawn through the chunk pipeline (`ChunkRenderer.render(dynamic:)`); the glTF loader + skinning replaces them |
 | `render/UpdraftRenderer.ts`, `CombatFx.ts`, `Effects.tsx` | `lib/render/fx/` | P2 | |
 | `input/Input.ts` | `lib/input/mouse_capture.dart`, `touch_controls.dart`, `lib/input/bindings.dart` | done / P1 | per-platform adapters |
 | `ui/*`, `state/uiStore.ts` | `lib/ui/pages`, `lib/ui/hud`, `lib/game/ui_state.dart`, `lib/app/session.dart` | done | plain `ChangeNotifier` + `ListenableBuilder`: two notifiers cover it, no Riverpod yet |

@@ -50,6 +50,7 @@ final class FakeSignalApi implements GameApi {
     WorldKind worldKind = WorldKind.own,
   }) async {
     rooms.add(code);
+    this.hostPeerId = hostPeerId;
     return RoomInfo(
       code: code,
       hostPeerId: hostPeerId,
@@ -74,7 +75,9 @@ final class FakeSignalApi implements GameApi {
   FakeSignalApi(this.mailbox, {this.hostPeerId = 'hostAAAAAAAA'});
 
   final FakeMailbox mailbox;
-  final String hostPeerId;
+
+  /// who [resolveRoom] points joiners at (the last [createRoom] wins)
+  String hostPeerId;
 
   @override
   Future<RoomInfo> resolveRoom(String code) async => RoomInfo(

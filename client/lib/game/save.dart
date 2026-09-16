@@ -1,9 +1,8 @@
 /// The saved-world format — twin of the `SaveData` shape in `net/api.ts` and
 /// `game/saveState.ts` (version 3): the seed regenerates the terrain and
 /// `edits` is the diff on top of it; `players` keeps everyone's gear keyed by
-/// user id. Parts this client does not simulate yet (zombies, drops, crates)
-/// are carried through untouched so a save written here loses nothing the
-/// browser host put in it.
+/// user id; `zombies`, `drops` and `crates` are the live entities at save
+/// time (`collectSave` in saveState.ts).
 library;
 
 import 'package:block_survival/items/inventory.dart';
@@ -68,6 +67,105 @@ final class SavedPlayer {
   };
 }
 
+/// newest drops kept in a save; older ones are just gone
+const int maxSavedDrops = 500;
+
+final class SavedZombie {
+  const SavedZombie({
+    required this.kind,
+    required this.x,
+    required this.y,
+    required this.z,
+    required this.hp,
+  });
+
+  factory SavedZombie.fromJson(Map<String, dynamic> j) => SavedZombie(
+    kind: j['kind'] as String,
+    x: (j['x'] as num).toDouble(),
+    y: (j['y'] as num).toDouble(),
+    z: (j['z'] as num).toDouble(),
+    hp: (j['hp'] as num).toDouble(),
+  );
+
+  final String kind;
+  final double x;
+  final double y;
+  final double z;
+  final double hp;
+
+  Map<String, dynamic> toJson() => {
+    'kind': kind,
+    'x': x,
+    'y': y,
+    'z': z,
+    'hp': hp,
+  };
+}
+
+final class SavedDrop {
+  const SavedDrop({
+    required this.id,
+    required this.count,
+    required this.x,
+    required this.y,
+    required this.z,
+  });
+
+  factory SavedDrop.fromJson(Map<String, dynamic> j) => SavedDrop(
+    id: j['id'] as String,
+    count: (j['count'] as num).toInt(),
+    x: (j['x'] as num).toDouble(),
+    y: (j['y'] as num).toDouble(),
+    z: (j['z'] as num).toDouble(),
+  );
+
+  /// the item id
+  final String id;
+  final int count;
+  final double x;
+  final double y;
+  final double z;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'count': count,
+    'x': x,
+    'y': y,
+    'z': z,
+  };
+}
+
+final class SavedCrate {
+  const SavedCrate({
+    required this.x,
+    required this.y,
+    required this.z,
+    required this.items,
+  });
+
+  factory SavedCrate.fromJson(Map<String, dynamic> j) => SavedCrate(
+    x: (j['x'] as num).toDouble(),
+    y: (j['y'] as num).toDouble(),
+    z: (j['z'] as num).toDouble(),
+    items: [
+      for (final s in j['items'] as List)
+        if (s != null) ItemStack.fromJson(s as Map<String, dynamic>),
+    ],
+  );
+
+  final double x;
+  final double y;
+  final double z;
+  final List<ItemStack> items;
+
+  Map<String, dynamic> toJson() => {
+    'x': x,
+    'y': y,
+    'z': z,
+    'items': items.map((s) => s.toJson()).toList(),
+  };
+}
+
 final class SaveData {
   const SaveData({
     required this.seed,
@@ -96,9 +194,9 @@ final class SaveData {
         for (final e in (j['players'] as Map<String, dynamic>).entries)
           e.key: SavedPlayer.fromJson(e.value as Map<String, dynamic>),
       },
-      zombies: (j['zombies'] as List? ?? const []).cast<Object?>(),
-      drops: (j['drops'] as List? ?? const []).cast<Object?>(),
-      crates: (j['crates'] as List? ?? const []).cast<Object?>(),
+      zombies: _list(j['zombies'], SavedZombie.fromJson),
+      drops: _list(j['drops'], SavedDrop.fromJson),
+      crates: _list(j['crates'], SavedCrate.fromJson),
       savedAt: (j['savedAt'] as num?)?.toInt() ?? 0,
     );
   }
@@ -111,9 +209,9 @@ final class SaveData {
 
   /// keyed by user id ("0" for a guest)
   final Map<String, SavedPlayer> players;
-  final List<Object?> zombies;
-  final List<Object?> drops;
-  final List<Object?> crates;
+  final List<SavedZombie> zombies;
+  final List<SavedDrop> drops;
+  final List<SavedCrate> crates;
 
   /// ms since the epoch on the host when the save was built
   final int savedAt;
@@ -124,9 +222,13 @@ final class SaveData {
     'time': time,
     'edits': edits.map((e) => e.toMap()).toList(),
     'players': {for (final e in players.entries) e.key: e.value.toJson()},
-    'zombies': zombies,
-    'drops': drops,
-    'crates': crates,
+    'zombies': zombies.map((z) => z.toJson()).toList(),
+    'drops': drops.map((d) => d.toJson()).toList(),
+    'crates': crates.map((c) => c.toJson()).toList(),
     'savedAt': savedAt,
   };
 }
+
+List<T> _list<T>(Object? raw, T Function(Map<String, dynamic>) parse) => [
+  for (final e in raw as List? ?? const []) parse(e as Map<String, dynamic>),
+];

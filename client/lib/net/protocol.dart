@@ -228,7 +228,7 @@ final class PropMetaWire {
     x: _i(j['x']),
     y: _i(j['y']),
     z: _i(j['z']),
-    yaw: _i(j['yaw']),
+    yaw: _d(j['yaw']),
     partner: j['partner'] == null ? null : Vec3.fromMap(j['partner'] as Json),
     primary: j['primary'] as bool,
   );
@@ -237,7 +237,7 @@ final class PropMetaWire {
   final int x;
   final int y;
   final int z;
-  final int yaw;
+  final double yaw;
   final Vec3? partner;
   final bool primary;
 
@@ -345,7 +345,7 @@ sealed class ClientMessage {
       ny: _i(j['ny']),
       nz: _i(j['nz']),
       slot: _i(j['slot']),
-      yaw: _i(j['yaw']),
+      yaw: _d(j['yaw']),
     ),
     'craft' => Craft(j['recipe'] as String),
     'moveSlot' => MoveSlot(_i(j['from']), _i(j['to'])),
@@ -473,7 +473,7 @@ final class PlaceBlock extends ClientMessage {
   final int ny;
   final int nz;
   final int slot;
-  final int yaw;
+  final double yaw;
 
   @override
   Json toMap() => {

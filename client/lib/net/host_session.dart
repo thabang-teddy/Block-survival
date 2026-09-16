@@ -1,8 +1,9 @@
 /// Host side of a match — twin of `net/HostSession.ts`. Solo play is a
 /// HostSession with no transport ("host with zero peers"). Accepts joiners,
 /// hands them the world diff, applies their block edits and broadcasts
-/// snapshots at [snapshotHz]. Remote players are tracked for the scoreboard
-/// and mirrored in snapshots; their combat and inventory arrive with P2.
+/// snapshots at [snapshotHz]. Every joiner gets an [Avatar] in the game's
+/// [HostSim], so the host simulates their vitals, inventory and combat and
+/// sends each one its private state.
 library;
 
 import 'dart:async';
@@ -10,7 +11,9 @@ import 'dart:typed_data';
 
 import 'package:block_survival/api/api_client.dart';
 import 'package:block_survival/api/game_api.dart';
+import 'package:block_survival/game/avatar.dart';
 import 'package:block_survival/game/game.dart';
+import 'package:block_survival/game/score.dart';
 import 'package:block_survival/game/ui_state.dart';
 import 'package:block_survival/net/protocol.dart';
 import 'package:block_survival/net/rtc.dart';
@@ -20,44 +23,6 @@ import 'package:block_survival/world/seed.dart';
 /// how often the host refreshes its room row on the API (seconds); in the
 /// global world this is also the heartbeat that keeps everyone's seat
 const double roomRefreshSeconds = 15;
-
-final class RemotePlayer {
-  RemotePlayer({
-    required this.id,
-    required this.name,
-    this.userId,
-    required this.spawn,
-  });
-
-  final String id;
-  final String name;
-  final int? userId;
-  Vec3 spawn;
-  double x = 0;
-  double y = 0;
-  double z = 0;
-  double yaw = 0;
-  double pitch = 0;
-  String anim = 'Idle';
-  int kills = 0;
-  int deaths = 0;
-
-  PlayerSnap snap() => PlayerSnap(
-    id: id,
-    name: name,
-    x: x,
-    y: y,
-    z: z,
-    yaw: yaw,
-    pitch: pitch,
-    anim: anim,
-    held: null,
-    health: 100,
-    dead: false,
-    kills: kills,
-    deaths: deaths,
-  );
-}
 
 final class HostSession implements TransportEvents {
   HostSession(this._api, this._rtc, {String? code})
@@ -70,7 +35,9 @@ final class HostSession implements TransportEvents {
   Game? _game;
   WorldKind _worldKind = WorldKind.own;
   final Set<String> _pending = {};
-  final Map<String, RemotePlayer> players = {};
+  final Map<String, Avatar> players = {};
+  final Map<String, Link> _links = {};
+  final Map<String, int> _inventorySent = {};
   final List<BlockEdit> _outgoing = [];
   double _snapshotTimer = 0;
   double _roomRefreshTimer = 0;
@@ -124,36 +91,24 @@ final class HostSession implements TransportEvents {
     _snapshotTimer += dt;
     if (_snapshotTimer >= 1 / snapshotHz) {
       _snapshotTimer = 0;
-      t.broadcast(encodeHost(_snapshot(game)));
+      t.broadcast(encodeHost(game.sim.snapshot()));
+      _sendPrivateState();
+      _refreshRows(game);
     }
   }
 
-  Snapshot _snapshot(Game game) {
-    final s = game.player.state;
-    return Snapshot(
-      time: game.time,
-      players: [
-        PlayerSnap(
-          id: 'host',
-          name: game.local.name,
-          x: s.x,
-          y: s.y,
-          z: s.z,
-          yaw: s.yaw,
-          pitch: s.pitch,
-          anim: 'Idle',
-          held: game.held?.id,
-          health: game.health,
-          dead: false,
-          kills: game.kills,
-          deaths: game.deaths,
-        ),
-        for (final p in players.values) p.snap(),
-      ],
-      zombies: const [],
-      drops: const [],
-      crates: const [],
-    );
+  /// each client gets what only it may know: its inventory when it changed,
+  /// plus whatever the sim queued (vitals, magazine, teleports, messages)
+  void _sendPrivateState() {
+    for (final p in players.values) {
+      final v = p.inventory.version;
+      if (_inventorySent[p.id] != v) {
+        _inventorySent[p.id] = v;
+        p.push(inventory: p.inventory.all());
+      }
+      final state = p.takeOutbox();
+      if (state != null) _links[p.id]?.send(encodeHost(state));
+    }
   }
 
   void _onRefreshFailed(Object e) {
@@ -186,13 +141,17 @@ final class HostSession implements TransportEvents {
       final name = msg.name.isEmpty
           ? 'Player'
           : msg.name.substring(0, msg.name.length > 16 ? 16 : msg.name.length);
-      final player = RemotePlayer(
+      final player = Avatar(
         id: link.id,
         name: name,
         userId: msg.userId,
         spawn: game.spawn,
       );
+      final saved = game.savedVisitor(msg.userId);
+      if (saved != null) Game.restorePlayer(player, saved, pose: false);
       players[link.id] = player;
+      _links[link.id] = link;
+      game.sim.avatars[link.id] = player;
       link.send(
         encodeHost(
           Welcome(
@@ -207,13 +166,14 @@ final class HostSession implements TransportEvents {
           ),
         ),
       );
+      _inventorySent[link.id] = player.inventory.version;
       link.send(
         encodeHost(
           PrivateState(
-            inventory: const [],
-            magazine: 0,
-            health: 100,
-            spawn: game.spawn,
+            inventory: player.inventory.all(),
+            magazine: player.magazine,
+            health: player.health,
+            spawn: player.spawn,
           ),
         ),
       );
@@ -231,6 +191,8 @@ final class HostSession implements TransportEvents {
         :final yaw,
         :final pitch,
         :final anim,
+        :final slot,
+        :final aiming,
       ):
         player
           ..x = x
@@ -238,17 +200,16 @@ final class HostSession implements TransportEvents {
           ..z = z
           ..yaw = yaw
           ..pitch = pitch
-          ..anim = anim;
-      case BreakBlock(:final x, :final y, :final z):
-        // P2 brings hardness and drops; until then a client's dig is honoured as-is
-        game.applyEdit(BlockEdit(x: x, y: y, z: z, id: 0));
-        _outgoing.add(BlockEdit(x: x, y: y, z: z, id: 0));
-        game.needsSave = true;
+          ..anim = anim
+          ..slot = slot
+          ..aiming = aiming;
       case ClientChat(:final text):
         _transport?.broadcast(encodeHost(HostChat(player.name, text)));
         game.toast('${player.name}: $text');
-      default:
+      case Hello():
         break;
+      default:
+        game.sim.apply(player, msg);
     }
   }
 
@@ -256,26 +217,34 @@ final class HostSession implements TransportEvents {
   void onClose(Link link) {
     _pending.remove(link.id);
     final player = players.remove(link.id);
+    _links.remove(link.id);
+    _inventorySent.remove(link.id);
     final game = _game;
     if (player != null && game != null) {
+      game.sim.avatars.remove(link.id);
+      game.leaveSaved(player);
       game.toast('${player.name} left');
       _playersChanged(game);
     }
   }
 
   void _playersChanged(Game game) {
+    _refreshRows(game);
+    onPlayersChanged?.call();
+  }
+
+  void _refreshRows(Game game) {
     game.remotePlayers = [
       for (final p in players.values)
         ScoreRow(
           id: p.id,
           name: p.name,
-          score: 0,
+          score: computeScore(game.nightsSurvived, p.kills),
           kills: p.kills,
           deaths: p.deaths,
           you: false,
         ),
     ];
-    onPlayersChanged?.call();
   }
 
   Future<void> dispose() async {
