@@ -28,15 +28,19 @@ final class FlutterWebRtc implements RtcFactory {
 final class _FlutterPeer implements RtcPeer {
   _FlutterPeer(this._pc) {
     _pc.onIceCandidate = (c) {
-      if (c.candidate == null) return;
+      if (c.candidate == null || _candidates.isClosed) return;
       _candidates.add({
         'candidate': c.candidate,
         'sdpMid': c.sdpMid,
         'sdpMLineIndex': c.sdpMLineIndex,
       });
     };
-    _pc.onDataChannel = (dc) => _channels.add(_FlutterChannel(dc));
-    _pc.onConnectionState = (s) => _states.add(_stateName(s));
+    _pc.onDataChannel = (dc) {
+      if (!_channels.isClosed) _channels.add(_FlutterChannel(dc));
+    };
+    _pc.onConnectionState = (s) {
+      if (!_states.isClosed) _states.add(_stateName(s));
+    };
   }
 
   final webrtc.RTCPeerConnection _pc;
@@ -108,10 +112,14 @@ final class _FlutterPeer implements RtcPeer {
 
   @override
   Future<void> close() async {
-    await _pc.close();
+    // the plugin may still deliver a callback after close(); detach first
+    _pc.onIceCandidate = null;
+    _pc.onDataChannel = null;
+    _pc.onConnectionState = null;
     await _candidates.close();
     await _channels.close();
     await _states.close();
+    await _pc.close();
   }
 }
 
@@ -129,13 +137,13 @@ final class _FlutterChannel implements RtcChannel {
             _opened.completeError(StateError('channel closed before opening'));
           }
           if (!_closed.isCompleted) _closed.complete();
-          _messages.close();
+          if (!_messages.isClosed) _messages.close();
         default:
           break;
       }
     };
     _dc.onMessage = (m) {
-      if (m.isBinary) _messages.add(m.binary);
+      if (m.isBinary && !_messages.isClosed) _messages.add(m.binary);
     };
   }
 
@@ -164,5 +172,10 @@ final class _FlutterChannel implements RtcChannel {
       unawaited(_dc.send(webrtc.RTCDataChannelMessage.fromBinary(bytes)));
 
   @override
-  Future<void> close() => _dc.close();
+  Future<void> close() async {
+    _dc.onMessage = null;
+    await _dc.close();
+    if (!_closed.isCompleted) _closed.complete();
+    if (!_messages.isClosed) await _messages.close();
+  }
 }

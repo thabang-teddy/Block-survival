@@ -1,6 +1,8 @@
 /// Token sign-in against `POST /api/auth/token` (docs/flutter-client-plan.md D2/S5).
 library;
 
+import 'dart:async';
+
 import 'package:block_survival/api/api_client.dart';
 import 'package:block_survival/api/models.dart';
 import 'package:block_survival/api/token_store.dart';
@@ -31,7 +33,10 @@ final class SignInRefused extends SignInResult {
 }
 
 final class AuthApi {
-  AuthApi(this._client, this._store, {required this.deviceName});
+  AuthApi(this._client, this._store, {required this.deviceName}) {
+    // any 401 means the server no longer honours the token: forget it centrally
+    _client.onUnauthenticated = () => unawaited(_store.writeAccessToken(null));
+  }
 
   final ApiClient _client;
   final TokenStore _store;
@@ -63,10 +68,10 @@ final class AuthApi {
 
   /// poll while parked on approval; true once an admin has approved this device
   Future<bool> deviceApproved() async {
-    final res = await _client.get(
-      '/auth/status',
-      query: {'device': await _store.deviceToken()},
-    );
+    // POST: the device token must never travel in a query string
+    final res = await _client.post('/auth/status', {
+      'device': await _store.deviceToken(),
+    });
     return res.json?['approved'] == true;
   }
 

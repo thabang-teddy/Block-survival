@@ -228,6 +228,56 @@ void main() {
       },
     );
 
+    test('a failed offer stops polling and closes the peer', () {
+      fakeAsync((async) {
+        final mailbox = FakeMailbox();
+        // every send fails: the offer is never posted
+        mailbox.sendFailures.addAll(List.filled(10, 503));
+        final rtc = FakeRtc();
+        final client = ClientTransport(
+          FakeSignalApi(mailbox),
+          rtc,
+          Recorder(),
+          id: 'clientBBBBBB',
+        );
+        Object? error;
+        client
+            .connect('ABCDEF', timeout: const Duration(seconds: 30))
+            .catchError((Object e) {
+              error = e;
+              throw e;
+            })
+            .ignore();
+        async.elapse(const Duration(seconds: 2));
+        expect(error, isNotNull, reason: 'the send failure surfaces');
+        expect(rtc.peers.single.closed, isTrue, reason: 'peer closed');
+        final pollsAtFailure = mailbox.polls;
+        async.elapse(const Duration(seconds: 10));
+        expect(mailbox.polls, pollsAtFailure, reason: 'polling stopped');
+      });
+    });
+
+    test('a host whose answer cannot be sent drops the half-open peer', () {
+      fakeAsync((async) {
+        final mailbox = FakeMailbox();
+        final rtc = FakeRtc();
+        final host = HostTransport(
+          FakeSignalApi(mailbox),
+          rtc,
+          Recorder(),
+          id: 'hostAAAAAAAA',
+        );
+        host.listen('ABCDEF');
+        mailbox.post('clientBBBBBB', host.id, 'offer', {'type': 'offer'});
+        mailbox.sendFailures.addAll(List.filled(10, 503));
+        async.elapse(const Duration(seconds: 3));
+        expect(rtc.peers.single.closed, isTrue);
+        expect(host.links, isEmpty);
+        unawaited(host.dispose());
+        async.elapse(Duration.zero);
+      });
+    });
+
     test('a joiner whose host never answers times out with the room state', () {
       fakeAsync((async) {
         final mailbox = FakeMailbox();

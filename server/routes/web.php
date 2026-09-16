@@ -35,7 +35,8 @@ Route::middleware('guest')->group(function () {
 // gates, but a Sanctum token comes back instead of a session (plan D2 / S5).
 Route::prefix('api/auth')->group(function () {
     Route::post('/token', [ApiAuthController::class, 'token'])->middleware('throttle:10,1');
-    Route::get('/status', [ApiAuthController::class, 'status'])->middleware('throttle:30,1');
+    // POST, not GET: the device token must never sit in a query string (access logs)
+    Route::post('/status', [ApiAuthController::class, 'status'])->middleware('throttle:30,1');
 });
 
 // `access` ends the sign-in when the account is disabled, the login window closes

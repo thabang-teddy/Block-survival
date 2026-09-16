@@ -16,12 +16,13 @@ use Illuminate\Support\Facades\Auth;
 class PreventRequestForgeryUnlessBearer extends PreventRequestForgery
 {
     /**
-     * Sign-in itself has no token yet. It opens no session and answers with a
-     * token only the caller can read, so a forged POST gains an attacker nothing.
+     * Sign-in and the approval poll have no token yet. Neither opens a session,
+     * and each answers with data only the caller can read, so a forged POST
+     * gains an attacker nothing.
      *
      * @var array<int, string>
      */
-    protected $except = ['api/auth/token'];
+    protected $except = ['api/auth/token', 'api/auth/status'];
 
     protected function inExceptArray($request): bool
     {

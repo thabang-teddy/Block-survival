@@ -108,12 +108,12 @@ class TokenAuthTest extends TestCase
         $this->assertNull($device->approved_at);
 
         // the client polls until an admin approves the device on /admin/devices
-        $this->getJson('/api/auth/status?device='.$this->deviceToken)->assertOk()->assertJson(['known' => true, 'approved' => false]);
-        $this->getJson('/api/auth/status?device=nonsense')->assertOk()->assertJson(['known' => false, 'approved' => false]);
+        $this->postJson('/api/auth/status', ['device' => $this->deviceToken])->assertOk()->assertJson(['known' => true, 'approved' => false]);
+        $this->postJson('/api/auth/status', ['device' => 'nonsense'])->assertOk()->assertJson(['known' => false, 'approved' => false]);
 
         $admin = User::factory()->admin()->create();
         $this->actingAs($admin)->post("/admin/devices/{$device->id}/approve")->assertRedirect();
-        $this->getJson('/api/auth/status?device='.$this->deviceToken)->assertOk()->assertJson(['known' => true, 'approved' => true]);
+        $this->postJson('/api/auth/status', ['device' => $this->deviceToken])->assertOk()->assertJson(['known' => true, 'approved' => true]);
 
         // second attempt on the approved device: a token comes back
         $this->postJson('/api/auth/token', $this->tokenRequest())->assertCreated()->assertJsonStructure(['token', 'user' => ['id', 'name', 'email', 'is_admin']]);
@@ -182,6 +182,7 @@ class TokenAuthTest extends TestCase
 
         $this->assertTrue($exempt($sessionRequest('/api/rooms', 'abc')), 'bearer + no session login');
         $this->assertTrue($exempt($sessionRequest('/api/auth/token', null)), 'sign-in has no token yet');
+        $this->assertTrue($exempt($sessionRequest('/api/auth/status', null)), 'the approval poll has no token yet');
         $this->assertFalse($exempt($sessionRequest('/api/rooms', null)), 'no bearer');
         $this->assertFalse($exempt($sessionRequest('/logout', 'abc')), 'bearer outside /api');
 

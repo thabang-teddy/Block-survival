@@ -80,7 +80,9 @@ final class _Peer {
   }
 
   Future<void> close() async {
-    await _candidateSub.cancel();
+    // not awaited: a broadcast cancel has nothing to wait for, and under a
+    // fake async zone its pre-built future never resolves
+    unawaited(_candidateSub.cancel());
     await pc.close();
   }
 }
@@ -143,15 +145,25 @@ final class HostTransport {
           _events.onClose(l);
         });
         unawaited(
-          channel.opened.then((_) {
-            links[link.id] = link;
-            _events.onOpen(link);
-          }),
+          channel.opened
+              .then((_) {
+                links[link.id] = link;
+                _events.onOpen(link);
+              })
+              .catchError((Object _) {
+                // closed before it opened: _wrap's onClose already handled it
+              }),
         );
       });
-      await fresh.setRemote(m.data);
-      final answer = await pc.createAnswer();
-      await s.send(m.from, 'answer', answer);
+      try {
+        await fresh.setRemote(m.data);
+        final answer = await pc.createAnswer();
+        await s.send(m.from, 'answer', answer);
+      } on Object {
+        // a lost answer is a failed join for that client: drop the half-open peer
+        if (_peers[m.from] == fresh) _peers.remove(m.from);
+        await fresh.close();
+      }
     } else if (m.type == 'candidate' && peer != null) {
       await peer.addCandidate(m.data);
     }
@@ -200,11 +212,18 @@ final class ClientTransport {
     final dc = await pc.createDataChannel(_dataChannel);
 
     final done = Completer<Link>();
-    final timer = Timer(timeout, () {
+    // one exit for every way the handshake can fail
+    void fail(Object error) {
       if (done.isCompleted) return;
       unawaited(peer.close());
       s.leave();
-      done.completeError(
+      _peer = null;
+      _signaller = null;
+      done.completeError(error);
+    }
+
+    final timer = Timer(timeout, () {
+      fail(
         s.gone ??
             StateError('Could not reach the host (is the game still open?)'),
       );
@@ -214,15 +233,19 @@ final class ClientTransport {
       _events.onClose(l);
     });
     unawaited(
-      dc.opened.then((_) {
-        if (done.isCompleted) return;
-        timer.cancel();
-        // connected: the mailbox has done its job, stop polling
-        s.leave();
-        link = wrapped;
-        _events.onOpen(wrapped);
-        done.complete(wrapped);
-      }),
+      dc.opened
+          .then((_) {
+            if (done.isCompleted) return;
+            timer.cancel();
+            // connected: the mailbox has done its job, stop polling
+            s.leave();
+            link = wrapped;
+            _events.onOpen(wrapped);
+            done.complete(wrapped);
+          })
+          .catchError((Object _) {
+            // the channel closed before opening: the timeout or fail() reports it
+          }),
     );
     s.messages.listen((m) {
       final f = switch (m.type) {
@@ -238,7 +261,7 @@ final class ClientTransport {
       await s.send(room.hostPeerId, 'offer', offer);
     } on Object catch (e) {
       timer.cancel();
-      if (!done.isCompleted) done.completeError(e);
+      fail(e);
     }
     return done.future;
   }

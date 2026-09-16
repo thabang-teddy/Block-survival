@@ -73,9 +73,9 @@ void main() {
         'pending': true,
         'device': {'id': 3, 'approved': false},
       }, 403);
-      server.routes['GET /api/auth/status'] = (req) => FakeServer.json({
+      server.routes['POST /api/auth/status'] = (req) => FakeServer.json({
         'known': true,
-        'approved': req.url.queryParameters['device'] == 'd' * 64,
+        'approved': (jsonDecode(req.body) as Map)['device'] == 'd' * 64,
       });
 
       expect(

@@ -68,10 +68,10 @@ class AuthController extends Controller
         ], Response::HTTP_CREATED);
     }
 
-    /** approval state of a device token, for the client to poll while parked */
+    /** approval state of a device token, for the client to poll while parked (POST: the token stays out of URLs and logs) */
     public function status(Request $request): JsonResponse
     {
-        $device = Device::findByToken($request->query('device'));
+        $device = Device::findByToken($request->input('device'));
 
         return response()->json(['known' => $device !== null, 'approved' => $device?->isApproved() ?? false]);
     }
