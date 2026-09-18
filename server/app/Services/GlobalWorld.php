@@ -125,6 +125,28 @@ class GlobalWorld
     }
 
     /**
+     * The host's refresh is its own sign of life. A tab in the background gets no frames,
+     * so no heartbeat, and its seat goes stale — but until someone sweeps the queue that
+     * seat is still there, and the host asking again is what proves it is back. False once
+     * the queue has moved on without them (the seat was swept).
+     */
+    public function heartbeat(User $host): bool
+    {
+        GlobalSeat::query()->where('user_id', $host->id)->update(['last_seen_at' => now()]);
+
+        return $this->isHost($host);
+    }
+
+    /** a global room closed: its host has left the world, whoever's session sent the request */
+    public function roomClosed(Room $room): void
+    {
+        $host = $room->user_id !== null ? User::find($room->user_id) : null;
+        if ($host) {
+            $this->leave($host);
+        }
+    }
+
+    /**
      * The host's periodic refresh vouches for everyone connected to it.
      *
      * @param  list<int>  $userIds

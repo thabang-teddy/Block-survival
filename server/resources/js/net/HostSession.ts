@@ -97,19 +97,35 @@ export class HostSession {
     }
   }
 
-  /** a refresh the server refused outright means the global world has a new host; anything else is retried next time */
+  /**
+   * A refresh the server refused outright means we no longer host the global world: the
+   * queue moved on while this tab was away (404: the room was swept; 409: someone else is
+   * at the front) or the browser signed in as someone else (403). Anything else is retried
+   * next time.
+   */
   private onRefreshFailed(e: unknown): void {
-    if (this.worldKind !== 'global' || !(e instanceof ApiError) || (e.status !== 404 && e.status !== 409)) return
-    this.onLost?.(e.message)
+    if (this.worldKind !== 'global' || !(e instanceof ApiError)) return
+    if (e.status === 404) this.onLost?.('The global world moved on to another host while this tab was in the background.')
+    else if (e.status === 403 || e.status === 409) this.onLost?.(e.message)
+  }
+
+  /**
+   * Leave the room for good: tell the players, stop listening and close the room on the
+   * API — resolved once the API has answered, so whatever comes next (re-entering the
+   * global world, whose seat goes with the room) sees the world without us.
+   */
+  async close(): Promise<void> {
+    const t = this.transport
+    if (!t) return
+    this.transport = null
+    t.broadcast(encode({ t: 'bye' }))
+    const closing = api.closeRoom(this.code, t.id).catch(() => {})
+    t.dispose()
+    await closing
   }
 
   dispose(): void {
-    if (this.transport) {
-      this.transport.broadcast(encode({ t: 'bye' }))
-      api.closeRoom(this.code, this.transport.id).catch(() => {})
-    }
-    this.transport?.dispose()
-    this.transport = null
+    void this.close()
   }
 
   private send(link: Link, msg: HostMessage): void {

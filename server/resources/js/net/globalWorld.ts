@@ -6,10 +6,10 @@
  * room, then either open ours or connect. The loop is pure over `GlobalWorldDeps` so it
  * is testable without a network; `liveDeps` wires the real modules.
  */
-import { api, type GlobalState, type SaveData, type SavedPlayer } from './api'
+import { api, ApiError, type GlobalState, type SaveData, type SavedPlayer } from './api'
 import { HostSession } from './HostSession'
 import { ClientSession } from './ClientSession'
-import { GLOBAL_SEED } from '../world/seed'
+import { GLOBAL_SEED, type WorldKind } from '../world/seed'
 import type { Launch } from '../state/uiStore'
 
 /** how often a player still waiting for a host asks the server again */
@@ -46,6 +46,29 @@ export async function handover(name: string, mine: SavedPlayer | null, oldCode: 
   return settle(await deps.claim(), name, mine, oldCode, deps)
 }
 
+/**
+ * The link dropped but the world is most likely still there: ask the server where we
+ * stand and go back in — to the same room if it is still the one, to the new host's if
+ * the queue moved on, or hosting ourselves (with our own gear carried over) if we are
+ * now at the front. A seat that was swept while the tab was away is taken again from
+ * the back of the queue.
+ */
+export async function reconnectGlobal(name: string, mine: SavedPlayer | null, deps: GlobalWorldDeps): Promise<Launch> {
+  let state: GlobalState
+  try {
+    state = await deps.claim()
+  } catch (e) {
+    if (!(e instanceof ApiError) || e.status !== 404) throw e
+    state = await deps.join()
+  }
+  return settle(state, name, mine, null, deps)
+}
+
+/** a friend's room after a dropped link: the same code, dialled again */
+export function rejoinRoom(code: string, name: string, worldKind: WorldKind, deps: GlobalWorldDeps): Promise<Launch> {
+  return clientLaunch(code, name, deps, worldKind)
+}
+
 async function settle(first: GlobalState, name: string, mine: SavedPlayer | null, oldCode: string | null, deps: GlobalWorldDeps): Promise<Launch> {
   const deadline = deps.now() + HANDOVER_TIMEOUT_MS
   let state = first
@@ -67,10 +90,10 @@ async function hostLaunch(name: string, mine: SavedPlayer | null, deps: GlobalWo
   return { role: 'host', name, session, restore, worldKind: 'global', seed: GLOBAL_SEED }
 }
 
-async function clientLaunch(code: string, name: string, deps: GlobalWorldDeps): Promise<Launch> {
+async function clientLaunch(code: string, name: string, deps: GlobalWorldDeps, worldKind: WorldKind = 'global'): Promise<Launch> {
   deps.onStatus?.('Joining…')
   const session = await deps.connect(code, name)
-  return { role: 'client', name, session, worldKind: 'global' }
+  return { role: 'client', name, session, worldKind }
 }
 
 export interface LiveDepsOptions {

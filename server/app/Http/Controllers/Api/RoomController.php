@@ -93,8 +93,14 @@ class RoomController extends Controller
         if (! $room) {
             return response()->json(['message' => 'Not your room.'], 404);
         }
-        if ($room->isGlobal() && ! $this->global->isHost($request->user())) {
-            return response()->json(['message' => 'The global world has moved to another host.'], 409);
+        if ($room->isGlobal()) {
+            // a sign-in in another tab of the same browser swaps the session under the game tab
+            if ($room->user_id !== null && $room->user_id !== $request->user()->id) {
+                return response()->json(['message' => 'This browser is signed in as another player now — reload the page to carry on.'], 403);
+            }
+            if (! $this->global->heartbeat($request->user())) {
+                return response()->json(['message' => 'The global world has moved to another host.'], 409);
+            }
         }
 
         $room->update(['players' => $data['players'], 'expires_at' => now()->addHours(Room::TTL_HOURS)]);
@@ -112,9 +118,9 @@ class RoomController extends Controller
         if ($room) {
             RoomSignal::query()->where('room_code', $room->code)->delete();
             $room->delete();
-            // closing the global world's room is leaving the world
-            if ($room->isGlobal() && $request->user()) {
-                $this->global->leave($request->user());
+            // closing the global world's room is its host leaving the world
+            if ($room->isGlobal()) {
+                $this->global->roomClosed($room);
             }
         }
 

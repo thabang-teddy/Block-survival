@@ -236,6 +236,7 @@ body { user-select: none; }
 .scoreboard tbody tr:not(.you) td:first-child { color: #dfe8ff; }
 .overlay .fine, .menu .fine { margin: 14px 0 0; font-size: 12px; opacity: .55; }
 .overlay.netdown h1 { color: #ff4a3a; }
+.overlay.netdown.busy h1 { color: var(--hud-accent); }
 .overlay.netdown p { color: var(--hud-ink); opacity: .8; font-size: 15px; }
 
 /* ---- main menu */

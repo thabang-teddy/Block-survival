@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
-import type { GlobalState, SaveData, SavedPlayer } from '../api'
-import { CLAIM_POLL_MS, enterGlobal, HANDOVER_TIMEOUT_MS, handover, type GlobalWorldDeps } from '../globalWorld'
+import { ApiError, type GlobalState, type SaveData, type SavedPlayer } from '../api'
+import { CLAIM_POLL_MS, enterGlobal, HANDOVER_TIMEOUT_MS, handover, reconnectGlobal, rejoinRoom, type GlobalWorldDeps } from '../globalWorld'
 import { GLOBAL_SEED } from '../../world/seed'
 import type { HostSession } from '../HostSession'
 
@@ -117,5 +117,43 @@ describe('handover', () => {
     const { deps } = fakeDeps([host])
     deps.claim = vi.fn(async () => { throw new Error('You are not in the global world') })
     await expect(handover('Me', mine, 'OLDOLD', deps)).rejects.toThrow('not in the global world')
+  })
+})
+
+describe('reconnectGlobal', () => {
+  test('a seat still held connects to whoever hosts now — the same room included', async () => {
+    const { deps } = fakeDeps([client('ABCDEF')])
+    const launch = await reconnectGlobal('Me', mine, deps)
+    expect(launch).toMatchObject({ role: 'client', worldKind: 'global', session: { code: 'ABCDEF' } })
+    expect(deps.claim).toHaveBeenCalledOnce()
+    expect(deps.join).not.toHaveBeenCalled()
+  })
+
+  test('a seat that was swept while the tab was away is taken again from the back of the queue', async () => {
+    const { deps } = fakeDeps([host])
+    deps.claim = vi.fn(async () => { throw new ApiError(404, 'You are not in the global world') })
+    const launch = await reconnectGlobal('Me', mine, deps)
+    expect(launch.role).toBe('host')
+    if (launch.role !== 'host') return
+    expect(deps.join).toHaveBeenCalledOnce()
+    expect(launch.restore?.players['7']).toEqual(mine) // our gear as we last saw it, over the stale save
+  })
+
+  test('any other refusal is the error the overlay shows', async () => {
+    const { deps } = fakeDeps([host])
+    deps.claim = vi.fn(async () => { throw new ApiError(0, 'Could not reach the server') })
+    await expect(reconnectGlobal('Me', mine, deps)).rejects.toThrow('Could not reach the server')
+    expect(deps.join).not.toHaveBeenCalled()
+  })
+})
+
+describe('rejoinRoom', () => {
+  test('dials the same room again and keeps the kind of world it was', async () => {
+    const { deps } = fakeDeps([host])
+    const launch = await rejoinRoom('FRIEND', 'Me', 'own', deps)
+    expect(launch).toMatchObject({ role: 'client', worldKind: 'own', session: { code: 'FRIEND' } })
+    expect(deps.connect).toHaveBeenCalledWith('FRIEND', 'Me')
+    expect(deps.claim).not.toHaveBeenCalled()
+    expect(deps.join).not.toHaveBeenCalled()
   })
 })

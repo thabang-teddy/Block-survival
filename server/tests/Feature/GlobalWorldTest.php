@@ -154,6 +154,48 @@ class GlobalWorldTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_a_hosts_late_refresh_revives_its_seat_while_nobody_has_swept_it(): void
+    {
+        $ana = $this->player('Ana');
+        $ben = $this->player('Ben');
+        $this->actingAs($ana)->postJson('/api/global/join');
+        $this->actingAs($ben)->postJson('/api/global/join');
+        $this->openRoom($ana)->assertCreated();
+
+        // Ana's tab sat in the background (no frames, so no heartbeat) past the stale mark,
+        // but nobody entered or asked in the meantime: her refresh is her own sign of life
+        Carbon::setTestNow(now()->addSeconds(GlobalSeat::STALE_SECONDS + 15));
+        $this->actingAs($ana)->patchJson('/api/rooms/ABCDEF', ['host_peer_id' => 'peer-ABCDEF', 'players' => 2, 'user_ids' => [$ben->id]])->assertOk();
+        $this->assertSame(2, GlobalSeat::query()->fresh()->count());
+        $this->actingAs($ben)->postJson('/api/global/claim')->assertOk()->assertJsonPath('status', 'client')->assertJsonPath('room.code', 'ABCDEF');
+
+        // once someone has swept the queue, a stale host is gone for good
+        Carbon::setTestNow(now()->addSeconds(GlobalSeat::STALE_SECONDS + 15));
+        $this->actingAs($this->player('Carl'))->postJson('/api/global/join')->assertOk()->assertJsonPath('status', 'host');
+        $this->actingAs($ana)->patchJson('/api/rooms/ABCDEF', ['host_peer_id' => 'peer-ABCDEF', 'players' => 2])->assertNotFound();
+        Carbon::setTestNow();
+    }
+
+    public function test_a_refresh_from_another_account_in_the_hosts_browser_is_refused_and_closing_frees_the_hosts_seat(): void
+    {
+        $ana = $this->player('Ana');
+        $ben = $this->player('Ben');
+        $this->actingAs($ana)->postJson('/api/global/join');
+        $this->openRoom($ana)->assertCreated();
+        $this->actingAs($ben)->postJson('/api/global/join')->assertOk()->assertJsonPath('status', 'client');
+
+        // Ben signed in in another tab of Ana's browser: her game tab now speaks as him
+        $this->actingAs($ben)->patchJson('/api/rooms/ABCDEF', ['host_peer_id' => 'peer-ABCDEF', 'players' => 1])
+            ->assertForbidden()->assertJsonPath('message', fn (string $m) => str_contains($m, 'another player'));
+        $this->assertTrue(GlobalSeat::query()->where('user_id', $ana->id)->exists());
+
+        // that tab going back to the menu closes Ana's room, which is Ana leaving — not Ben
+        $this->actingAs($ben)->deleteJson('/api/rooms/ABCDEF', ['host_peer_id' => 'peer-ABCDEF'])->assertOk();
+        $this->assertFalse(GlobalSeat::query()->where('user_id', $ana->id)->exists());
+        $this->assertTrue(GlobalSeat::query()->where('user_id', $ben->id)->exists());
+        $this->actingAs($ben)->postJson('/api/global/claim')->assertOk()->assertJsonPath('status', 'host');
+    }
+
     public function test_the_hosts_refresh_keeps_the_players_it_lists_fresh(): void
     {
         $ana = $this->player('Ana');
