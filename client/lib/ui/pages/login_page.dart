@@ -7,6 +7,7 @@ library;
 import 'package:block_survival/app/session.dart';
 import 'package:block_survival/app/settings.dart';
 import 'package:block_survival/ui/theme.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 class LoginPage extends StatefulWidget {
@@ -34,6 +35,16 @@ class _LoginPageState extends State<LoginPage> {
     _server.dispose();
     super.dispose();
   }
+
+  /// `.test` names and localhost live on the developer's PC, which an
+  /// emulator or phone cannot see by name; say where the PC is instead
+  String get _serverHint => switch (defaultTargetPlatform) {
+    TargetPlatform.android || TargetPlatform.iOS =>
+      'Where the game is hosted — the address you open in the browser. '
+          'A dev server on your PC is http://10.0.2.2:8000 from the Android '
+          'emulator, or http://<PC LAN address>:8000 from a phone.',
+    _ => 'Where the game is hosted — the address you open in the browser.',
+  };
 
   bool get _canSubmit =>
       !_busy &&
@@ -122,9 +133,7 @@ class _LoginPageState extends State<LoginPage> {
           onSubmitted: (_) => _submit(),
         ),
         ErrorLine(_serverError),
-        const Fine(
-          'Where the game is hosted — the address you open in the browser.',
-        ),
+        Fine(_serverHint),
       ],
     );
   }
