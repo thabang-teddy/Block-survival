@@ -1,0 +1,22 @@
+{
+ "version": 1,
+ "chunk": 16,
+ "worldChunksY": 8,
+ "seeds": [
+  11,
+  1,
+  12345,
+  987654321,
+  2147483646
+ ],
+ "files": [
+  "primitives.json",
+  "seed-11.json",
+  "seed-1.json",
+  "seed-12345.json",
+  "seed-987654321.json",
+  "seed-2147483646.json"
+ ],
+ "chunkEncoding": "base64(gzip(Uint8Array of CHUNK^3 block ids, index = (x << 8) | (y << 4) | z)); null = all air",
+ "generator": "server/scripts/dump-worldgen-fixtures.ts"
+}

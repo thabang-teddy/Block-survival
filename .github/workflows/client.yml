@@ -1,0 +1,86 @@
+# CI for client/ (the native Flutter app). Runs when the client or the shared
+# contracts change; the golden worldgen fixtures under shared/ are the reason a
+# server-side change to resources/js/world/*.ts must regenerate them in the same
+# PR — this workflow fails on drift (docs/flutter-client-plan.md §4).
+#
+# The ubuntu job analyses, tests and builds Android + Linux; the windows job
+# builds Windows. These checks become required on dev once the client exists.
+name: Client
+
+on:
+  push:
+    branches: [dev, staging, master]
+    paths: ['client/**', 'shared/**', '.github/workflows/client.yml']
+  pull_request:
+    branches: [dev, staging, master]
+    paths: ['client/**', 'shared/**', '.github/workflows/client.yml']
+
+permissions:
+  contents: read
+
+env:
+  # pinned: flutter_gpu is preview API, a channel bump is a deliberate change (client/docs/tech.md)
+  FLUTTER_VERSION: '3.47.4'
+
+defaults:
+  run:
+    working-directory: client
+
+jobs:
+  test:
+    name: Analyze, test, build (Android + Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Linux desktop toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgtk-3-dev libsecret-1-dev
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - run: flutter pub get
+
+      - name: Format
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+
+      - name: Test (golden worldgen fixtures included)
+        run: flutter test --coverage
+
+      - name: Build Android (debug APK)
+        run: flutter build apk --debug
+
+      - name: Build Linux
+        run: flutter build linux --debug
+
+  windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - run: flutter test
+
+      - name: Build Windows
+        run: flutter build windows --debug

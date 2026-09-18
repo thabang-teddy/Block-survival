@@ -1,5 +1,11 @@
 # Block Survival — project rules
 
+## Layout
+
+One project per folder: `server/` (Laravel + web client — run every `php`,
+`composer` and `npm` command from there), `client/` (native Flutter client),
+`shared/` (contracts both clients load). The CI artefact is `server/` itself.
+
 ## Branch flow (enforced)
 
 Promotion order is **`dev` → `staging` → `master`**; never skip a stage and
@@ -14,6 +20,6 @@ never push directly to `staging` or `master`.
 
 ## Testing
 
-`php artisan test` and `npm test` must pass before a PR is opened.
+`php artisan test` and `npm test` (both in `server/`) must pass before a PR is opened.
 `phpunit.xml` pins `APP_MAINTENANCE_MODE=false`; do not read maintenance state
 from `.env` in tests.
