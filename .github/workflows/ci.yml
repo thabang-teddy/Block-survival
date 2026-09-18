@@ -1,7 +1,13 @@
-# CI: test every push and PR; on a push to master/staging, build a deployable
-# tree (vendor/ + public/build/ committed) and force-push it as a single orphan
-# commit to deploy/production or deploy/staging. The cPanel account pulls that
-# branch — see docs/cpanel-go-live.md §5.
+# CI for server/ (the Laravel app + web client): test every push and PR; on a
+# push to master/staging, build a deployable tree (vendor/ + public/build/
+# committed) and force-push it as a single orphan commit to deploy/production
+# or deploy/staging. The cPanel account pulls that branch — see
+# docs/cpanel-go-live.md §5. The artefact is server/ itself, so the deploy
+# branches look exactly as they did when the app lived at the repo root.
+#
+# No path filter on purpose: the flow/test checks are required on PRs, and a
+# filtered-out required check blocks the merge forever. client/ gets its own
+# workflow; a client-only PR also runs this one (about a minute).
 #
 # Promotion order is dev -> staging -> master (§5.0). The `flow` job fails any
 # PR that skips a stage; branch protection on GitHub blocks direct pushes.
@@ -18,7 +24,7 @@ permissions:
 
 env:
   # must match the PHP Selector setting on the cPanel account (§4.2) and
-  # MIN_PHP_ID in deploy/cpanel-deploy.sh
+  # MIN_PHP_ID in server/deploy/cpanel-deploy.sh
   CPANEL_PHP_VERSION: '8.4'
   NODE_VERSION: '24'
   PHP_EXTENSIONS: mbstring, xml, ctype, fileinfo, tokenizer, pdo_sqlite, sqlite3, bcmath, intl, curl, openssl, zip
@@ -48,6 +54,9 @@ jobs:
   test:
     name: Test (PHPUnit + Vitest)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
     steps:
       - uses: actions/checkout@v5
 
@@ -63,7 +72,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.composer/cache
-          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          key: composer-${{ runner.os }}-${{ hashFiles('server/composer.lock') }}
           restore-keys: composer-${{ runner.os }}-
 
       - name: Install PHP dependencies
@@ -82,6 +91,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: server/package-lock.json
 
       - name: Install JS dependencies
         run: npm ci --ignore-scripts
@@ -110,6 +120,9 @@ jobs:
       cancel-in-progress: true
     env:
       DEPLOY_ENV: ${{ github.ref_name == 'master' && 'production' || 'staging' }}
+    defaults:
+      run:
+        working-directory: server
     steps:
       - uses: actions/checkout@v5
 
@@ -125,7 +138,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.composer/cache
-          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          key: composer-${{ runner.os }}-${{ hashFiles('server/composer.lock') }}
           restore-keys: composer-${{ runner.os }}-
 
       - name: Install production PHP dependencies
@@ -136,6 +149,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: server/package-lock.json
 
       - name: Install JS dependencies
         run: npm ci --ignore-scripts
@@ -148,15 +162,10 @@ jobs:
           set -euo pipefail
           ART="$RUNNER_TEMP/artefact"
           mkdir -p "$ART"
-          # everything the server needs, nothing it does not
+          # everything the server needs, nothing it does not (cwd is server/)
           rsync -a \
-            --exclude='.git/' \
-            --exclude='.github/' \
-            --exclude='.claude/' \
             --exclude='node_modules/' \
             --exclude='tests/' \
-            --exclude='Design/' \
-            --exclude='game docs/' \
             --exclude='/.env' \
             --exclude='/.env.*' \
             --exclude='.phpunit.result.cache' \

@@ -10,18 +10,31 @@ One **Laravel 13** application with **Inertia.js + React** as the frontend: the 
 page; menu data (signed-in user, leaderboard, cloud save) arrives as props; the running game talks to
 `/api/*` with the same session. Laravel serves the page, auth, rooms, scores and saves.
 
+The repo holds one project per folder:
+
+```
+server/         the Laravel app and the web client (everything below)
+client/         the native Flutter client (Android, Windows, Linux) — planned, see docs/flutter-client-plan.md
+shared/         contracts both clients must agree on: worldgen fixtures, protocol schema, item/recipe data
+Design/         Blender generators, concept art, the raw assets
+docs/           repo-wide docs (go-live runbook, client plan)
+```
+
+Inside `server/`:
+
 ```
 app/            controllers (PlayController → Inertia 'Play'; AuthController; Api/*), models
 routes/web.php  the page, session auth, and the /api JSON routes
 resources/js/   the game (React + three.js via React Three Fiber) — see the layout below
 public/assets/  GLB characters, props, blocks (from Design/)
-Design/         Blender generators, concept art, the raw assets
-GAME_PROMPT.md  the spec the game was built from
 ```
 
 ## Run it
 
+Everything runs from `server/`:
+
 ```bash
+cd server
 composer install
 cp .env.example .env && php artisan key:generate    # SQLite by default
 php artisan migrate
@@ -32,10 +45,11 @@ php artisan serve --port=8000                        # open http://localhost:800
 
 Production (cPanel, PHP 8.4): CI builds `deploy/staging` / `deploy/production` from `staging` /
 `master` (vendor + Vite bundle committed); on the server run `deploy/cpanel-deploy.sh <app-dir>`,
-which migrates only when something is pending. The full plan is [docs/cpanel-go-live.md](docs/cpanel-go-live.md).
+which migrates only when something is pending. The artefact is `server/` itself. The full plan is
+[docs/cpanel-go-live.md](docs/cpanel-go-live.md).
 
-Tests: `php artisan test` (page, session auth, every /api endpoint) and `npm test` (70 vitest tests
-for the world, mesher, physics, items, zombies, crates, netcode).
+Tests (from `server/`): `php artisan test` (page, session auth, every /api endpoint) and `npm test`
+(vitest: the world, mesher, physics, items, zombies, crates, netcode).
 
 ## Playing
 
@@ -94,3 +108,16 @@ state/       zustand UI store (React never holds sim state)
 
 Dev builds expose `window.__game` (and `__gl`, `__composer`) in the console; `__game.dayNight.time = 299`
 jumps to the first sunset.
+
+
+------
+git fetch origin deploy/staging && git reset --hard origin/deploy/staging
+
+bash deploy/cpanel-deploy.sh
+
+rm -f bootstrap/cache/packages.php bootstrap/cache/services.php bootstrap/cache/config.php bootstrap/cache/routes-v7.php bootstrap/cache/events.php && php artisan package:discover && php artisan optimize:clear && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan event:cache && php artisan up
+
+php artisan tinker --execute='print_r(App\Models\User::where("is_admin", true)->get(["id","name","email","is_disabled","created_at"])->toArray());'
+
+php artisan migrate --force && php artisan admin:sync
+------

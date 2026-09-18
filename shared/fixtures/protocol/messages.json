@@ -1,0 +1,464 @@
+{
+ "version": 1,
+ "constants": {
+  "INPUT_HZ": 30,
+  "SNAPSHOT_HZ": 20,
+  "INTERPOLATION_DELAY": 0.1,
+  "MAX_PLAYERS": 4,
+  "ROOM_CODE_LENGTH": 6
+ },
+ "encoding": "msgpackr pack() with default options: standard MessagePack, maps with string keys, integral numbers as ints, others as float64",
+ "generator": "server/scripts/dump-protocol-fixtures.ts",
+ "messages": [
+  {
+   "side": "client",
+   "name": "hello",
+   "message": {
+    "t": "hello",
+    "v": 1,
+    "name": "Teddy",
+    "userId": 7
+   },
+   "base64": "3gAEoXSlaGVsbG+hdgGkbmFtZaVUZWRkeaZ1c2VySWQH"
+  },
+  {
+   "side": "client",
+   "name": "helloGuest",
+   "message": {
+    "t": "hello",
+    "v": 1,
+    "name": "Guest"
+   },
+   "base64": "3gADoXSlaGVsbG+hdgGkbmFtZaVHdWVzdA=="
+  },
+  {
+   "side": "client",
+   "name": "input",
+   "message": {
+    "t": "input",
+    "x": 0.5,
+    "y": 37,
+    "z": -12.25,
+    "yaw": 1.5707963267948966,
+    "pitch": -0.1,
+    "anim": "Run",
+    "slot": 3,
+    "aiming": false
+   },
+   "base64": "3gAJoXSlaW5wdXSheMs/4AAAAAAAAKF5JaF6y8AogAAAAAAAo3lhd8s/+SH7VEQtGKVwaXRjaMu/uZmZmZmZmqRhbmlto1J1bqRzbG90A6ZhaW1pbmfC"
+  },
+  {
+   "side": "client",
+   "name": "inputAiming",
+   "message": {
+    "t": "input",
+    "x": -100.125,
+    "y": 80,
+    "z": 3,
+    "yaw": 0,
+    "pitch": 0.75,
+    "anim": "Aim",
+    "slot": 0,
+    "aiming": true
+   },
+   "base64": "3gAJoXSlaW5wdXSheMvAWQgAAAAAAKF5UKF6A6N5YXcApXBpdGNoyz/oAAAAAAAApGFuaW2jQWltpHNsb3QApmFpbWluZ8M="
+  },
+  {
+   "side": "client",
+   "name": "break",
+   "message": {
+    "t": "break",
+    "x": 10,
+    "y": 36,
+    "z": -4
+   },
+   "base64": "3gAEoXSlYnJlYWuheAqheSShevw="
+  },
+  {
+   "side": "client",
+   "name": "place",
+   "message": {
+    "t": "place",
+    "x": 10,
+    "y": 36,
+    "z": -4,
+    "nx": 0,
+    "ny": 1,
+    "nz": 0,
+    "slot": 2,
+    "yaw": 3
+   },
+   "base64": "3gAJoXSlcGxhY2WheAqheSShevyibngAom55AaJuegCkc2xvdAKjeWF3Aw=="
+  },
+  {
+   "side": "client",
+   "name": "craft",
+   "message": {
+    "t": "craft",
+    "recipe": "planks"
+   },
+   "base64": "3gACoXSlY3JhZnSmcmVjaXBlpnBsYW5rcw=="
+  },
+  {
+   "side": "client",
+   "name": "moveSlot",
+   "message": {
+    "t": "moveSlot",
+    "from": 0,
+    "to": 8
+   },
+   "base64": "3gADoXSobW92ZVNsb3SkZnJvbQCidG8I"
+  },
+  {
+   "side": "client",
+   "name": "dropHeld",
+   "message": {
+    "t": "dropHeld",
+    "slot": 1,
+    "dx": 0.7071067811865476,
+    "dz": -0.7071067811865476
+   },
+   "base64": "3gAEoXSoZHJvcEhlbGSkc2xvdAGiZHjLP+agnmZ/O82iZHrLv+agnmZ/O80="
+  },
+  {
+   "side": "client",
+   "name": "interact",
+   "message": {
+    "t": "interact",
+    "x": 1,
+    "y": 2,
+    "z": 3,
+    "block": 16,
+    "crate": null
+   },
+   "base64": "3gAGoXSoaW50ZXJhY3SheAGheQKhegOlYmxvY2sQpWNyYXRlwA=="
+  },
+  {
+   "side": "client",
+   "name": "interactCrate",
+   "message": {
+    "t": "interact",
+    "x": 1,
+    "y": 2,
+    "z": 3,
+    "block": 0,
+    "crate": 42
+   },
+   "base64": "3gAGoXSoaW50ZXJhY3SheAGheQKhegOlYmxvY2sApWNyYXRlKg=="
+  },
+  {
+   "side": "client",
+   "name": "swing",
+   "message": {
+    "t": "swing",
+    "ox": 0.5,
+    "oy": 38.6,
+    "oz": 0.5,
+    "dx": 0,
+    "dy": -0.2,
+    "dz": -0.9797958971132712
+   },
+   "base64": "3gAHoXSlc3dpbmeib3jLP+AAAAAAAACib3nLQENMzMzMzM2ib3rLP+AAAAAAAACiZHgAomR5y7/JmZmZmZmaomR6y7/vWnzs22hK"
+  },
+  {
+   "side": "client",
+   "name": "fire",
+   "message": {
+    "t": "fire",
+    "ox": 0.5,
+    "oy": 38.6,
+    "oz": 0.5,
+    "dx": 1,
+    "dy": 0,
+    "dz": 0
+   },
+   "base64": "3gAHoXSkZmlyZaJveMs/4AAAAAAAAKJvectAQ0zMzMzMzaJvess/4AAAAAAAAKJkeAGiZHkAomR6AA=="
+  },
+  {
+   "side": "client",
+   "name": "reload",
+   "message": {
+    "t": "reload"
+   },
+   "base64": "3gABoXSmcmVsb2Fk"
+  },
+  {
+   "side": "client",
+   "name": "chat",
+   "message": {
+    "t": "chat",
+    "text": "héllo — ünïcode ✓"
+   },
+   "base64": "3gACoXSkY2hhdKR0ZXh0uGjDqWxsbyDigJQgw7xuw69jb2RlIOKckw=="
+  },
+  {
+   "side": "host",
+   "name": "welcome",
+   "message": {
+    "t": "welcome",
+    "v": 1,
+    "you": "abcDEF123",
+    "seed": 11,
+    "time": 123.5,
+    "edits": [
+     {
+      "x": 1,
+      "y": 37,
+      "z": 1,
+      "id": 8
+     },
+     {
+      "x": 2,
+      "y": 37,
+      "z": 1,
+      "id": 0
+     },
+     {
+      "x": 3,
+      "y": 37,
+      "z": 1,
+      "id": 15,
+      "meta": {
+       "id": 15,
+       "x": 3,
+       "y": 37,
+       "z": 1,
+       "yaw": 1,
+       "primary": true
+      }
+     },
+     {
+      "x": 4,
+      "y": 37,
+      "z": 1,
+      "id": 17,
+      "meta": {
+       "id": 17,
+       "x": 4,
+       "y": 37,
+       "z": 1,
+       "yaw": 2,
+       "partner": {
+        "x": 4,
+        "y": 37,
+        "z": 2
+       },
+       "primary": true
+      }
+     }
+    ],
+    "spawn": {
+     "x": 0.5,
+     "y": 37,
+     "z": 0.5
+    }
+   },
+   "base64": "3gAHoXSnd2VsY29tZaF2AaN5b3WpYWJjREVGMTIzpHNlZWQLpHRpbWXLQF7gAAAAAAClZWRpdHOU3gAEoXgBoXkloXoBomlkCN4ABKF4AqF5JaF6AaJpZADeAAWheAOheSWhegGiaWQPpG1ldGHeAAaiaWQPoXgDoXkloXoBo3lhdwGncHJpbWFyecPeAAWheASheSWhegGiaWQRpG1ldGHeAAeiaWQRoXgEoXkloXoBo3lhdwKncGFydG5lct4AA6F4BKF5JaF6AqdwcmltYXJ5w6VzcGF3bt4AA6F4yz/gAAAAAAAAoXkloXrLP+AAAAAAAAA="
+  },
+  {
+   "side": "host",
+   "name": "snap",
+   "message": {
+    "t": "snap",
+    "time": 456.75,
+    "players": [
+     {
+      "id": "abcDEF123",
+      "name": "Teddy",
+      "x": 0.5,
+      "y": 37,
+      "z": 0.5,
+      "yaw": 0,
+      "pitch": 0,
+      "anim": "Idle",
+      "held": "pickaxe",
+      "health": 20,
+      "dead": false,
+      "kills": 3,
+      "deaths": 1
+     },
+     {
+      "id": "zzz",
+      "name": "Kiddo",
+      "x": -3,
+      "y": 38,
+      "z": 2.5,
+      "yaw": 3.1,
+      "pitch": -0.4,
+      "anim": "Walk",
+      "held": null,
+      "health": 0,
+      "dead": true,
+      "kills": 0,
+      "deaths": 2
+     }
+    ],
+    "zombies": [
+     {
+      "id": 1,
+      "kind": "Basic",
+      "x": 10,
+      "y": 36,
+      "z": 10,
+      "yaw": 1,
+      "state": "chase",
+      "attacked": false,
+      "burnTimer": 0
+     },
+     {
+      "id": 2,
+      "kind": "Toxic",
+      "x": 12,
+      "y": 36,
+      "z": 9,
+      "yaw": 2,
+      "state": "burn",
+      "attacked": true,
+      "burnTimer": 1.25
+     }
+    ],
+    "drops": [
+     {
+      "id": 5,
+      "item": "log",
+      "x": 1.5,
+      "y": 37.5,
+      "z": 1.5
+     }
+    ],
+    "crates": [
+     {
+      "id": 9,
+      "x": -3,
+      "y": 38,
+      "z": 2,
+      "items": 4
+     }
+    ]
+   },
+   "base64": "3gAGoXSkc25hcKR0aW1ly0B8jAAAAAAAp3BsYXllcnOS3gANomlkqWFiY0RFRjEyM6RuYW1lpVRlZGR5oXjLP+AAAAAAAACheSWhess/4AAAAAAAAKN5YXcApXBpdGNoAKRhbmltpElkbGWkaGVsZKdwaWNrYXhlpmhlYWx0aBSkZGVhZMKla2lsbHMDpmRlYXRocwHeAA2iaWSjenp6pG5hbWWlS2lkZG+heP2heSahestABAAAAAAAAKN5YXfLQAjMzMzMzM2lcGl0Y2jLv9mZmZmZmZqkYW5pbaRXYWxrpGhlbGTApmhlYWx0aACkZGVhZMOla2lsbHMApmRlYXRocwKnem9tYmllc5LeAAmiaWQBpGtpbmSlQmFzaWOheAqheSShegqjeWF3AaVzdGF0ZaVjaGFzZahhdHRhY2tlZMKpYnVyblRpbWVyAN4ACaJpZAKka2luZKVUb3hpY6F4DKF5JKF6CaN5YXcCpXN0YXRlpGJ1cm6oYXR0YWNrZWTDqWJ1cm5UaW1lcss/9AAAAAAAAKVkcm9wc5HeAAWiaWQFpGl0ZW2jbG9noXjLP/gAAAAAAAChectAQsAAAAAAAKF6yz/4AAAAAAAApmNyYXRlc5HeAAWiaWQJoXj9oXkmoXoCpWl0ZW1zBA=="
+  },
+  {
+   "side": "host",
+   "name": "snapEmpty",
+   "message": {
+    "t": "snap",
+    "time": 0,
+    "players": [],
+    "zombies": [],
+    "drops": [],
+    "crates": []
+   },
+   "base64": "3gAGoXSkc25hcKR0aW1lAKdwbGF5ZXJzkKd6b21iaWVzkKVkcm9wc5CmY3JhdGVzkA=="
+  },
+  {
+   "side": "host",
+   "name": "state",
+   "message": {
+    "t": "state",
+    "inventory": [
+     {
+      "id": "log",
+      "count": 12
+     },
+     null,
+     {
+      "id": "rifle",
+      "count": 1
+     }
+    ],
+    "magazine": 6,
+    "reloading": false,
+    "health": 17,
+    "poisoned": true,
+    "hurtAt": 12.5,
+    "dead": false,
+    "respawnIn": 0,
+    "message": "You feel sick.",
+    "fx": [
+     {
+      "kind": "tracer",
+      "ax": 0,
+      "ay": 1,
+      "az": 2,
+      "bx": 3,
+      "by": 4,
+      "bz": 5
+     },
+     {
+      "kind": "flash",
+      "ax": 0,
+      "ay": 0,
+      "az": 0,
+      "bx": 0,
+      "by": 0,
+      "bz": 0
+     }
+    ]
+   },
+   "base64": "3gALoXSlc3RhdGWpaW52ZW50b3J5k94AAqJpZKNsb2elY291bnQMwN4AAqJpZKVyaWZsZaVjb3VudAGobWFnYXppbmUGqXJlbG9hZGluZ8KmaGVhbHRoEahwb2lzb25lZMOmaHVydEF0y0ApAAAAAAAApGRlYWTCqXJlc3Bhd25JbgCnbWVzc2FnZa5Zb3UgZmVlbCBzaWNrLqJmeJLeAAeka2luZKZ0cmFjZXKiYXgAomF5AaJhegKiYngDomJ5BKJiegXeAAeka2luZKVmbGFzaKJheACiYXkAomF6AKJieACiYnkAomJ6AA=="
+  },
+  {
+   "side": "host",
+   "name": "stateTeleport",
+   "message": {
+    "t": "state",
+    "teleport": {
+     "x": 0.5,
+     "y": 37,
+     "z": 0.5
+    },
+    "spawn": {
+     "x": 0.5,
+     "y": 37,
+     "z": 0.5
+    },
+    "dead": true,
+    "respawnIn": 5
+   },
+   "base64": "3gAFoXSlc3RhdGWodGVsZXBvcnTeAAOheMs/4AAAAAAAAKF5JaF6yz/gAAAAAAAApXNwYXdu3gADoXjLP+AAAAAAAACheSWhess/4AAAAAAAAKRkZWFkw6lyZXNwYXduSW4F"
+  },
+  {
+   "side": "host",
+   "name": "blocks",
+   "message": {
+    "t": "blocks",
+    "edits": [
+     {
+      "x": 1,
+      "y": 2,
+      "z": 3,
+      "id": 4
+     }
+    ]
+   },
+   "base64": "3gACoXSmYmxvY2tzpWVkaXRzkd4ABKF4AaF5AqF6A6JpZAQ="
+  },
+  {
+   "side": "host",
+   "name": "chat",
+   "message": {
+    "t": "chat",
+    "from": "Teddy",
+    "text": "gg"
+   },
+   "base64": "3gADoXSkY2hhdKRmcm9tpVRlZGR5pHRleHSiZ2c="
+  },
+  {
+   "side": "host",
+   "name": "full",
+   "message": {
+    "t": "full"
+   },
+   "base64": "3gABoXSkZnVsbA=="
+  },
+  {
+   "side": "host",
+   "name": "bye",
+   "message": {
+    "t": "bye"
+   },
+   "base64": "3gABoXSjYnll"
+  }
+ ]
+}
