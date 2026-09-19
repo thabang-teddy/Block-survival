@@ -10,6 +10,7 @@ import type { HostSession } from '../net/HostSession'
 import type { ClientSession } from '../net/ClientSession'
 import type { SaveData } from '../net/api'
 import type { WorldKind } from '../world/seed'
+import type { Where } from '../game/locator'
 
 export interface ScoreRow {
   id: string
@@ -18,6 +19,21 @@ export interface ScoreRow {
   kills: number
   deaths: number
   you: boolean
+  /** distance and direction to this player (issue #15); null for you, and while the board is hidden */
+  where: Where | null
+}
+
+/** a HUD marker on (or pointing at) another player; coordinates are NDC, −1..1 */
+export interface PlayerMarker {
+  id: string
+  name: string
+  /** whole metres */
+  distance: number
+  x: number
+  y: number
+  onScreen: boolean
+  /** degrees clockwise from up, for the off-screen arrow */
+  angle: number
 }
 
 /** how the current run was started; null = main menu */
@@ -81,6 +97,8 @@ interface UiState extends UiSnapshot {
   /** 'host-left' / 'error' overlays for clients */
   netStatus: string
   netError: string
+  /** where the other players are, refreshed every frame apart from the snapshot (issue #15) */
+  markers: PlayerMarker[]
   setGame(game: Game | null): void
   /** start a run (solo/host/client); the Scene builds the Game from it */
   start(launch: Launch): void
@@ -88,15 +106,26 @@ interface UiState extends UiSnapshot {
   /** back to the main menu (tears the Game down) */
   restart(): void
   sync(next: UiSnapshot): void
+  syncMarkers(next: PlayerMarker[]): void
 }
 
 const roundPos = (p: [number, number, number]): [number, number, number] =>
   [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10, Math.round(p[2] * 10) / 10]
 const q = (v: number, step: number): number => Math.round(v / step) * step
+const sameWhere = (a: Where | null, b: Where | null): boolean =>
+  a === b || (!!a && !!b && a.distance === b.distance && a.bearing === b.bearing && a.dy === b.dy)
 const sameRows = (a: ScoreRow[], b: ScoreRow[]): boolean =>
   a.length === b.length && a.every((r, i) => {
     const o = b[i]
-    return r.id === o.id && r.name === o.name && r.score === o.score && r.kills === o.kills && r.deaths === o.deaths
+    return r.id === o.id && r.name === o.name && r.score === o.score && r.kills === o.kills && r.deaths === o.deaths &&
+      sameWhere(r.where, o.where)
+  })
+/** markers are quantised before they get here, so exact comparison is enough */
+const sameMarkers = (a: PlayerMarker[], b: PlayerMarker[]): boolean =>
+  a.length === b.length && a.every((m, i) => {
+    const o = b[i]
+    return m.id === o.id && m.name === o.name && m.distance === o.distance && m.x === o.x && m.y === o.y &&
+      m.onScreen === o.onScreen && m.angle === o.angle
   })
 
 export const useUiStore = create<UiState>((set, get) => ({
@@ -141,10 +170,14 @@ export const useUiStore = create<UiState>((set, get) => ({
   launch: null,
   netStatus: '',
   netError: '',
+  markers: [],
   setGame: game => set({ game }),
   start: launch => set(state => ({ launch, run: state.run + 1, netStatus: '', netError: '' })),
   setNetStatus: (netStatus, netError = '') => set({ netStatus, netError }),
-  restart: () => set(state => ({ launch: null, run: state.run + 1, netStatus: '', netError: '' })),
+  restart: () => set(state => ({ launch: null, run: state.run + 1, netStatus: '', netError: '', markers: [] })),
+  syncMarkers(next) {
+    if (!sameMarkers(get().markers, next)) set({ markers: next })
+  },
   sync(next) {
     const cur = get()
     const pos = roundPos(next.position)

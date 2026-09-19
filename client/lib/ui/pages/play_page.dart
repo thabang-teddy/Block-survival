@@ -165,7 +165,8 @@ class _PlayPageState extends State<PlayPage>
       dropHeld: playing && _dropHeld,
       togglePanel: _togglePanel,
       selectSlot: _selectSlot,
-      scoreboard: _down(LogicalKeyboardKey.tab),
+      // the pause screen shows the board too
+      scoreboard: _down(LogicalKeyboardKey.tab) || _paused,
     );
     _dig = false;
     _place = false;
