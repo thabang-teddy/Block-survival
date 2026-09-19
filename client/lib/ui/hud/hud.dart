@@ -5,13 +5,17 @@
 /// game's [GameUiState].
 library;
 
+import 'dart:math' as math;
+
 import 'package:block_survival/api/game_api.dart';
 import 'package:block_survival/app/launch.dart';
 import 'package:block_survival/game/day_night.dart';
+import 'package:block_survival/game/locator.dart';
 import 'package:block_survival/game/score.dart';
 import 'package:block_survival/game/ui_state.dart';
 import 'package:block_survival/ui/hud/crafting_panel.dart';
 import 'package:block_survival/ui/hud/invite_panel.dart';
+import 'package:block_survival/ui/hud/player_markers.dart';
 import 'package:block_survival/ui/hud/widgets.dart';
 import 'package:block_survival/ui/theme.dart';
 import 'package:block_survival/world/palette.dart';
@@ -178,6 +182,13 @@ class _HudLayerState extends State<HudLayer> {
               const Center(
                 child: IgnorePointer(
                   child: Icon(Icons.add, size: 22, color: Colors.white),
+                ),
+              ),
+            // where the other players are (issue #15)
+            if (u.locked && !widget.paused && !u.aiming)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: PlayerMarkersLayer(camera: launch.game.camera, ui: u),
                 ),
               ),
             Positioned(
@@ -356,6 +367,7 @@ class _HudLayerState extends State<HudLayer> {
               _Th('Kills'),
               _Th('Deaths'),
               _Th('Time'),
+              _Th('Where'),
             ],
           ),
           for (final p in u.players)
@@ -370,12 +382,16 @@ class _HudLayerState extends State<HudLayer> {
                 _Td('${p.kills}'),
                 _Td('${p.deaths}'),
                 _Td(formatTime(u.timeAlive)),
+                _Where(p.where),
               ],
             ),
           TableRow(
             children: [
-              _Td('best ${u.bestScore} · nights × 100 + kills × 5', dim: true),
-              for (var i = 0; i < 5; i++) const SizedBox.shrink(),
+              _Td(
+                'best ${u.bestScore} · nights × 100 + kills × 5 · arrows point from where you look',
+                dim: true,
+              ),
+              for (var i = 0; i < 6; i++) const SizedBox.shrink(),
             ],
           ),
         ],
@@ -555,6 +571,43 @@ class _Th extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// the scoreboard's answer to "where are they?": an arrow relative to where
+/// you look, the distance, and up/down when it matters
+class _Where extends StatelessWidget {
+  const _Where(this.where);
+
+  final Where? where;
+
+  @override
+  Widget build(BuildContext context) {
+    final w = where;
+    if (w == null) return const _Td('—');
+    final hint = verticalHint(w.dy);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Transform.rotate(
+            angle: w.bearing * math.pi / 180,
+            child: const Text(
+              '▲',
+              style: TextStyle(fontSize: 12, color: Hud.accent),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text('${w.distance} m', style: const TextStyle(color: Hud.ink)),
+          if (hint.isNotEmpty)
+            Text(
+              ' · $hint',
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _Td extends StatelessWidget {

@@ -71,6 +71,11 @@ Top-left logo. Top-right **countdown timer** (`MM:SS`, turns red and pulses at `
 Bottom-left **health bar** (green, 100 max) and **stamina bar** (yellow). Bottom-right
 **ammo** `mag / reserve` (e.g. `30 / 120`) with a magazine icon. Centre crosshair; hotbar of 9
 slots along the bottom centre. Damage vignette on hit. All HUD is React DOM over the canvas.
+**Finding the others (issue #15):** a tag over every other player in view (name + distance,
+dropped within 12 m where the model's own label takes over) and a tag pinned to the screen edge,
+arrow first, for every player out of view — behind you means the bottom edge. The Tab scoreboard
+has a **Where** column: distance, an arrow relative to where you look, and "N m up/down" when the
+height difference is 6 m or more. `game/locator.ts` holds the pure maths; the native client twins it.
 
 ## 4. Game loop: day / night and zombies
 

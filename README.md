@@ -55,8 +55,9 @@ Tests (from `server/`): `php artisan test` (page, session auth, every /api endpo
 
 WASD move · Shift sprint · Space jump · **V** first/third person · mouse look · hold **left** dig /
 swing · **right** place, or aim with the rifle · **1–9** hotbar · **Q** drop · **R** reload ·
-**E** inventory & crafting · **F** workbench / set respawn at a bed / take loot · **Tab** scoreboard ·
-Esc pause.
+**E** inventory & crafting · **F** workbench / set respawn at a bed / take loot · **Tab** scoreboard
+(with each player's distance and direction) · Esc pause. Other players show as tags on screen — on
+them when in view, pinned to the edge with an arrow when not — so you can find each other.
 
 Punch logs, craft planks → sticks → workbench → a wooden pickaxe by hand; everything else (stone and
 iron pickaxes, sword, glass, walls, torches, a bed and finally a rifle) needs the workbench. The first sunset is at 5:00 — build walls first.
