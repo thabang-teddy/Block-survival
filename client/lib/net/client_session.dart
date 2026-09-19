@@ -170,6 +170,11 @@ final class ClientSession implements TransportEvents {
             ..deaths = mine.deaths;
         }
         game.remotePlayers = this.players.where((p) => !p.you).toList();
+        game.remotePoses = [
+          for (final p in players)
+            if (p.id != _you)
+              PlayerPose(id: p.id, name: p.name, x: p.x, y: p.y, z: p.z),
+        ];
       case PrivateState():
         if (game == null) return;
         _applyPrivate(game, msg);

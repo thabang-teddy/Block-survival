@@ -3,6 +3,7 @@
 library;
 
 import 'package:block_survival/game/day_night.dart';
+import 'package:block_survival/game/locator.dart';
 import 'package:block_survival/items/inventory.dart';
 import 'package:flutter/foundation.dart';
 
@@ -23,6 +24,7 @@ final class ScoreRow {
     required this.kills,
     required this.deaths,
     required this.you,
+    this.where,
   });
 
   final String id;
@@ -31,6 +33,36 @@ final class ScoreRow {
   final int kills;
   final int deaths;
   final bool you;
+
+  /// distance and direction to this player (issue #15); null for you
+  final Where? where;
+
+  ScoreRow withWhere(Where? where) => ScoreRow(
+    id: id,
+    name: name,
+    score: score,
+    kills: kills,
+    deaths: deaths,
+    you: you,
+    where: where,
+  );
+}
+
+/// another player's place in the world, for the HUD's markers (issue #15)
+final class PlayerPose {
+  const PlayerPose({
+    required this.id,
+    required this.name,
+    required this.x,
+    required this.y,
+    required this.z,
+  });
+
+  final String id;
+  final String name;
+  final double x;
+  final double y;
+  final double z;
 }
 
 final class Ammo {
@@ -89,6 +121,9 @@ final class GameUiState extends ChangeNotifier {
   double timeAlive = 0;
   bool scoreboard = false;
   List<ScoreRow> players = const [];
+
+  /// the other players' positions this frame; the HUD projects them onto the screen
+  List<PlayerPose> poses = const [];
   String? roomCode;
   Role role = Role.host;
   NetStatus netStatus = NetStatus.none;

@@ -10,7 +10,10 @@ import { ItemIcon } from './ItemIcon'
 import { CraftingPanel } from './CraftingPanel'
 import { MainMenu } from './MainMenu'
 import { InvitePanel } from './InvitePanel'
+import { PlayerMarkers } from './PlayerMarkers'
 import { formatTime } from '../game/score'
+import { verticalHint } from '../game/locator'
+import type { ScoreRow } from '../state/uiStore'
 import { savedPlayerOf } from '../game/saveState'
 import { api } from '../net/api'
 import { handover, liveDeps, reconnectGlobal, rejoinRoom } from '../net/globalWorld'
@@ -30,6 +33,18 @@ function Slot({ stack, index, active }: { stack: ItemStack | null; index: number
       {stack && stack.count > 1 && <span className="count">{stack.count}</span>}
       {def && active && <span className="name">{def.name}</span>}
     </div>
+  )
+}
+
+/** the scoreboard's answer to "where are they?": distance, an arrow relative to where you look, up/down */
+function Where({ row }: { row: ScoreRow }) {
+  if (!row.where) return <td className="where">—</td>
+  const hint = verticalHint(row.where.dy)
+  return (
+    <td className="where">
+      <span className="arrow" style={{ transform: `rotate(${row.where.bearing}deg)` }}>▲</span>
+      {row.where.distance} m{hint && <span className="vert"> · {hint}</span>}
+    </td>
   )
 }
 
@@ -220,6 +235,8 @@ export function Hud() {
       {message && <div className="toast">{message}</div>}
       {locked && interactHint && <div className="interact-hint">{interactHint}</div>}
 
+      <PlayerMarkers />
+
       {locked && !aiming && (
         <div className="crosshair" aria-hidden>
           {breakProgress > 0 && (
@@ -245,17 +262,18 @@ export function Hud() {
       {(scoreboard || (!locked && panel === 'none')) && (
         <table className="scoreboard">
           <thead>
-            <tr><th>Player</th><th>Score</th><th>Nights</th><th>Kills</th><th>Deaths</th><th>Time</th></tr>
+            <tr><th>Player</th><th>Score</th><th>Nights</th><th>Kills</th><th>Deaths</th><th>Time</th><th>Where</th></tr>
           </thead>
           <tbody>
             {players.map(p => (
               <tr key={p.id} className={p.you ? 'you' : ''}>
                 <td>{p.name}{p.you ? ' (you)' : ''}</td><td>{p.score}</td><td>{nightsSurvived}</td><td>{p.kills}</td><td>{p.deaths}</td><td>{formatTime(timeAlive)}</td>
+                <Where row={p} />
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr><td colSpan={6}>best {bestScore} · nights × 100 + kills × 5</td></tr>
+            <tr><td colSpan={7}>best {bestScore} · nights × 100 + kills × 5 · arrows point from where you look</td></tr>
           </tfoot>
         </table>
       )}

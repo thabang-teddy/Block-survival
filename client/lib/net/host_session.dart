@@ -70,6 +70,8 @@ final class HostSession implements TransportEvents {
     final game = _game;
     final t = _transport;
     if (game == null || t == null) return;
+    // the markers follow the avatars every frame, not just at snapshot rate
+    _refreshPoses(game);
     _roomRefreshTimer += dt;
     if (_roomRefreshTimer >= roomRefreshSeconds) {
       _roomRefreshTimer = 0;
@@ -245,6 +247,15 @@ final class HostSession implements TransportEvents {
           deaths: p.deaths,
           you: false,
         ),
+    ];
+    _refreshPoses(game);
+  }
+
+  /// the host simulates everyone, so the poses come straight off the avatars
+  void _refreshPoses(Game game) {
+    game.remotePoses = [
+      for (final p in players.values)
+        PlayerPose(id: p.id, name: p.name, x: p.x, y: p.y, z: p.z),
     ];
   }
 

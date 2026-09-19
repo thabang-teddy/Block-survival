@@ -42,8 +42,9 @@ import { api, type SaveData } from '../net/api'
 import { Autosave } from './autosave'
 import { collectSave, restorePlayer, visitorsOf, zombiesToRestore } from './saveState'
 import { Visitors } from './visitors'
+import { projectMarker, whereOf } from './locator'
 import type { ItemStack } from '../items/inventory'
-import { useUiStore } from '../state/uiStore'
+import { useUiStore, type PlayerMarker } from '../state/uiStore'
 
 export const REACH = 5
 export type CameraMode = 'first' | 'third'
@@ -52,6 +53,10 @@ export type Panel = 'none' | 'crafting'
 export type Role = 'host' | 'client'
 
 const MAX_DT = 1 / 20
+/** an on-screen marker is dropped this close: the name label over the player takes over */
+const MARKER_NEAR_M = 12
+/** markers float this far above the feet */
+const MARKER_HEAD_M = PLAYER.height + 0.4
 const SWING_SECONDS = 0.4
 const THIRD_PERSON = { back: 3.5, right: 0.6, up: 1.6, clearance: 0.35 } as const
 const RIFLE_MAG = 30
@@ -154,6 +159,7 @@ export class Game {
   private packing = false
   private readonly tmpDir = new THREE.Vector3()
   private readonly tmpRight = new THREE.Vector3()
+  private readonly tmpViewProj = new THREE.Matrix4()
 
   get inventory() { return this.local.inventory }
   get hotbarSlot(): number { return this.local.slot }
@@ -302,6 +308,7 @@ export class Game {
     this.crates.update(this.time)
     this.fx.update(dt)
     this.publishUi()
+    this.publishMarkers()
   }
 
   /** The host keeps the world loaded around every player (it simulates them all); a client around itself. */
@@ -1102,10 +1109,13 @@ export class Game {
     const a = this.local
     const held = this.heldItem
     const nights = this.nightsSurvived
+    // the board is up on Tab or the pause screen; only then are the fixes worth computing
+    const boardShown = this.input.isDown('Tab') || !this.input.locked
     const players = [
-      { id: a.id, name: a.name, score: computeScore(nights, a.kills), kills: a.kills, deaths: a.deaths, you: true },
+      { id: a.id, name: a.name, score: computeScore(nights, a.kills), kills: a.kills, deaths: a.deaths, you: true, where: null },
       ...[...this.remotePoses.values()].map(p => ({
         id: p.id, name: p.name, score: computeScore(nights, p.kills), kills: p.kills, deaths: p.deaths, you: false,
+        where: boardShown ? whereOf(s, p) : null,
       })),
     ].sort((x, y) => y.score - x.score)
     const host = this.session.role === 'host' ? (this.session as HostSession) : null
@@ -1150,5 +1160,31 @@ export class Game {
       roomCode: host ? (host.online ? host.code : '') : this.session.code,
       role: this.role,
     })
+  }
+
+  /**
+   * Where the other players are on screen (issue #15): a marker over each one in
+   * view beyond arm's reach, and one pinned to the edge for each one out of view.
+   * Quantised so the store only re-renders when something moved visibly.
+   */
+  private publishMarkers(): void {
+    const markers: PlayerMarker[] = []
+    if (this.remotePoses.size > 0 && this.input.locked && !this.aiming) {
+      this.camera.updateMatrixWorld()
+      this.camera.matrixWorldInverse.copy(this.camera.matrixWorld).invert()
+      const vp = this.tmpViewProj.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse).elements
+      const s = this.player.state
+      for (const p of this.remotePoses.values()) {
+        const m = projectMarker(vp, p.x, p.y + MARKER_HEAD_M, p.z)
+        const distance = Math.round(Math.hypot(p.x - s.x, p.y - s.y, p.z - s.z))
+        if (m.onScreen && distance < MARKER_NEAR_M) continue
+        markers.push({
+          id: p.id, name: p.name, distance,
+          x: Math.round(m.x * 500) / 500, y: Math.round(m.y * 500) / 500,
+          onScreen: m.onScreen, angle: Math.round(m.angle),
+        })
+      }
+    }
+    useUiStore.getState().syncMarkers(markers)
   }
 }

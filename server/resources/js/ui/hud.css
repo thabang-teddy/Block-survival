@@ -224,6 +224,31 @@ body { user-select: none; }
 .scoreboard tfoot td { font-size: 11px; opacity: .55; text-align: center; border-top: 1px solid rgba(255,255,255,.12); }
 .scoreboard { z-index: 2; }
 
+/* ---- where the other players are (issue #15) */
+.scoreboard td.where { white-space: nowrap; }
+.scoreboard td.where .arrow, .player-marker .arrow {
+  display: inline-block; font-size: 12px; line-height: 1; color: var(--hud-accent); margin-right: 6px;
+  transform-origin: 50% 55%;
+}
+.scoreboard td.where .vert { font-weight: 600; font-size: 12px; opacity: .7; font-family: inherit; }
+.player-markers { position: absolute; inset: 0; overflow: hidden; }
+.player-marker {
+  position: absolute; transform: translate(-50%, -50%);
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 9px; border-radius: 14px; background: var(--hud-panel);
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.12);
+}
+.player-marker .arrow { display: none; }
+.player-marker.off .arrow { display: inline-block; font-size: 14px; margin-right: 0; }
+.player-marker .who { color: #dfe8ff; }
+.player-marker .dist { font: 700 11px ui-monospace, Consolas, monospace; opacity: .75; }
+/* on a player in view: a small pin under the tag pointing down at them */
+.player-marker:not(.off)::after {
+  content: ''; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%);
+  border: 5px solid transparent; border-bottom: 0; border-top-color: var(--hud-panel);
+}
+
 /* ---- room badge (under the logo) */
 .room {
   position: absolute; top: 66px; left: 18px; display: flex; align-items: baseline; gap: 8px;

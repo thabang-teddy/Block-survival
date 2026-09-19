@@ -13,6 +13,7 @@ import 'package:block_survival/entities/crates.dart';
 import 'package:block_survival/game/avatar.dart';
 import 'package:block_survival/game/day_night.dart';
 import 'package:block_survival/game/host_sim.dart';
+import 'package:block_survival/game/locator.dart';
 import 'package:block_survival/game/rules.dart';
 import 'package:block_survival/game/save.dart';
 import 'package:block_survival/game/score.dart';
@@ -81,7 +82,7 @@ final class FrameInput {
   final bool togglePanel;
   final int? selectSlot;
 
-  /// Tab held
+  /// Tab held, or the pause screen (which shows the board) is up
   final bool scoreboard;
 }
 
@@ -658,6 +659,9 @@ final class Game implements SimHost {
   /// remote players for the scoreboard and room counter (the sessions fill it)
   List<ScoreRow> remotePlayers = const [];
 
+  /// where the remote players are (the sessions fill it alongside the rows)
+  List<PlayerPose> remotePoses = const [];
+
   void _publish({required bool scoreboard}) {
     final s = player.state;
     final hit = target();
@@ -703,6 +707,11 @@ final class Game implements SimHost {
     u.nightsSurvived = nightsSurvived;
     u.timeAlive = dayNight.time;
     u.scoreboard = scoreboard;
+    // only while the board is up are the fixes worth computing
+    final poseById = {
+      for (final p in remotePoses)
+        if (scoreboard) p.id: p,
+    };
     u.players = [
       ScoreRow(
         id: 'me',
@@ -712,10 +721,22 @@ final class Game implements SimHost {
         deaths: deaths,
         you: true,
       ),
-      ...remotePlayers,
+      for (final r in remotePlayers) r.withWhere(_whereTo(poseById[r.id], s)),
     ];
+    u.poses = remotePoses;
     u.publish();
   }
+
+  /// the scoreboard's fix on another player, when we know where they are
+  Where? _whereTo(PlayerPose? pose, PlayerState s) => pose == null
+      ? null
+      : whereOf(
+          x: s.x,
+          y: s.y,
+          z: s.z,
+          yaw: s.yaw,
+          other: vm.Vector3(pose.x, pose.y, pose.z),
+        );
 
   void dispose() {
     inventory.removeListener(_inventoryChanged);
