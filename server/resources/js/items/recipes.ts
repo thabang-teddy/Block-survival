@@ -28,13 +28,22 @@ export const RECIPES: readonly Recipe[] = [
   r('torch', ['torch', 4], [['stick', 1], ['coal', 1]], true),
   r('pickaxe_wood', ['pickaxe_wood', 1], [['planks', 3], ['stick', 2]], false),
   r('pickaxe_stone', ['pickaxe_stone', 1], [['cobble', 3], ['stick', 2]], true),
+  r('pickaxe_copper', ['pickaxe_copper', 1], [['copper', 3], ['stick', 2]], true),
   r('pickaxe_iron', ['pickaxe_iron', 1], [['iron', 3], ['stick', 2]], true),
+  r('pickaxe_gold', ['pickaxe_gold', 1], [['gold', 3], ['stick', 2]], true),
+  r('pickaxe_diamond', ['pickaxe_diamond', 1], [['diamond', 3], ['stick', 2]], true),
   r('sword', ['sword', 1], [['iron', 2], ['stick', 1]], true),
+  r('sword_diamond', ['sword_diamond', 1], [['diamond', 2], ['stick', 1]], true),
+  // issue #25: the lens that finds ore, and the emerald that widens its reach
+  r('prospector', ['prospector', 1], [['lapis', 2], ['redstone', 2], ['iron', 1]], true),
+  r('prospector_far', ['prospector_far', 1], [['prospector', 1], ['emerald', 2]], true),
   r('glass', ['glass', 4], [['sand', 4], ['coal', 1]], true),
   r('reinforced_wall', ['reinforced_wall', 4], [['cobble', 4], ['iron', 1]], true),
   r('bed', ['bed', 1], [['planks', 3], ['leaves', 3]], true),
   r('rifle', ['rifle', 1], [['iron', 8], ['planks', 2], ['coal', 2]], true),
   r('ammo', ['ammo', 30], [['iron', 1], ['coal', 1]], true),
+  // redstone burns hotter than coal: the same iron goes twice as far
+  r('ammo_redstone', ['ammo', 60], [['iron', 1], ['redstone', 1]], true),
 ]
 
 export type CraftContext = 'hand' | 'bench'

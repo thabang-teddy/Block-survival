@@ -4,6 +4,10 @@ import type { ItemDef } from '../items/registry'
 const ICONS: Readonly<Record<string, string>> = {
   pickaxe_wood: '⛏', pickaxe_stone: '⛏', pickaxe_iron: '⛏', sword: '🗡', rifle: '🔫',
   torch: '🔥', ammo: '▮', stick: '╱', coal: '●', iron: '▣', workbench: '🛠', bed: '🛏',
+  // issue #25: the rest of the minerals and what they make
+  pickaxe_copper: '⛏', pickaxe_gold: '⛏', pickaxe_diamond: '⛏', sword_diamond: '🗡',
+  copper: '▣', gold: '▣', redstone: '✦', lapis: '✦', diamond: '◆', emerald: '◆',
+  prospector: '◎', prospector_far: '◎',
 }
 
 export const cssColour = (c: readonly [number, number, number], mul = 1): string =>

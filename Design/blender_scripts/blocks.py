@@ -24,6 +24,13 @@ BLOCK_COLOURS = {
     "snow":   ((0.95, 0.96, 0.98),) * 3,
     "ore_iron": ((0.62, 0.55, 0.48),) * 3,
     "ore_coal": ((0.30, 0.30, 0.30),) * 3,
+    # the rest of the Overworld ores (issue #25)
+    "ore_copper": ((0.62, 0.42, 0.28),) * 3,
+    "ore_gold": ((0.85, 0.70, 0.25),) * 3,
+    "ore_redstone": ((0.62, 0.18, 0.18),) * 3,
+    "ore_lapis": ((0.20, 0.32, 0.68),) * 3,
+    "ore_diamond": ((0.42, 0.82, 0.85),) * 3,
+    "ore_emerald": ((0.22, 0.72, 0.40),) * 3,
 }
 
 TRANSPARENT = {"water": 0.75, "glass": 0.35, "leaves": 1.0}

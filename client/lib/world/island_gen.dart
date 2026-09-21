@@ -210,11 +210,14 @@ IslandInfo generateIsland(VoxelSink world, IslandParams p) {
         kind = Block.dirt;
       } else {
         kind = Block.stone;
+        // one roll, as before: adding copper to the ladder must not shift the island's RNG
         final r = rng.random();
         if (r < 0.03) {
           kind = Block.oreCoal;
         } else if (r < 0.045) {
           kind = Block.oreIron;
+        } else if (r < 0.055) {
+          kind = Block.oreCopper;
         }
       }
       world.setBlock(x, y, z, kind);

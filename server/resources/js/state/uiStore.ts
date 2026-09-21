@@ -36,6 +36,30 @@ export interface PlayerMarker {
   angle: number
 }
 
+/** a marker on a pocket of ore the prospector has found (issue #25) */
+export interface OreMarker {
+  /** chunk the ore sits in, so a marker keeps its identity between scans */
+  id: string
+  /** whole metres */
+  distance: number
+  /** how many blocks of ore are in that pocket */
+  count: number
+  x: number
+  y: number
+  onScreen: boolean
+  angle: number
+}
+
+/** what the prospector in hand is doing; null when none is held */
+export interface ProspectorState {
+  /** the block id it is tuned to */
+  ore: number
+  /** how far it senses, in metres */
+  range: number
+  /** pockets within range */
+  found: number
+}
+
 /** how the current run was started; null = main menu */
 export type Launch =
   | { role: 'host'; name: string; session: HostSession; restore?: SaveData; worldKind: WorldKind; seed: number }
@@ -82,6 +106,10 @@ export interface UiSnapshot {
   timeAlive: number
   /** Tab held */
   scoreboard: boolean
+  /** the prospector in hand, or null (issue #25) */
+  prospector: ProspectorState | null
+  /** top block of the player's column, so the HUD can say how far down they are */
+  surfaceY: number
   players: ScoreRow[]
   /** shown in the HUD while hosting online or joined */
   roomCode: string
@@ -99,6 +127,8 @@ interface UiState extends UiSnapshot {
   netError: string
   /** where the other players are, refreshed every frame apart from the snapshot (issue #15) */
   markers: PlayerMarker[]
+  /** where the prospector says the ore is, on the same footing as the player markers (issue #25) */
+  oreMarkers: OreMarker[]
   setGame(game: Game | null): void
   /** start a run (solo/host/client); the Scene builds the Game from it */
   start(launch: Launch): void
@@ -107,6 +137,7 @@ interface UiState extends UiSnapshot {
   restart(): void
   sync(next: UiSnapshot): void
   syncMarkers(next: PlayerMarker[]): void
+  syncOreMarkers(next: OreMarker[]): void
 }
 
 const roundPos = (p: [number, number, number]): [number, number, number] =>
@@ -127,6 +158,14 @@ const sameMarkers = (a: PlayerMarker[], b: PlayerMarker[]): boolean =>
     return m.id === o.id && m.name === o.name && m.distance === o.distance && m.x === o.x && m.y === o.y &&
       m.onScreen === o.onScreen && m.angle === o.angle
   })
+const sameOreMarkers = (a: OreMarker[], b: OreMarker[]): boolean =>
+  a.length === b.length && a.every((m, i) => {
+    const o = b[i]
+    return m.id === o.id && m.distance === o.distance && m.count === o.count && m.x === o.x && m.y === o.y &&
+      m.onScreen === o.onScreen && m.angle === o.angle
+  })
+const sameProspector = (a: ProspectorState | null, b: ProspectorState | null): boolean =>
+  a === b || (!!a && !!b && a.ore === b.ore && a.range === b.range && a.found === b.found)
 
 export const useUiStore = create<UiState>((set, get) => ({
   locked: false,
@@ -162,6 +201,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   deaths: 0,
   timeAlive: 0,
   scoreboard: false,
+  prospector: null,
+  surfaceY: 0,
   players: [],
   roomCode: '',
   role: 'host',
@@ -171,12 +212,16 @@ export const useUiStore = create<UiState>((set, get) => ({
   netStatus: '',
   netError: '',
   markers: [],
+  oreMarkers: [],
   setGame: game => set({ game }),
   start: launch => set(state => ({ launch, run: state.run + 1, netStatus: '', netError: '' })),
   setNetStatus: (netStatus, netError = '') => set({ netStatus, netError }),
-  restart: () => set(state => ({ launch: null, run: state.run + 1, netStatus: '', netError: '', markers: [] })),
+  restart: () => set(state => ({ launch: null, run: state.run + 1, netStatus: '', netError: '', markers: [], oreMarkers: [] })),
   syncMarkers(next) {
     if (!sameMarkers(get().markers, next)) set({ markers: next })
+  },
+  syncOreMarkers(next) {
+    if (!sameOreMarkers(get().oreMarkers, next)) set({ oreMarkers: next })
   },
   sync(next) {
     const cur = get()
@@ -204,6 +249,7 @@ export const useUiStore = create<UiState>((set, get) => ({
       cur.dead === next.dead && cur.respawnIn === respawnIn && cur.score === next.score &&
       cur.bestScore === next.bestScore && cur.nightsSurvived === next.nightsSurvived &&
       cur.deaths === next.deaths && cur.scoreboard === next.scoreboard &&
+      sameProspector(cur.prospector, next.prospector) && cur.surfaceY === next.surfaceY &&
       cur.roomCode === next.roomCode && cur.role === next.role && sameRows(cur.players, next.players) &&
       (cur.timeAlive === timeAlive || !(next.scoreboard || !next.locked)) &&
       cur.position[0] === pos[0] && cur.position[1] === pos[1] && cur.position[2] === pos[2]
@@ -241,6 +287,8 @@ export const useUiStore = create<UiState>((set, get) => ({
       deaths: next.deaths,
       timeAlive,
       scoreboard: next.scoreboard,
+      prospector: sameProspector(cur.prospector, next.prospector) ? cur.prospector : next.prospector,
+      surfaceY: next.surfaceY,
       players: next.players,
       roomCode: next.roomCode,
       role: next.role,

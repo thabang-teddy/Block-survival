@@ -3,14 +3,16 @@
  * click-to-play overlay. All React DOM over the canvas; state comes from the UI store.
  */
 import { useUiStore } from '../state/uiStore'
-import { BLOCK_NAMES } from '../world/palette'
+import { BLOCK_DEFS, BLOCK_NAMES, type BlockId } from '../world/palette'
+import { depthBand, depthNote, oreOf } from '../world/ores'
 import { getItem } from '../items/registry'
 import type { ItemStack } from '../items/inventory'
-import { ItemIcon } from './ItemIcon'
+import { ItemIcon, cssColour } from './ItemIcon'
 import { CraftingPanel } from './CraftingPanel'
 import { MainMenu } from './MainMenu'
 import { InvitePanel } from './InvitePanel'
 import { PlayerMarkers } from './PlayerMarkers'
+import { OreMarkers } from './OreMarkers'
 import { formatTime } from '../game/score'
 import { verticalHint } from '../game/locator'
 import type { ScoreRow } from '../state/uiStore'
@@ -45,6 +47,22 @@ function Where({ row }: { row: ScoreRow }) {
       <span className="arrow" style={{ transform: `rotate(${row.where.bearing}deg)` }}>▲</span>
       {row.where.distance} m{hint && <span className="vert"> · {hint}</span>}
     </td>
+  )
+}
+
+/** the prospector in hand (issue #25): what it is tuned to, how far it reaches, what it has found */
+function Prospector() {
+  const p = useUiStore(s => s.prospector)
+  if (!p) return null
+  const ore = oreOf(p.ore)
+  const colour = cssColour(BLOCK_DEFS[p.ore as BlockId].colours[0], 1.5)
+  return (
+    <div className="prospector">
+      <span className="label">prospector · {p.range} m</span>
+      <span className="tuned" style={{ color: colour }}>{ore?.drop ?? 'ore'}</span>
+      <span className="found">{p.found ? `${p.found} nearby` : 'nothing in range'}</span>
+      <span className="tune-hint">right-click to tune</span>
+    </div>
   )
 }
 
@@ -89,6 +107,7 @@ export function Hud() {
   const nightsSurvived = useUiStore(s => s.nightsSurvived)
   const timeAlive = useUiStore(s => s.timeAlive)
   const scoreboard = useUiStore(s => s.scoreboard)
+  const surfaceY = useUiStore(s => s.surfaceY)
   const restart = useUiStore(s => s.restart)
   const game = useUiStore(s => s.game)
   const launch = useUiStore(s => s.launch)
@@ -214,7 +233,8 @@ export function Hud() {
       </div>
       <div className="debug">
         {x.toFixed(1)}, {y.toFixed(1)}, {z.toFixed(1)}
-        {targetBlock ? ` · ${BLOCK_NAMES[targetBlock].replace('_', ' ')}${canBreak ? '' : ' (needs pickaxe)'}` : ''}
+        {` · ${depthNote(y, surfaceY)} · ${depthBand(Math.round(y))}`}
+        {targetBlock ? ` · ${BLOCK_NAMES[targetBlock].replace('_', ' ')}${canBreak ? '' : ' (needs a better pickaxe)'}` : ''}
         {` · ${cameraMode === 'first' ? '1st' : '3rd'} person (V) · kills ${kills}`}
       </div>
 
@@ -236,6 +256,8 @@ export function Hud() {
       {locked && interactHint && <div className="interact-hint">{interactHint}</div>}
 
       <PlayerMarkers />
+      <OreMarkers />
+      {locked && <Prospector />}
 
       {locked && !aiming && (
         <div className="crosshair" aria-hidden>

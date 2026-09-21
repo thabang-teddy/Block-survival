@@ -1,6 +1,7 @@
 import 'package:block_survival/items/inventory.dart';
 import 'package:block_survival/items/recipes.dart';
 import 'package:block_survival/items/registry.dart';
+import 'package:block_survival/world/ores.dart';
 import 'package:block_survival/world/palette.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -12,7 +13,7 @@ void main() {
     expect(items.containsKey('bedrock'), isFalse);
     expect(getItem('torch').kind, ItemKind.prop);
     expect(getItem('torch').block, Block.torch);
-    expect(items.length, 26); // 14 placeable blocks + 12 others, as on the web
+    expect(items.length, 44); // 20 placeable blocks + 24 others, as on the web
   });
 
   test('drops and break times follow the web rules', () {
@@ -24,6 +25,52 @@ void main() {
     expect(breakTime(Block.stone, 'pickaxe_wood'), closeTo(5 / 1.5, 1e-9));
     expect(breakTime(Block.dirt, null), 0.75);
     expect(breakTime(Block.bedrock, 'pickaxe_iron'), double.infinity);
+  });
+
+  // issue #25: the same ladder the web client's minerals test pins
+  test('every mineral drops, and the deep ones are gated behind iron', () {
+    for (final o in ores) {
+      expect(dropForBlock(o.block), o.drop, reason: '${o.drop} drop');
+      expect(items.containsKey(o.drop), isTrue, reason: '${o.drop} item');
+      expect(breakTime(o.block, null), double.infinity);
+    }
+    expect(breakTime(Block.oreCoal, 'pickaxe_wood'), lessThan(double.infinity));
+    expect(breakTime(Block.oreCopper, 'pickaxe_wood'), double.infinity);
+    expect(
+      breakTime(Block.oreCopper, 'pickaxe_stone'),
+      lessThan(double.infinity),
+    );
+    for (final ore in [
+      Block.oreGold,
+      Block.oreRedstone,
+      Block.oreDiamond,
+      Block.oreEmerald,
+    ]) {
+      expect(breakTime(ore, 'pickaxe_copper'), double.infinity);
+      expect(breakTime(ore, 'pickaxe_iron'), lessThan(double.infinity));
+    }
+    // gold digs faster than iron but cannot touch what iron opens
+    expect(
+      breakTime(Block.stone, 'pickaxe_gold'),
+      lessThan(breakTime(Block.stone, 'pickaxe_iron')),
+    );
+    expect(breakTime(Block.oreDiamond, 'pickaxe_gold'), double.infinity);
+    expect(mineTierOf('pickaxe_gold'), lessThan(mineTierOf('pickaxe_iron')));
+  });
+
+  test('a prospector senses, and the attuned one senses further', () {
+    expect(getItem('prospector').senseRange, greaterThan(0));
+    expect(
+      getItem('prospector_far').senseRange!,
+      greaterThan(getItem('prospector').senseRange!),
+    );
+  });
+
+  test('every mineral has a recipe to go into', () {
+    final used = {for (final r in recipes) ...r.inputs.map((i) => i.id)};
+    for (final o in ores) {
+      expect(used.contains(o.drop), isTrue, reason: '${o.drop} is unused');
+    }
   });
 
   test('inventory stacks, overflows and removes like the web one', () {

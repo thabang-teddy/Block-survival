@@ -1,10 +1,10 @@
 # Block Survival
 
 A voxel zombie-survival game (Minecraft-style) in the browser: an infinite, seeded world of
-rolling ground with floating islands in the sky (streamed in chunks as you walk), first/third
-person, crafting, a 10-minute day/night cycle with zombies that path and break walls, sword and
-rifle combat, death and score, four-player peer-to-peer co-op, accounts with a leaderboard and
-cloud saves.
+rolling ground with floating islands in the sky (streamed in chunks as you walk) over caves and
+ore veins that run down to bedrock, first/third person, crafting, a 10-minute day/night cycle with
+zombies that path and break walls, sword and rifle combat, death and score, four-player
+peer-to-peer co-op, accounts with a leaderboard and cloud saves.
 
 One **Laravel 13** application with **Inertia.js + React** as the frontend: the game is an Inertia
 page; menu data (signed-in user, leaderboard, cloud save) arrives as props; the running game talks to
@@ -55,12 +55,27 @@ Tests (from `server/`): `php artisan test` (page, session auth, every /api endpo
 
 WASD move · Shift sprint · Space jump · **V** first/third person · mouse look · hold **left** dig /
 swing · **right** place, or aim with the rifle · **1–9** hotbar · **Q** drop · **R** reload ·
-**E** inventory & crafting · **F** workbench / set respawn at a bed / take loot · **Tab** scoreboard
+**E** inventory, crafting & minerals · **F** workbench / set respawn at a bed / take loot · **Tab** scoreboard
 (with each player's distance and direction) · Esc pause. Other players show as tags on screen — on
 them when in view, pinned to the edge with an arrow when not — so you can find each other.
 
-Punch logs, craft planks → sticks → workbench → a wooden pickaxe by hand; everything else (stone and
-iron pickaxes, sword, glass, walls, torches, a bed and finally a rifle) needs the workbench. The first sunset is at 5:00 — build walls first.
+Punch logs, craft planks → sticks → workbench → a wooden pickaxe by hand; everything else (the
+pickaxe ladder, swords, glass, walls, torches, a bed and finally a rifle) needs the workbench. The first sunset is at 5:00 — build walls first.
+
+## Minerals
+
+All eight Overworld ores are down there, in bands: **coal** and **copper** just under the soil,
+**iron** all the way down, then **lapis**, **gold**, **redstone** and finally **diamond** in the
+last dozen blocks above bedrock; **emerald** only inside high ground. Caves wind through the stone
+from y 3 up to five blocks below the surface, and veins show in their walls — follow a cave, or dig
+straight down and read the depth on the HUD. The pickaxe ladder is wood → stone → copper → iron →
+diamond, with **gold** off to one side: it digs faster than iron but is too soft for the ores iron
+opens. Coal and iron are still in the sky islands too, along with a little copper.
+
+Can't find something? Craft a **prospector** (lapis, redstone and iron at a workbench): hold it and
+it marks the nearest veins of one mineral on screen, with distance — **right-click** to tune it to
+another. Two emeralds attune it to twice the range. The **Minerals** tab in the inventory (**E**)
+lists every ore, how deep it lies and which pickaxe it takes.
 Every floating island has a glowing **updraft** beside its rim: stand in it and hold **Space** to rise,
 **Shift** to sink, or hover — then step off onto the island and put a bed there to respawn up high.
 Dying leaves your gear in a crate where you fell; you respawn at your bed after 5 s.
@@ -94,16 +109,17 @@ packed copy). **Start over** on a world card (or the admin's **Reset both worlds
 
 ```
 app.tsx      Inertia bootstrap          Pages/Play.tsx   the page (Scene + Hud)
-world/       palette, seeded noise, per-chunk terrain generator (ground heightmap + spawn pad,
-             sky-island field, island generator ported from Design/blender_scripts/islands.py),
-             16³ chunk store with column streaming, culled mesher with vertex colours + AO, DDA raycast
+world/       palette, ore table, seeded noise, per-chunk terrain generator (ground heightmap + spawn
+             pad, caves and ore veins, sky-island field, island generator ported from
+             Design/blender_scripts/islands.py), 16³ chunk store with column streaming, culled
+             mesher with vertex colours + AO, DDA raycast
 physics/     swept AABB vs voxels, player controller
 entities/    drops, loot crates, A* pathfinding, zombie sim (variants, spawning, AI, block breaking)
 items/       registry, recipes + crafting, inventory
-game/        Game (the simulation, host-authoritative), Avatar, DayNight, score
+game/        Game (the simulation, host-authoritative), Avatar, DayNight, score, locator, prospector
 net/         protocol (msgpackr), WebRTC transport + polling signaller, Host/ClientSession, SnapshotBuffer, api client
 render/      chunk/prop/zombie/remote-player renderers, view-model, lighting, bloom, GLB cache
-ui/          HUD, crafting panel, main menu
+ui/          HUD, crafting panel, minerals guide, player + ore markers, main menu
 state/       zustand UI store (React never holds sim state)
 ```
 

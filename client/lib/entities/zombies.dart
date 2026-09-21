@@ -10,6 +10,7 @@ import 'package:block_survival/net/protocol.dart' show ZombieSnap;
 import 'package:block_survival/physics/aabb.dart';
 import 'package:block_survival/world/js_math.dart';
 import 'package:block_survival/world/noise.dart';
+import 'package:block_survival/world/ores.dart';
 import 'package:block_survival/world/palette.dart';
 import 'package:block_survival/world/world.dart';
 
@@ -95,9 +96,9 @@ int? blockHitPoints(int id) => switch (id) {
   Block.snow => 3,
   Block.planks || Block.glass => 5,
   Block.log => 8,
-  Block.cobble || Block.stone || Block.oreCoal || Block.oreIron => 15,
+  Block.cobble || Block.stone => 15,
   Block.torch || Block.workbench || Block.bed => 2,
-  _ => null, // air, water, reinforced wall
+  _ => isOre(id) ? 15 : null, // air, water, reinforced wall
 };
 
 /// Which variants a night can spawn (spec §4).

@@ -10,6 +10,7 @@ import 'ground_gen.dart';
 import 'island_field.dart';
 import 'island_template.dart';
 import 'palette.dart';
+import 'underground.dart';
 import 'updraft.dart';
 
 /// vertical band of the world: chunks cy 0 .. worldChunksY-1 (y 0..127)
@@ -60,10 +61,18 @@ final class _ColumnBlock {
 }
 
 final class TerrainGenerator {
-  TerrainGenerator(this.seed) : ground = GroundModel(seed);
+  TerrainGenerator(this.seed)
+    : ground = GroundModel(seed),
+      // the pad and the ground it eases into stay solid, so spawn can never drop into a cave
+      caves = CaveModel(seed, padRadius + padBlend),
+      veins = VeinField(seed);
 
   final int seed;
   final GroundModel ground;
+
+  /// the tunnels and the ore veins under the ground (issue #25)
+  final CaveModel caves;
+  final VeinField veins;
   final IslandTemplates _templates = IslandTemplates();
   final Map<String, _ColumnBlock> _columns = {};
   final Map<String, Updraft> _updrafts = {};
@@ -115,13 +124,32 @@ final class TerrainGenerator {
     for (var lx = 0; lx < chunkSize; lx++) {
       for (var lz = 0; lz < chunkSize; lz++) {
         final h = col.h[(lx + _border) * _cols + lz + _border];
+        // the roof rule keeps every tunnel below h - caveRoof, which is well inside the stone
+        final carve = y0 <= h - caveRoof;
         for (var ly = 0; ly < chunkSize; ly++) {
           final id = _groundBlock(y0 + ly, h);
           if (id == air) continue;
+          if (carve &&
+              id == Block.stone &&
+              caves.open(x0 + lx, y0 + ly, z0 + lz, h)) {
+            continue;
+          }
           data[localIndex(lx, ly, lz)] = id;
           any = true;
         }
       }
+    }
+    // ore last, and only into stone: a vein showing in a tunnel wall is one the caves cut open
+    if (!aboveAllVeins(y0)) {
+      any =
+          stampVeins(
+            data,
+            veins.near(x0, y0, z0, x0 + chunkSize - 1, y1, z0 + chunkSize - 1),
+            x0,
+            y0,
+            z0,
+          ) ||
+          any;
     }
     if (col.maxY >= y0) any = _stampTrees(data, col, y0) || any;
     for (final r in islands) {

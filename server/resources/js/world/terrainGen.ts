@@ -6,7 +6,8 @@
  */
 import { CHUNK, localIndex } from './chunkStore'
 import { AIR, BLOCK } from './palette'
-import { GroundModel, SEA_LEVEL, TREE_MAX_HEIGHT } from './groundGen'
+import { GroundModel, PAD_BLEND, PAD_RADIUS, SEA_LEVEL, TREE_MAX_HEIGHT } from './groundGen'
+import { aboveAllVeins, CAVE_ROOF, CaveModel, stampVeins, VeinField } from './underground'
 import { islandsNear, IslandTemplates, type PlacedIsland } from './islandField'
 import type { IslandTemplate } from './islandTemplate'
 import { updraftFor, type Updraft } from './updraft'
@@ -41,6 +42,9 @@ interface ColumnBlock {
 export class TerrainGenerator {
   readonly seed: number
   readonly ground: GroundModel
+  /** the tunnels and the ore veins under the ground (issue #25) */
+  readonly caves: CaveModel
+  readonly veins: VeinField
   private readonly templates = new IslandTemplates()
   private readonly columns = new Map<string, ColumnBlock>()
   private readonly updrafts = new Map<string, Updraft>()
@@ -48,6 +52,9 @@ export class TerrainGenerator {
   constructor(seed: number) {
     this.seed = seed
     this.ground = new GroundModel(seed)
+    // the pad and the ground it eases into stay solid, so spawn can never drop into a cave
+    this.caves = new CaveModel(seed, PAD_RADIUS + PAD_BLEND)
+    this.veins = new VeinField(seed)
   }
 
   /** where a new player stands: on the centre of the spawn pad */
@@ -92,13 +99,20 @@ export class TerrainGenerator {
     for (let lx = 0; lx < CHUNK; lx++) {
       for (let lz = 0; lz < CHUNK; lz++) {
         const h = col.h[(lx + BORDER) * COLS + lz + BORDER]
+        // the roof rule keeps every tunnel below h - CAVE_ROOF, which is well inside the stone
+        const carve = y0 <= h - CAVE_ROOF
         for (let ly = 0; ly < CHUNK; ly++) {
           const id = groundBlock(y0 + ly, h)
           if (id === AIR) continue
+          if (carve && id === BLOCK.stone && this.caves.open(x0 + lx, y0 + ly, z0 + lz, h)) continue
           data[localIndex(lx, ly, lz)] = id
           any = true
         }
       }
+    }
+    // ore last, and only into stone: a vein showing in a tunnel wall is one the caves cut open
+    if (!aboveAllVeins(y0)) {
+      any = stampVeins(data, this.veins.near(x0, y0, z0, x0 + CHUNK - 1, y1, z0 + CHUNK - 1), x0, y0, z0) || any
     }
     if (col.maxY >= y0) any = stampTrees(data, col, y0) || any
     for (const { island, template } of islands) {

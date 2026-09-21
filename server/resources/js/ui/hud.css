@@ -249,6 +249,47 @@ body { user-select: none; }
   border: 5px solid transparent; border-bottom: 0; border-top-color: var(--hud-panel);
 }
 
+/* ---- the prospector and its ore markers (issue #25) */
+.ore-markers { position: absolute; inset: 0; overflow: hidden; }
+.player-marker.ore { box-shadow: none; border: 1px solid currentColor; }
+.player-marker.ore .dist { opacity: .85; }
+.prospector {
+  position: absolute; left: 50%; bottom: 104px; transform: translateX(-50%);
+  display: flex; align-items: baseline; gap: 8px; white-space: nowrap;
+  padding: 4px 12px; border-radius: 14px; background: var(--hud-panel);
+}
+.prospector .label { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; opacity: .6; }
+.prospector .tuned { font-weight: 800; font-size: 13px; text-transform: capitalize; }
+.prospector .found { font: 700 11px ui-monospace, Consolas, monospace; opacity: .8; }
+.prospector .tune-hint { font-size: 10px; opacity: .45; }
+
+/* ---- minerals guide (the crafting panel's second tab) */
+.panel .tabs { display: flex; gap: 4px; }
+.panel .tabs button {
+  padding: 4px 12px; border: 0; border-radius: 12px; cursor: pointer; font: 700 12px inherit;
+  background: rgba(255,255,255,.08); color: rgba(255,255,255,.7);
+}
+.panel .tabs button.on { background: var(--hud-accent); color: #1a1a1a; }
+.minerals .depth-line { margin: 0 0 10px; font-size: 13px; opacity: .8; }
+.minerals .depth-line b { color: var(--hud-accent); }
+.ore-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ore-table th {
+  text-align: left; padding: 4px 8px; font-size: 10px; text-transform: uppercase;
+  letter-spacing: .5px; opacity: .55; font-weight: 700;
+}
+.ore-table td { padding: 5px 8px; border-top: 1px solid rgba(255,255,255,.07); vertical-align: middle; }
+.ore-table tr.here { background: rgba(232,178,58,.1); }
+.ore-table .ore-name { font-weight: 800; text-transform: capitalize; }
+.ore-table .band { font: 700 12px ui-monospace, Consolas, monospace; white-space: nowrap; }
+.ore-table .here-tag {
+  margin-left: 6px; padding: 1px 6px; border-radius: 8px; font: 700 9px inherit;
+  text-transform: uppercase; background: var(--hud-accent); color: #1a1a1a;
+}
+.ore-table .needs { text-transform: capitalize; opacity: .8; }
+.ore-table .note { font-size: 12px; opacity: .65; }
+.minerals .hint { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; font-size: 12px; opacity: .75; }
+.minerals .hint b { color: var(--hud-accent); }
+
 /* ---- room badge (under the logo) */
 .room {
   position: absolute; top: 66px; left: 18px; display: flex; align-items: baseline; gap: 8px;

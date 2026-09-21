@@ -14,6 +14,7 @@ import 'package:block_survival/game/avatar.dart';
 import 'package:block_survival/game/day_night.dart';
 import 'package:block_survival/game/host_sim.dart';
 import 'package:block_survival/game/locator.dart';
+import 'package:block_survival/game/prospector.dart';
 import 'package:block_survival/game/rules.dart';
 import 'package:block_survival/game/save.dart';
 import 'package:block_survival/game/score.dart';
@@ -25,6 +26,7 @@ import 'package:block_survival/physics/player_controller.dart';
 import 'package:block_survival/render/camera.dart';
 import 'package:block_survival/render/lighting.dart';
 import 'package:block_survival/world/chunk.dart';
+import 'package:block_survival/world/ores.dart';
 import 'package:block_survival/world/palette.dart';
 import 'package:block_survival/world/raycast.dart';
 import 'package:block_survival/world/seed.dart';
@@ -45,6 +47,14 @@ const double fixedDt = 1 / 60;
 
 /// how long the arm / weapon swing animation plays
 const double swingSeconds = 0.4;
+
+/// The prospector rescans this often while it is in hand (issue #25). A scan walks
+/// every loaded chunk in range, so it is worth a few milliseconds a second but not a
+/// frame's worth. Nothing about it is networked — each player's lens is their own.
+const double _prospectInterval = 0.4;
+
+/// an ore marker is dropped this close: you are standing on the vein
+const double oreMarkerNearMetres = 4;
 
 /// one frame's worth of player intent, whatever produced it
 final class FrameInput {
@@ -183,6 +193,11 @@ final class Game implements SimHost {
   String _toast = '';
   double _toastUntil = 0;
   double _swingUntil = 0;
+
+  /// which ore the prospector is tuned to, and the last scan (issue #25; purely local)
+  int _prospectOre = ores.first.block;
+  List<OreFix> _oreFixes = const [];
+  double _nextProspectAt = 0;
   double _accumulator = 0;
   final Set<(int, int)> _loaded = {};
   Set<(int, int)> _anchors = const {};
@@ -227,6 +242,7 @@ final class Game implements SimHost {
     }
     _syncCamera();
     _streamAround();
+    _updateProspector();
     _publish(scoreboard: input.scoreboard);
   }
 
@@ -347,7 +363,7 @@ final class Game implements SimHost {
       return;
     }
     act(Swing(viewRay()));
-    if (item == 'sword') {
+    if (isSword(item)) {
       _swing();
       return;
     }
@@ -384,8 +400,54 @@ final class Game implements SimHost {
 
   void _swing() => _swingUntil = time + swingSeconds;
 
+  // ---------------------------------------------------------------- the prospector (issue #25)
+  /// how far the held prospector senses, or 0 when none is in hand
+  double get prospectRange {
+    final item = held?.id;
+    return (item == null ? null : getItem(item).senseRange) ?? 0;
+  }
+
+  /// the ore the prospector is tuned to
+  int get prospectTuning => _prospectOre;
+
+  /// Place with a prospector in hand: tune it to the next ore. Returns false when
+  /// there is no prospector, so the input falls through to placing a block.
+  bool tuneProspector() {
+    if (prospectRange == 0 || me.dead) return false;
+    final i = ores.indexWhere((o) => o.block == _prospectOre);
+    final next = ores[(i + 1) % ores.length];
+    _prospectOre = next.block;
+    _nextProspectAt = 0;
+    toast('Prospector tuned to ${next.drop}');
+    return true;
+  }
+
+  /// Rescan for the tuned ore, at most every [_prospectInterval] and only while held.
+  void _updateProspector() {
+    final range = prospectRange;
+    if (range == 0 || me.dead) {
+      if (_oreFixes.isNotEmpty) _oreFixes = const [];
+      return;
+    }
+    if (time < _nextProspectAt) return;
+    // a wider lens reads four times the chunks, so it reads them half as often
+    _nextProspectAt = time + _prospectInterval * (range > 40 ? 2 : 1);
+    final s = player.state;
+    _oreFixes = scanForOre(
+      world.getChunk,
+      _prospectOre,
+      s.x,
+      s.y + PlayerTuning.eyeHeight,
+      s.z,
+      range,
+      worldChunksY,
+    );
+  }
+
   /// put the held block against the face the crosshair is on
   void place() {
+    // a prospector in hand tunes instead of placing
+    if (tuneProspector()) return;
     final hit = target();
     final item = held;
     if (hit == null || item == null) return;
@@ -682,6 +744,15 @@ final class Game implements SimHost {
         ? Ammo(me.magazine, inventory.count('ammo'))
         : null;
     u.cameraMode = cameraMode;
+    u.oreFixes = _oreFixes;
+    u.surfaceY = terrain.ground.height(s.x.floor(), s.z.floor());
+    u.prospector = prospectRange > 0
+        ? ProspectorState(
+            ore: _prospectOre,
+            range: prospectRange,
+            found: _oreFixes.length,
+          )
+        : null;
     u.panel = panel;
     u.nearWorkbench = nearWorkbench;
     u.message = dayNight.time < _toastUntil ? _toast : '';

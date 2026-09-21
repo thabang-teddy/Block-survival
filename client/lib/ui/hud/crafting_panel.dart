@@ -1,15 +1,22 @@
 /// Inventory + crafting panel — twin of `ui/CraftingPanel.tsx`: recipes on
 /// the left, requirements on the right, the 36-slot inventory underneath (tap
 /// a slot, then another, to swap).
+///
+/// The second tab is the minerals guide (issue #25): what there is to dig up and
+/// how deep it lies. It lives here because this is the screen you open when you
+/// are wondering what to make next.
 library;
 
 import 'package:block_survival/game/game.dart';
 import 'package:block_survival/items/inventory.dart';
 import 'package:block_survival/items/recipes.dart';
 import 'package:block_survival/items/registry.dart';
+import 'package:block_survival/ui/hud/minerals_guide.dart';
 import 'package:block_survival/ui/hud/widgets.dart';
 import 'package:block_survival/ui/theme.dart';
 import 'package:flutter/material.dart';
+
+enum _Tab { craft, minerals }
 
 class CraftingPanel extends StatefulWidget {
   const CraftingPanel({super.key, required this.game, required this.onClose});
@@ -24,6 +31,7 @@ class CraftingPanel extends StatefulWidget {
 class _CraftingPanelState extends State<CraftingPanel> {
   Recipe? _selected;
   int? _picked;
+  _Tab _tab = _Tab.craft;
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +80,16 @@ class _CraftingPanelState extends State<CraftingPanel> {
                             ),
                           ),
                           const SizedBox(width: 10),
+                          for (final t in _Tab.values)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: _TabButton(
+                                label: t == _Tab.craft ? 'Craft' : 'Minerals',
+                                on: _tab == t,
+                                onTap: () => setState(() => _tab = t),
+                              ),
+                            ),
+                          const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
@@ -99,6 +117,12 @@ class _CraftingPanelState extends State<CraftingPanel> {
                         ],
                       ),
                       const SizedBox(height: 8),
+                      if (_tab == _Tab.minerals)
+                        MineralsGuide(
+                          y: game.ui.y.round(),
+                          surfaceY: game.ui.surfaceY,
+                        )
+                      else
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -228,6 +252,39 @@ class _CraftingPanelState extends State<CraftingPanel> {
     widget.game.moveSlot(picked, i);
     setState(() => _picked = null);
   }
+}
+
+/// a tab chip in the panel header
+class _TabButton extends StatelessWidget {
+  const _TabButton({
+    required this.label,
+    required this.on,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool on;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: on ? Hud.accent : const Color(0x14FFFFFF),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: on ? const Color(0xFF1A1A1A) : Colors.white70,
+        ),
+      ),
+    ),
+  );
 }
 
 class _RecipeRow extends StatelessWidget {
