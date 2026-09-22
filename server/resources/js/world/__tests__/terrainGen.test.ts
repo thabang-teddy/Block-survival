@@ -6,6 +6,7 @@ import { generateChunk, groundSpawn, TerrainGenerator, WORLD_CHUNKS_Y, WORLD_HEI
 import { GROUND_MAX, GROUND_MIN, PAD_RADIUS, SEA_LEVEL, TREE_MAX_HEIGHT } from '../groundGen'
 import { ISLAND_CELL, islandAtCell, islandsNear, LEGACY_ISLAND_Y } from '../islandField'
 import { IslandTemplate } from '../islandTemplate'
+import { CAVE_FLOOR, CAVE_ROOF } from '../underground'
 
 /** every block of a column of chunks, as a World for easy lookups */
 function fillColumn(w: World, seed: number, cx: number, cz: number): void {
@@ -80,13 +81,15 @@ describe('generateChunk', () => {
     for (let cx = -3; cx < 3; cx++) for (let cz = -3; cz < 3; cz++) fillColumn(w, seed, cx, cz)
     let water = 0
     let grass = 0
+    let hollow = 0
     for (let x = -48; x < 48; x++) {
       for (let z = -48; z < 48; z++) {
         expect(w.getBlock(x, 0, z)).toBe(BLOCK.bedrock)
-        // solid ground column with no air pockets up to its surface
-        let y = 1
-        while (isSolid(w.getBlock(x, y, z)) && w.getBlock(x, y, z) !== BLOCK.log && w.getBlock(x, y, z) !== BLOCK.leaves) y++
-        const h = y - 1
+        // the surface is the top of the soil: walk down past trees, water, and the gap
+        // under a canopy that overhangs from the tree next door
+        let h = topOf(w, x, z, GROUND_MAX + TREE_MAX_HEIGHT + 4)
+        const overhead = new Set<number>([AIR, BLOCK.log, BLOCK.leaves, BLOCK.water])
+        while (h > 0 && overhead.has(w.getBlock(x, h, z))) h--
         expect(h).toBeGreaterThanOrEqual(GROUND_MIN)
         expect(h).toBeLessThanOrEqual(GROUND_MAX)
         const surface = w.getBlock(x, h, z)
@@ -97,10 +100,16 @@ describe('generateChunk', () => {
           water++
         }
         expect(w.getBlock(x, SEA_LEVEL + 1, z)).not.toBe(BLOCK.water)
+        // caves (issue #25) hollow the stone out, but never the roof, the floor or the soil
+        for (let y = h - CAVE_ROOF + 1; y <= h; y++) expect(isSolid(w.getBlock(x, y, z))).toBe(true)
+        for (let y = 1; y <= CAVE_FLOOR; y++) expect(isSolid(w.getBlock(x, y, z))).toBe(true)
+        for (let y = CAVE_FLOOR + 1; y < h - CAVE_ROOF + 1; y++) if (w.getBlock(x, y, z) === AIR) hollow++
       }
     }
     expect(grass).toBeGreaterThan(0)
     expect(water).toBeGreaterThan(0)
+    // the ground is not solid rock any more: there is somewhere down there to walk
+    expect(hollow).toBeGreaterThan(0)
   })
 
   test('spawn pad: flat, dry grass with headroom, for many seeds', () => {

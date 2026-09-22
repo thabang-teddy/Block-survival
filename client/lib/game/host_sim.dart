@@ -58,6 +58,21 @@ const MeleeTuning swordTuning = MeleeTuning(
   knockback: 6,
 );
 
+/// the diamond sword (issue #25): the same swing, harder
+const MeleeTuning diamondSwordTuning = MeleeTuning(
+  damage: 32,
+  reach: 2.8,
+  knockback: 7.5,
+);
+
+const Map<String, MeleeTuning> swordTunings = {
+  'sword': swordTuning,
+  'sword_diamond': diamondSwordTuning,
+};
+
+/// a sword swings at zombies instead of digging
+bool isSword(String? item) => item != null && swordTunings.containsKey(item);
+
 /// bare hands or whatever tool is held: you can always fight back, just not well
 const MeleeTuning fistsTuning = MeleeTuning(
   damage: 5,
@@ -519,7 +534,7 @@ final class HostSim implements ZombieHost {
 
   void doSwing(Avatar a, Ray r) {
     if (a.dead || a.heldItem == 'rifle') return;
-    final m = a.heldItem == 'sword' ? swordTuning : fistsTuning;
+    final m = swordTunings[a.heldItem] ?? fistsTuning;
     final o = r.origin;
     final d = r.direction;
     for (final z in zombies.zombies) {

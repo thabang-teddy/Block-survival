@@ -2,6 +2,7 @@
 /// tool, weapon and material. Block items share the id of their block name.
 library;
 
+import 'package:block_survival/world/ores.dart';
 import 'package:block_survival/world/palette.dart';
 
 enum ItemKind { block, tool, weapon, material, prop }
@@ -15,7 +16,9 @@ final class ItemDef {
     required this.colour,
     this.block,
     this.model,
-    this.pickaxeTier,
+    this.mineTier,
+    this.mineSpeed,
+    this.senseRange,
   });
 
   final String id;
@@ -29,8 +32,16 @@ final class ItemDef {
   /// GLB under /assets used for the held view-model and drops
   final String? model;
 
-  /// pickaxe tier: 1 wood, 2 stone, 3 iron
-  final int? pickaxeTier;
+  /// How hard a block this may break: 1 wood, 2 stone, 3 copper, 4 iron, 5 diamond.
+  /// Separate from [mineSpeed] on purpose — gold digs faster than iron but, like
+  /// Minecraft's, is too soft for the ores iron opens up.
+  final int? mineTier;
+
+  /// how many times faster than bare hands this digs (bare hands = 1)
+  final double? mineSpeed;
+
+  /// prospector only: how far it senses ore, in metres (issue #25)
+  final double? senseRange;
 
   /// swatch colour for the HUD icon, linear RGB
   final Rgb colour;
@@ -83,13 +94,56 @@ final Map<String, ItemDef> items = {
     maxStack: 64,
     colour: (0.80, 0.78, 0.74),
   ),
+  'copper': const ItemDef(
+    id: 'copper',
+    name: 'copper',
+    kind: ItemKind.material,
+    maxStack: 64,
+    colour: (0.80, 0.50, 0.30),
+  ),
+  'gold': const ItemDef(
+    id: 'gold',
+    name: 'gold',
+    kind: ItemKind.material,
+    maxStack: 64,
+    colour: (0.95, 0.80, 0.30),
+  ),
+  'redstone': const ItemDef(
+    id: 'redstone',
+    name: 'redstone',
+    kind: ItemKind.material,
+    maxStack: 64,
+    colour: (0.80, 0.16, 0.16),
+  ),
+  'lapis': const ItemDef(
+    id: 'lapis',
+    name: 'lapis',
+    kind: ItemKind.material,
+    maxStack: 64,
+    colour: (0.22, 0.38, 0.85),
+  ),
+  'diamond': const ItemDef(
+    id: 'diamond',
+    name: 'diamond',
+    kind: ItemKind.material,
+    maxStack: 64,
+    colour: (0.45, 0.90, 0.92),
+  ),
+  'emerald': const ItemDef(
+    id: 'emerald',
+    name: 'emerald',
+    kind: ItemKind.material,
+    maxStack: 64,
+    colour: (0.24, 0.85, 0.46),
+  ),
   'pickaxe_wood': ItemDef(
     id: 'pickaxe_wood',
     name: 'wooden pickaxe',
     kind: ItemKind.tool,
     maxStack: 1,
     model: _model('Pickaxe'),
-    pickaxeTier: 1,
+    mineTier: 1,
+    mineSpeed: 1.5,
     colour: (0.55, 0.40, 0.22),
   ),
   'pickaxe_stone': ItemDef(
@@ -98,8 +152,19 @@ final Map<String, ItemDef> items = {
     kind: ItemKind.tool,
     maxStack: 1,
     model: _model('Pickaxe'),
-    pickaxeTier: 2,
+    mineTier: 2,
+    mineSpeed: 2.5,
     colour: (0.5, 0.5, 0.5),
+  ),
+  'pickaxe_copper': ItemDef(
+    id: 'pickaxe_copper',
+    name: 'copper pickaxe',
+    kind: ItemKind.tool,
+    maxStack: 1,
+    model: _model('Pickaxe'),
+    mineTier: 3,
+    mineSpeed: 3.2,
+    colour: (0.80, 0.50, 0.30),
   ),
   'pickaxe_iron': ItemDef(
     id: 'pickaxe_iron',
@@ -107,8 +172,56 @@ final Map<String, ItemDef> items = {
     kind: ItemKind.tool,
     maxStack: 1,
     model: _model('Pickaxe'),
-    pickaxeTier: 3,
+    mineTier: 4,
+    mineSpeed: 4,
     colour: (0.8, 0.78, 0.74),
+  ),
+  // soft: it flies through stone but cannot bite the ores iron opens (Minecraft's gold)
+  'pickaxe_gold': ItemDef(
+    id: 'pickaxe_gold',
+    name: 'golden pickaxe',
+    kind: ItemKind.tool,
+    maxStack: 1,
+    model: _model('Pickaxe'),
+    mineTier: 2,
+    mineSpeed: 6.5,
+    colour: (0.95, 0.80, 0.30),
+  ),
+  'pickaxe_diamond': ItemDef(
+    id: 'pickaxe_diamond',
+    name: 'diamond pickaxe',
+    kind: ItemKind.tool,
+    maxStack: 1,
+    model: _model('Pickaxe'),
+    mineTier: 5,
+    mineSpeed: 7,
+    colour: (0.45, 0.90, 0.92),
+  ),
+  // the finder of issue #25, in three rungs: a whittled one you can have in the first
+  // minute, then lapis and redstone to see further, then emerald
+  'prospector': const ItemDef(
+    id: 'prospector',
+    name: 'prospector',
+    kind: ItemKind.tool,
+    maxStack: 1,
+    senseRange: 16,
+    colour: (0.55, 0.40, 0.22),
+  ),
+  'prospector_tuned': const ItemDef(
+    id: 'prospector_tuned',
+    name: 'tuned prospector',
+    kind: ItemKind.tool,
+    maxStack: 1,
+    senseRange: 32,
+    colour: (0.22, 0.38, 0.85),
+  ),
+  'prospector_far': const ItemDef(
+    id: 'prospector_far',
+    name: 'attuned prospector',
+    kind: ItemKind.tool,
+    maxStack: 1,
+    senseRange: 64,
+    colour: (0.24, 0.85, 0.46),
   ),
   'sword': ItemDef(
     id: 'sword',
@@ -117,6 +230,14 @@ final Map<String, ItemDef> items = {
     maxStack: 1,
     model: _model('Sword'),
     colour: (0.85, 0.65, 0.20),
+  ),
+  'sword_diamond': ItemDef(
+    id: 'sword_diamond',
+    name: 'diamond sword',
+    kind: ItemKind.weapon,
+    maxStack: 1,
+    model: _model('Sword'),
+    colour: (0.45, 0.90, 0.92),
   ),
   'rifle': ItemDef(
     id: 'rifle',
@@ -173,13 +294,11 @@ String? dropForBlock(int id) => switch (id) {
   Block.air || Block.water => null,
   Block.grass => 'dirt',
   Block.stone => 'cobble', // Minecraft convention; cobble is the wall block
-  Block.oreCoal => 'coal',
-  Block.oreIron => 'iron',
-  _ => blockNames[id],
+  _ => oreOf(id)?.drop ?? blockNames[id],
 };
 
-/// seconds to break by hand
-const Map<int, double> _hardness = {
+/// seconds to break by hand, before the tool's speed divides it
+final Map<int, double> _hardness = {
   Block.grass: 0.9,
   Block.dirt: 0.75,
   Block.sand: 0.75,
@@ -191,27 +310,31 @@ const Map<int, double> _hardness = {
   Block.planks: 2.2,
   Block.stone: 5,
   Block.cobble: 4.5,
-  Block.oreCoal: 5,
-  Block.oreIron: 6,
   Block.torch: 0.2,
   Block.workbench: 1.5,
   Block.bed: 1.0,
   Block.reinforcedWall: 9,
+  for (final o in ores) o.block: o.hardness,
 };
-const Set<int> _needsPickaxe = {
-  Block.stone,
-  Block.cobble,
-  Block.oreCoal,
-  Block.oreIron,
-  Block.reinforcedWall,
+
+/// The pickaxe tier a block demands; anything missing can be broken by hand. Ores
+/// bring their own from the ore table, which is what gates the deep ones behind iron.
+final Map<int, int> _mineTier = {
+  Block.stone: 1,
+  Block.cobble: 1,
+  Block.reinforcedWall: 2,
+  for (final o in ores) o.block: o.tier,
 };
-const List<double> _pickaxeSpeed = [1, 1.5, 2.5, 4];
+
+/// The pickaxe tier [itemId] has (0 = not a pickaxe, which still breaks soil and wood).
+int mineTierOf(String? itemId) =>
+    itemId == null ? 0 : (items[itemId]?.mineTier ?? 0);
 
 /// Seconds to break `block` holding `item` (infinity = cannot).
 double breakTime(int block, String? heldItemId) {
   final base = _hardness[block];
   if (base == null) return double.infinity;
-  final tier = heldItemId == null ? 0 : (items[heldItemId]?.pickaxeTier ?? 0);
-  if (_needsPickaxe.contains(block) && tier == 0) return double.infinity;
-  return base / _pickaxeSpeed[tier];
+  final def = heldItemId == null ? null : items[heldItemId];
+  if ((_mineTier[block] ?? 0) > (def?.mineTier ?? 0)) return double.infinity;
+  return base / (def?.mineSpeed ?? 1);
 }

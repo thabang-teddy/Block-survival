@@ -26,8 +26,11 @@ import { islandAtCell, islandsNear, IslandTemplates } from '../resources/js/worl
 import { ISLAND_LARGE } from '../resources/js/world/islandGen'
 import { IslandTemplate } from '../resources/js/world/islandTemplate'
 import { TerrainGenerator, WORLD_CHUNKS_Y } from '../resources/js/world/terrainGen'
+import { PAD_BLEND, PAD_RADIUS } from '../resources/js/world/groundGen'
+import { CaveModel, VeinField } from '../resources/js/world/underground'
 
-export const FIXTURE_VERSION = 1
+/** 2: caves and ore veins under the ground (issue #25) changed every chunk */
+export const FIXTURE_VERSION = 2
 /** the global world's seed plus a spread of own-world seeds (31-bit, like newWorldSeed) */
 export const SEEDS = [ISLAND_LARGE.seed, 1, 12345, 987654321, 2147483646]
 
@@ -71,6 +74,36 @@ function primitives(): object {
   for (const a of angles) trig.push([a, Math.sin(a), Math.cos(a)])
 
   return { rng, hashInt: hashCases, perlin: { seed: 11 ^ 0x5eed, samples: perlinSamples }, fractal2: fractalSamples, hypot, trig }
+}
+
+/**
+ * Caves and ore veins (issue #25), sampled on their own so a Dart mismatch lands on
+ * one function instead of a whole chunk. Cave cases cover the roof, the bedrock floor
+ * and the solid ground under the spawn pad as well as ordinary deep stone; vein cases
+ * cover empty cells, shallow cells and cells down where diamond lives.
+ */
+function underground(seed: number): object {
+  const caves = new CaveModel(seed, PAD_RADIUS + PAD_BLEND)
+  const caveSamples: (number | boolean)[][] = []
+  const caveCases: number[][] = [
+    [0, 20, 0, 40], [6, 20, 0, 40], [12, 20, 0, 40], [13, 20, 0, 40], // over and beside the pad
+    [120, 1, 64, 40], [120, 2, 64, 40], [120, 3, 64, 40], // the bedrock floor
+    [64, 36, 64, 40], [64, 35, 64, 40], [64, 34, 64, 40], // the roof
+    [100, 8, -100, 44], [101, 8, -100, 44], [-250, 17, 900, 48], [33, 25, -77, 52],
+  ]
+  for (const [x, y, z, h] of caveCases) caveSamples.push([x, y, z, h, caves.open(x, y, z, h)])
+
+  const field = new VeinField(seed)
+  const veinSamples: object[] = []
+  for (let gx = -2; gx <= 2; gx++) {
+    for (const gy of [0, 1, 2, 4, 6]) {
+      for (let gz = -2; gz <= 2; gz++) {
+        const v = field.in(gx, gy, gz)
+        veinSamples.push({ gx, gy, gz, vein: v ? { block: v.ore.block, x: v.x, y: v.y, z: v.z, offsets: Array.from(v.offsets) } : null })
+      }
+    }
+  }
+  return { caves: caveSamples, veins: veinSamples }
 }
 
 function templateInfo(t: IslandTemplate, size: number, depth: number, maxHeight: number): object {
@@ -148,6 +181,7 @@ function seedFixture(seed: number): object {
     updrafts,
     updraftsNear: gen.updraftsNear(-160, -160, 159, 159),
     islandsNear: islandsNear(seed, -100, -100, 100, 100).map(i => [i.ix, i.iz]),
+    underground: underground(seed),
     chunks,
   }
 }
