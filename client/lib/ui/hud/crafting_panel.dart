@@ -146,7 +146,7 @@ class _CraftingPanelState extends State<CraftingPanel> {
                                   const Padding(
                                     padding: EdgeInsets.all(8),
                                     child: Fine(
-                                      'Build a workbench for tools, weapons, glass, walls and torches.',
+                                      'Build a workbench for tools, weapons, the prospector, glass, walls and torches.',
                                     ),
                                   ),
                               ],

@@ -87,7 +87,7 @@ export function CraftingPanel() {
                 </li>
               )
             })}
-            {!nearWorkbench && <li className="bench-hint">Build a workbench for tools, weapons, glass, walls and torches.</li>}
+            {!nearWorkbench && <li className="bench-hint">Build a workbench for tools, weapons, the prospector, glass, walls and torches.</li>}
           </ul>
 
           <section className="details">
