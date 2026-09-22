@@ -197,9 +197,19 @@ final Map<String, ItemDef> items = {
     mineSpeed: 7,
     colour: (0.45, 0.90, 0.92),
   ),
+  // the finder of issue #25, in three rungs: a whittled one you can have in the first
+  // minute, then lapis and redstone to see further, then emerald
   'prospector': const ItemDef(
     id: 'prospector',
     name: 'prospector',
+    kind: ItemKind.tool,
+    maxStack: 1,
+    senseRange: 16,
+    colour: (0.55, 0.40, 0.22),
+  ),
+  'prospector_tuned': const ItemDef(
+    id: 'prospector_tuned',
+    name: 'tuned prospector',
     kind: ItemKind.tool,
     maxStack: 1,
     senseRange: 32,

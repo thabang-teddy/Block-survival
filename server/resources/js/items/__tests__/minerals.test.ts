@@ -70,12 +70,14 @@ describe('minerals in the registry', () => {
     for (let i = 1; i < speeds.length; i++) expect(speeds[i]).toBeGreaterThan(speeds[i - 1])
   })
 
-  test('a prospector senses, and the attuned one senses further', () => {
-    expect(getItem('prospector').senseRange).toBeGreaterThan(0)
-    expect(getItem('prospector_far').senseRange!).toBeGreaterThan(getItem('prospector').senseRange!)
+  test('the prospector ladder reaches further at every rung', () => {
+    const ladder = ['prospector', 'prospector_tuned', 'prospector_far']
+    const ranges = ladder.map(id => getItem(id).senseRange!)
+    expect(ranges[0]).toBeGreaterThan(0)
+    for (let i = 1; i < ranges.length; i++) expect(ranges[i]).toBeGreaterThan(ranges[i - 1])
     // and nothing else in the game senses anything
     const sensing = Object.values(ITEMS).filter(i => i.senseRange).map(i => i.id)
-    expect(sensing.sort()).toEqual(['prospector', 'prospector_far'])
+    expect(sensing.sort()).toEqual([...ladder].sort())
   })
 })
 
@@ -98,22 +100,28 @@ describe('mineral recipes', () => {
     for (const o of ORES) expect(used.has(o.drop), `${o.drop} is not used by any recipe`).toBe(true)
   })
 
-  test('a prospector takes lapis, redstone and iron at a bench', () => {
+  test('the first prospector costs only wood, so it comes before any mining', () => {
     const r = getRecipe('prospector')
     expect(r.bench).toBe(true)
-    const inv = stocked({ lapis: 2, redstone: 2, iron: 1 })
+    // whatever it takes must be makeable from logs alone
+    const fromWood = new Set(['planks', 'stick', 'log'])
+    for (const i of r.inputs) expect(fromWood.has(i.id), `${i.id} is not wood`).toBe(true)
+    const inv = stocked({ planks: 4, stick: 2 })
     expect(craftStatus(inv, r, false)).toBe('needsBench')
     expect(craftStatus(inv, r, true)).toBe('ok')
     craft(inv, r, true)
     expect(inv.count('prospector')).toBe(1)
-    expect(inv.count('lapis')).toBe(0)
   })
 
-  test('emeralds attune a prospector, consuming the plain one', () => {
-    const inv = stocked({ prospector: 1, emerald: 2 })
+  test('lapis and redstone tune it, emeralds attune it, each consuming the last', () => {
+    const inv = stocked({ prospector: 1, lapis: 2, redstone: 2, iron: 1, emerald: 2 })
+    craft(inv, getRecipe('prospector_tuned'), true)
+    expect(inv.count('prospector_tuned')).toBe(1)
+    expect(inv.count('prospector')).toBe(0)
+    expect(inv.count('lapis')).toBe(0)
     craft(inv, getRecipe('prospector_far'), true)
     expect(inv.count('prospector_far')).toBe(1)
-    expect(inv.count('prospector')).toBe(0)
+    expect(inv.count('prospector_tuned')).toBe(0)
   })
 
   test('redstone ammo yields twice what coal ammo does for the same iron', () => {

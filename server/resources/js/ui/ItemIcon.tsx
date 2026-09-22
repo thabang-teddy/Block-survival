@@ -7,7 +7,7 @@ const ICONS: Readonly<Record<string, string>> = {
   // issue #25: the rest of the minerals and what they make
   pickaxe_copper: '⛏', pickaxe_gold: '⛏', pickaxe_diamond: '⛏', sword_diamond: '🗡',
   copper: '▣', gold: '▣', redstone: '✦', lapis: '✦', diamond: '◆', emerald: '◆',
-  prospector: '◎', prospector_far: '◎',
+  prospector: '◎', prospector_tuned: '◎', prospector_far: '◎',
 }
 
 export const cssColour = (c: readonly [number, number, number], mul = 1): string =>

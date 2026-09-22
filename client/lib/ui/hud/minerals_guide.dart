@@ -50,9 +50,10 @@ class MineralsGuide extends StatelessWidget {
           const SizedBox(width: 8),
           const Expanded(
             child: Fine(
-              'A prospector (lapis, redstone and iron at a workbench) marks the nearest '
-              'veins of one mineral on screen — hold it and place to tune it. '
-              'Two emeralds attune it to twice the range.',
+              'A prospector (4 planks and 2 sticks at a workbench) marks the nearest '
+              'veins of one mineral on screen — hold it and place to tune it. Make one '
+              'before you dig. Lapis, redstone and iron double its reach; two emeralds '
+              'double it again.',
             ),
           ),
         ],

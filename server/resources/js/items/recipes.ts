@@ -34,9 +34,12 @@ export const RECIPES: readonly Recipe[] = [
   r('pickaxe_diamond', ['pickaxe_diamond', 1], [['diamond', 3], ['stick', 2]], true),
   r('sword', ['sword', 1], [['iron', 2], ['stick', 1]], true),
   r('sword_diamond', ['sword_diamond', 1], [['diamond', 2], ['stick', 1]], true),
-  // issue #25: the lens that finds ore, and the emerald that widens its reach
-  r('prospector', ['prospector', 1], [['lapis', 2], ['redstone', 2], ['iron', 1]], true),
-  r('prospector_far', ['prospector_far', 1], [['prospector', 1], ['emerald', 2]], true),
+  // issue #25: the thing that finds ore. The first one is whittled out of wood, so
+  // finding your first iron does not depend on already having mined it; lapis and
+  // redstone, then emerald, widen its reach from there.
+  r('prospector', ['prospector', 1], [['planks', 4], ['stick', 2]], true),
+  r('prospector_tuned', ['prospector_tuned', 1], [['prospector', 1], ['lapis', 2], ['redstone', 2], ['iron', 1]], true),
+  r('prospector_far', ['prospector_far', 1], [['prospector_tuned', 1], ['emerald', 2]], true),
   r('glass', ['glass', 4], [['sand', 4], ['coal', 1]], true),
   r('reinforced_wall', ['reinforced_wall', 4], [['cobble', 4], ['iron', 1]], true),
   r('bed', ['bed', 1], [['planks', 3], ['leaves', 3]], true),

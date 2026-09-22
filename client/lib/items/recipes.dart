@@ -58,14 +58,21 @@ const List<Recipe> recipes = [
     ItemStack('diamond', 2),
     ItemStack('stick', 1),
   ], bench: true),
-  // issue #25: the lens that finds ore, and the emerald that widens its reach
+  // issue #25: the thing that finds ore. The first one is whittled out of wood, so
+  // finding your first iron does not depend on already having mined it; lapis and
+  // redstone, then emerald, widen its reach from there.
   Recipe('prospector', ItemStack('prospector', 1), [
+    ItemStack('planks', 4),
+    ItemStack('stick', 2),
+  ], bench: true),
+  Recipe('prospector_tuned', ItemStack('prospector_tuned', 1), [
+    ItemStack('prospector', 1),
     ItemStack('lapis', 2),
     ItemStack('redstone', 2),
     ItemStack('iron', 1),
   ], bench: true),
   Recipe('prospector_far', ItemStack('prospector_far', 1), [
-    ItemStack('prospector', 1),
+    ItemStack('prospector_tuned', 1),
     ItemStack('emerald', 2),
   ], bench: true),
   Recipe('glass', ItemStack('glass', 4), [

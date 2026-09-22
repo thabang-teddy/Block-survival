@@ -13,7 +13,7 @@ void main() {
     expect(items.containsKey('bedrock'), isFalse);
     expect(getItem('torch').kind, ItemKind.prop);
     expect(getItem('torch').block, Block.torch);
-    expect(items.length, 44); // 20 placeable blocks + 24 others, as on the web
+    expect(items.length, 45); // 20 placeable blocks + 25 others, as on the web
   });
 
   test('drops and break times follow the web rules', () {
@@ -58,12 +58,24 @@ void main() {
     expect(mineTierOf('pickaxe_gold'), lessThan(mineTierOf('pickaxe_iron')));
   });
 
-  test('a prospector senses, and the attuned one senses further', () {
-    expect(getItem('prospector').senseRange, greaterThan(0));
-    expect(
-      getItem('prospector_far').senseRange!,
-      greaterThan(getItem('prospector').senseRange!),
-    );
+  test('the prospector ladder reaches further at every rung', () {
+    final ranges = ['prospector', 'prospector_tuned', 'prospector_far']
+        .map((id) => getItem(id).senseRange!)
+        .toList();
+    expect(ranges.first, greaterThan(0));
+    for (var i = 1; i < ranges.length; i++) {
+      expect(ranges[i], greaterThan(ranges[i - 1]));
+    }
+  });
+
+  test('the first prospector costs only wood, so it comes before any mining', () {
+    for (final i in getRecipe('prospector').inputs) {
+      expect(
+        const {'planks', 'stick', 'log'}.contains(i.id),
+        isTrue,
+        reason: '${i.id} is not wood',
+      );
+    }
   });
 
   test('every mineral has a recipe to go into', () {

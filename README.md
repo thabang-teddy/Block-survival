@@ -72,10 +72,11 @@ straight down and read the depth on the HUD. The pickaxe ladder is wood → ston
 diamond, with **gold** off to one side: it digs faster than iron but is too soft for the ores iron
 opens. Coal and iron are still in the sky islands too, along with a little copper.
 
-Can't find something? Craft a **prospector** (lapis, redstone and iron at a workbench): hold it and
-it marks the nearest veins of one mineral on screen, with distance — **right-click** to tune it to
-another. Two emeralds attune it to twice the range. The **Minerals** tab in the inventory (**E**)
-lists every ore, how deep it lies and which pickaxe it takes.
+Can't find something? Craft a **prospector** out of 4 planks and 2 sticks at the workbench, before
+you ever swing a pickaxe: hold it and it marks the nearest veins of one mineral on screen, with
+distance — **right-click** to tune it to another. The wooden one reaches 16 m; lapis, redstone and
+iron tune it to 32 m, and two emeralds attune it to 64 m. The **Minerals** tab in the inventory
+(**E**) lists every ore, how deep it lies and which pickaxe it takes.
 Every floating island has a glowing **updraft** beside its rim: stand in it and hold **Space** to rise,
 **Shift** to sink, or hover — then step off onto the island and put a bed there to respawn up high.
 Dying leaves your gear in a crate where you fell; you respawn at your bed after 5 s.

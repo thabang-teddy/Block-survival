@@ -54,9 +54,10 @@ export function MineralsGuide() {
         </tbody>
       </table>
       <p className="hint">
-        <ItemIcon def={getItem('prospector')} /> A <b>prospector</b> (lapis, redstone and iron at a
+        <ItemIcon def={getItem('prospector')} /> A <b>prospector</b> (4 planks and 2 sticks at a
         workbench) marks the nearest veins of one mineral on screen — hold it and <b>right-click</b> to
-        tune it. Two emeralds attune it to twice the range.
+        tune it. Make one before you dig. Lapis, redstone and iron double its reach; two emeralds
+        double it again.
       </p>
     </div>
   )

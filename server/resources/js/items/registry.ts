@@ -65,7 +65,10 @@ export const ITEMS: Readonly<Record<string, ItemDef>> = Object.fromEntries(
     // soft: it flies through stone but cannot bite the ores iron opens (Minecraft's gold)
     { id: 'pickaxe_gold', name: 'golden pickaxe', kind: 'tool', maxStack: 1, model: MODEL('Pickaxe'), mineTier: 2, mineSpeed: 6.5, colour: [0.95, 0.80, 0.30] },
     { id: 'pickaxe_diamond', name: 'diamond pickaxe', kind: 'tool', maxStack: 1, model: MODEL('Pickaxe'), mineTier: 5, mineSpeed: 7, colour: [0.45, 0.90, 0.92] },
-    { id: 'prospector', name: 'prospector', kind: 'tool', maxStack: 1, senseRange: 32, colour: [0.22, 0.38, 0.85] },
+    // the finder of issue #25, in three rungs: a whittled one you can have in the first
+    // minute, then lapis and redstone to see further, then emerald
+    { id: 'prospector', name: 'prospector', kind: 'tool', maxStack: 1, senseRange: 16, colour: [0.55, 0.40, 0.22] },
+    { id: 'prospector_tuned', name: 'tuned prospector', kind: 'tool', maxStack: 1, senseRange: 32, colour: [0.22, 0.38, 0.85] },
     { id: 'prospector_far', name: 'attuned prospector', kind: 'tool', maxStack: 1, senseRange: 64, colour: [0.24, 0.85, 0.46] },
     { id: 'sword', name: 'sword', kind: 'weapon', maxStack: 1, model: MODEL('Sword'), colour: [0.85, 0.65, 0.20] },
     { id: 'sword_diamond', name: 'diamond sword', kind: 'weapon', maxStack: 1, model: MODEL('Sword'), colour: [0.45, 0.90, 0.92] },
