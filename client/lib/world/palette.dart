@@ -28,6 +28,14 @@ abstract final class Block {
 
   /// the unbreakable floor of the world at y = 0
   static const int bedrock = 19;
+
+  // issue #25: the rest of the Overworld ores, found underground by depth
+  static const int oreCopper = 20;
+  static const int oreGold = 21;
+  static const int oreRedstone = 22;
+  static const int oreLapis = 23;
+  static const int oreDiamond = 24;
+  static const int oreEmerald = 25;
 }
 
 const List<String> blockNames = [
@@ -51,6 +59,12 @@ const List<String> blockNames = [
   'bed',
   'reinforced_wall',
   'bedrock',
+  'ore_copper',
+  'ore_gold',
+  'ore_redstone',
+  'ore_lapis',
+  'ore_diamond',
+  'ore_emerald',
 ];
 
 /// (top, side, bottom) colours in linear RGB 0..1
@@ -216,6 +230,43 @@ const List<BlockDef> blockDefs = [
   ),
   BlockDef.uniform(
     (0.18, 0.18, 0.20),
+    alpha: 1,
+    seeThrough: false,
+    solid: true,
+  ),
+  // the ores of issue #25: stone-grey with the metal's tint, so a vein reads at torch range
+  BlockDef.uniform(
+    (0.62, 0.42, 0.28),
+    alpha: 1,
+    seeThrough: false,
+    solid: true,
+  ),
+  BlockDef.uniform(
+    (0.85, 0.70, 0.25),
+    alpha: 1,
+    seeThrough: false,
+    solid: true,
+  ),
+  BlockDef.uniform(
+    (0.62, 0.18, 0.18),
+    alpha: 1,
+    seeThrough: false,
+    solid: true,
+  ),
+  BlockDef.uniform(
+    (0.20, 0.32, 0.68),
+    alpha: 1,
+    seeThrough: false,
+    solid: true,
+  ),
+  BlockDef.uniform(
+    (0.42, 0.82, 0.85),
+    alpha: 1,
+    seeThrough: false,
+    solid: true,
+  ),
+  BlockDef.uniform(
+    (0.22, 0.72, 0.40),
     alpha: 1,
     seeThrough: false,
     solid: true,

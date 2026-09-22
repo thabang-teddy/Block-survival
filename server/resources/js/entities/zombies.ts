@@ -5,6 +5,7 @@
  */
 import type { World } from '../world/chunkStore'
 import { BLOCK, isProp, isSolid } from '../world/palette'
+import { isOre } from '../world/ores'
 import { moveBox } from '../physics/aabb'
 import { findPath, standingCellAt, type Cell } from './pathfinding'
 import type { Rng } from '../world/noise'
@@ -35,9 +36,9 @@ export function blockHitPoints(id: number): number | undefined {
     case BLOCK.dirt: case BLOCK.sand: case BLOCK.gravel: case BLOCK.leaves: case BLOCK.grass: case BLOCK.snow: return 3
     case BLOCK.planks: case BLOCK.glass: return 5
     case BLOCK.log: return 8
-    case BLOCK.cobble: case BLOCK.stone: case BLOCK.ore_coal: case BLOCK.ore_iron: return 15
+    case BLOCK.cobble: case BLOCK.stone: return 15
     case BLOCK.torch: case BLOCK.workbench: case BLOCK.bed: return 2
-    default: return undefined // air, water, reinforced wall
+    default: return isOre(id) ? 15 : undefined // air, water, reinforced wall
   }
 }
 

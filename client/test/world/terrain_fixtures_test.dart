@@ -9,6 +9,7 @@ import 'package:block_survival/world/ground_gen.dart';
 import 'package:block_survival/world/island_field.dart';
 import 'package:block_survival/world/island_template.dart';
 import 'package:block_survival/world/terrain_gen.dart';
+import 'package:block_survival/world/underground.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fixtures.dart';
@@ -175,6 +176,52 @@ void main() {
               .map((u) => [(u as Map)['ix'], u['iz']])
               .toList(),
         );
+      });
+
+      // issue #25: sampled on their own so a mismatch lands on one function
+      // instead of a whole chunk
+      test('caves are carved in the same places', () {
+        final caves = CaveModel(seed, padRadius + padBlend);
+        final samples = (f['underground'] as Map)['caves'] as List;
+        for (final row in samples.cast<List>()) {
+          final x = row[0] as int;
+          final y = row[1] as int;
+          final z = row[2] as int;
+          final h = row[3] as int;
+          expect(
+            caves.open(x, y, z, h),
+            row[4] as bool,
+            reason: 'cave at $x,$y,$z under h $h',
+          );
+        }
+      });
+
+      test('ore veins land in the same cells, with the same shape', () {
+        final field = VeinField(seed);
+        final samples = (f['underground'] as Map)['veins'] as List;
+        for (final row in samples.cast<Map>()) {
+          final gx = row['gx'] as int;
+          final gy = row['gy'] as int;
+          final gz = row['gz'] as int;
+          final got = field.inCell(gx, gy, gz);
+          final want = row['vein'] as Map?;
+          final label = 'vein cell $gx,$gy,$gz';
+          if (want == null) {
+            expect(got, isNull, reason: '$label should be empty');
+            continue;
+          }
+          expect(got, isNotNull, reason: '$label should hold a vein');
+          expect(
+            [got!.ore.block, got.x, got.y, got.z],
+            [want['block'], want['x'], want['y'], want['z']],
+            reason: '$label ore and centre',
+          );
+          expect(
+            got.offsets.toList(),
+            (want['offsets'] as List).cast<int>(),
+            reason: '$label shape',
+          );
+        }
       });
 
       test('chunks are byte-identical', () {

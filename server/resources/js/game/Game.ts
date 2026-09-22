@@ -43,8 +43,10 @@ import { Autosave } from './autosave'
 import { collectSave, restorePlayer, visitorsOf, zombiesToRestore } from './saveState'
 import { Visitors } from './visitors'
 import { projectMarker, whereOf } from './locator'
+import { scanForOre, type OreFix } from './prospector'
+import { ORES } from '../world/ores'
 import type { ItemStack } from '../items/inventory'
-import { useUiStore, type PlayerMarker } from '../state/uiStore'
+import { useUiStore, type OreMarker, type PlayerMarker } from '../state/uiStore'
 
 export const REACH = 5
 export type CameraMode = 'first' | 'third'
@@ -64,7 +66,13 @@ const RIFLE_MAG = 30
 export const BENCH_REACH = 3
 const MESSAGE_SECONDS = 2.5
 const RIFLE = { damage: 12, headshot: 2, interval: 0.12, reloadSeconds: 2, range: 80, kick: 0.012 } as const
-const SWORD = { damage: 20, reach: 2.5, arcCos: Math.cos(Math.PI / 6), knockback: 6 } as const
+interface Melee { damage: number; reach: number; arcCos: number; knockback: number }
+const SWORD: Melee = { damage: 20, reach: 2.5, arcCos: Math.cos(Math.PI / 6), knockback: 6 }
+/** the diamond sword (issue #25): the same swing, harder */
+const SWORD_DIAMOND: Melee = { damage: 32, reach: 2.8, arcCos: Math.cos(Math.PI / 6), knockback: 7.5 }
+const SWORDS: Readonly<Record<string, Melee>> = { sword: SWORD, sword_diamond: SWORD_DIAMOND }
+/** a sword swings at zombies instead of digging */
+const isSword = (item: string | null): boolean => item !== null && item in SWORDS
 /** bare hands or whatever tool is held: you can always fight back, just not well */
 const FISTS = { damage: 5, reach: 2.0, arcCos: Math.cos(Math.PI / 6), knockback: 3 } as const
 const ADS = { fov: 20, normalFov: 75, speed: 12 } as const
@@ -78,6 +86,15 @@ const HOST_ID = 'host'
 const INITIAL_LOAD_RADIUS = 2
 /** while dirty, the host re-packs the save this often so a sudden unload can beacon it */
 const BEACON_REFRESH_SECONDS = 10
+/**
+ * The prospector rescans this often while it is in hand (issue #25). A scan walks every
+ * loaded chunk in range, so it is worth a few milliseconds a second but not a frame's
+ * worth; a wider lens costs proportionally more chunks, so it looks proportionally less
+ * often. Nothing about the scan is networked — each player's lens is their own.
+ */
+const PROSPECT_INTERVAL = 0.4
+/** an ore marker is dropped this close: you are standing on the vein */
+const ORE_MARKER_NEAR_M = 4
 
 export interface GameOptions {
   role: Role
@@ -154,6 +171,10 @@ export class Game {
   private dirtySignature = ''
   /** a brand-new world must be uploaded once so its seed sticks; a restored one only when it changes */
   private readonly needsFirstSave: boolean
+  /** which ore the prospector is tuned to, and the last scan (issue #25; purely local) */
+  private prospectOre = ORES[0].block
+  private oreFixes: OreFix[] = []
+  private nextProspectAt = 0
   private beaconTimer = 0
   private beacon: { bytes: Uint8Array; night: number; seconds: number } | null = null
   private packing = false
@@ -307,8 +328,10 @@ export class Game {
     this.remotePlayers.update(dt, this.remotePoses.values())
     this.crates.update(this.time)
     this.fx.update(dt)
+    this.updateProspector()
     this.publishUi()
     this.publishMarkers()
+    this.publishOreMarkers()
   }
 
   /** The host keeps the world loaded around every player (it simulates them all); a client around itself. */
@@ -734,7 +757,7 @@ export class Game {
 
   private doSwing(a: Avatar, r: Ray): void {
     if (a.dead || a.heldItem === 'rifle') return
-    const m = a.heldItem === 'sword' ? SWORD : FISTS
+    const m = (a.heldItem !== null ? SWORDS[a.heldItem] : undefined) ?? FISTS
     for (const z of this.zombies.zombies) {
       if (z.state !== 'chase' && z.state !== 'attack') continue
       const vx = z.x - r.ox
@@ -906,7 +929,8 @@ export class Game {
       case 'jump': this.player.queueJump(); break
       case 'hotbar': this.local.slot = ev.slot; this.breaking = null; break
       case 'primary': this.useItem(); break
-      case 'secondary': this.place(); break
+      // a prospector in hand tunes on right click; anything else places
+      case 'secondary': if (!this.tuneProspector()) this.place(); break
       case 'toggleCamera': this.cameraMode = this.cameraMode === 'first' ? 'third' : 'first'; break
       case 'drop': {
         const dir = this.camera.getWorldDirection(this.tmpDir)
@@ -987,7 +1011,7 @@ export class Game {
   private updateBreaking(dt: number): void {
     const t = this.target
     const held = this.heldItem
-    const digging = !this.dead && this.input.isButtonDown(0) && t && held !== 'rifle' && held !== 'sword'
+    const digging = !this.dead && this.input.isButtonDown(0) && t && held !== 'rifle' && !isSword(held)
     if (!digging) { this.breaking = null; return }
     if (!this.breaking || this.breaking.x !== t.x || this.breaking.y !== t.y || this.breaking.z !== t.z) {
       this.breaking = { x: t.x, y: t.y, z: t.z, progress: 0 }
@@ -1156,6 +1180,10 @@ export class Game {
       deaths: a.deaths,
       timeAlive: this.dayNight.time,
       scoreboard: this.input.isDown('Tab'),
+      prospector: this.prospectRange > 0
+        ? { ore: this.prospectOre, range: this.prospectRange, found: this.oreFixes.length }
+        : null,
+      surfaceY: this.terrain.ground.height(Math.floor(s.x), Math.floor(s.z)),
       players,
       roomCode: host ? (host.online ? host.code : '') : this.session.code,
       role: this.role,
@@ -1167,12 +1195,17 @@ export class Game {
    * view beyond arm's reach, and one pinned to the edge for each one out of view.
    * Quantised so the store only re-renders when something moved visibly.
    */
+  /** the current view-projection, as projectMarker wants it (column-major elements) */
+  private viewProjection(): ArrayLike<number> {
+    this.camera.updateMatrixWorld()
+    this.camera.matrixWorldInverse.copy(this.camera.matrixWorld).invert()
+    return this.tmpViewProj.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse).elements
+  }
+
   private publishMarkers(): void {
     const markers: PlayerMarker[] = []
     if (this.remotePoses.size > 0 && this.input.locked && !this.aiming) {
-      this.camera.updateMatrixWorld()
-      this.camera.matrixWorldInverse.copy(this.camera.matrixWorld).invert()
-      const vp = this.tmpViewProj.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse).elements
+      const vp = this.viewProjection()
       const s = this.player.state
       for (const p of this.remotePoses.values()) {
         const m = projectMarker(vp, p.x, p.y + MARKER_HEAD_M, p.z)
@@ -1186,5 +1219,68 @@ export class Game {
       }
     }
     useUiStore.getState().syncMarkers(markers)
+  }
+
+  // ---------------------------------------------------------------- the prospector (issue #25)
+  /** how far the held prospector senses, or 0 when none is in hand */
+  get prospectRange(): number {
+    const held = this.heldItem
+    return (held ? getItem(held).senseRange : undefined) ?? 0
+  }
+
+  /** the ore the prospector is tuned to */
+  get prospectTuning(): number {
+    return this.prospectOre
+  }
+
+  /**
+   * Right click with a prospector in hand: tune it to the next ore. Returns false when
+   * there is no prospector, so the click falls through to placing a block.
+   */
+  tuneProspector(): boolean {
+    if (this.prospectRange === 0 || this.dead) return false
+    const i = ORES.findIndex(o => o.block === this.prospectOre)
+    const next = ORES[(i + 1) % ORES.length]
+    this.prospectOre = next.block
+    this.nextProspectAt = 0
+    this.showMessage(`Prospector tuned to ${next.drop}`)
+    return true
+  }
+
+  /** Rescan for the tuned ore, at most every PROSPECT_INTERVAL and only while one is held. */
+  private updateProspector(): void {
+    const range = this.prospectRange
+    if (range === 0 || this.dead) {
+      if (this.oreFixes.length) this.oreFixes = []
+      return
+    }
+    if (this.time < this.nextProspectAt) return
+    // a wider lens reads four times the chunks, so it reads them half as often
+    this.nextProspectAt = this.time + PROSPECT_INTERVAL * (range > 40 ? 2 : 1)
+    const s = this.player.state
+    this.oreFixes = scanForOre(this.world, this.prospectOre, s.x, s.y + PLAYER.eyeHeight, s.z, range, WORLD_CHUNKS_Y)
+  }
+
+  /**
+   * The ore fixes as screen markers, on the same footing as the player ones: over the
+   * pocket when it is in view, pinned to the edge with an arrow when it is not.
+   */
+  private publishOreMarkers(): void {
+    const markers: OreMarker[] = []
+    if (this.oreFixes.length && this.input.locked && !this.aiming) {
+      const vp = this.viewProjection()
+      for (const f of this.oreFixes) {
+        if (f.distance < ORE_MARKER_NEAR_M) continue
+        const m = projectMarker(vp, f.x, f.y, f.z)
+        markers.push({
+          id: `${Math.floor(f.x)},${Math.floor(f.y)},${Math.floor(f.z)}`,
+          distance: Math.round(f.distance),
+          count: f.count,
+          x: Math.round(m.x * 500) / 500, y: Math.round(m.y * 500) / 500,
+          onScreen: m.onScreen, angle: Math.round(m.angle),
+        })
+      }
+    }
+    useUiStore.getState().syncOreMarkers(markers)
   }
 }

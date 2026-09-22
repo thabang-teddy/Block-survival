@@ -29,6 +29,13 @@ export const BLOCK = {
   reinforced_wall: 18,
   /** the unbreakable floor of the world at y = 0 */
   bedrock: 19,
+  // ---- issue #25: the rest of the Overworld ores, found underground by depth
+  ore_copper: 20,
+  ore_gold: 21,
+  ore_redstone: 22,
+  ore_lapis: 23,
+  ore_diamond: 24,
+  ore_emerald: 25,
 } as const
 
 export type BlockId = (typeof BLOCK)[keyof typeof BLOCK]
@@ -38,6 +45,7 @@ export const BLOCK_NAMES: readonly BlockName[] = [
   'air', 'grass', 'dirt', 'stone', 'cobble', 'sand', 'gravel', 'log',
   'planks', 'leaves', 'water', 'glass', 'snow', 'ore_iron', 'ore_coal',
   'torch', 'workbench', 'bed', 'reinforced_wall', 'bedrock',
+  'ore_copper', 'ore_gold', 'ore_redstone', 'ore_lapis', 'ore_diamond', 'ore_emerald',
 ]
 
 interface BlockDef {
@@ -87,6 +95,13 @@ export const BLOCK_DEFS: Readonly<Record<BlockId, BlockDef>> = {
     alpha: 1, seeThrough: false, solid: true,
   },
   [BLOCK.bedrock]: { colours: solidRgb([0.18, 0.18, 0.20]), alpha: 1, seeThrough: false, solid: true },
+  // the ores of issue #25: stone-grey with the metal's tint, so a vein reads at torch range
+  [BLOCK.ore_copper]: { colours: solidRgb([0.62, 0.42, 0.28]), alpha: 1, seeThrough: false, solid: true },
+  [BLOCK.ore_gold]: { colours: solidRgb([0.85, 0.70, 0.25]), alpha: 1, seeThrough: false, solid: true },
+  [BLOCK.ore_redstone]: { colours: solidRgb([0.62, 0.18, 0.18]), alpha: 1, seeThrough: false, solid: true },
+  [BLOCK.ore_lapis]: { colours: solidRgb([0.20, 0.32, 0.68]), alpha: 1, seeThrough: false, solid: true },
+  [BLOCK.ore_diamond]: { colours: solidRgb([0.42, 0.82, 0.85]), alpha: 1, seeThrough: false, solid: true },
+  [BLOCK.ore_emerald]: { colours: solidRgb([0.22, 0.72, 0.40]), alpha: 1, seeThrough: false, solid: true },
 }
 
 export const isSolid = (id: number): boolean => BLOCK_DEFS[id as BlockId]?.solid ?? false

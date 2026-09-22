@@ -15,9 +15,11 @@ import 'package:block_survival/game/score.dart';
 import 'package:block_survival/game/ui_state.dart';
 import 'package:block_survival/ui/hud/crafting_panel.dart';
 import 'package:block_survival/ui/hud/invite_panel.dart';
+import 'package:block_survival/ui/hud/ore_markers.dart';
 import 'package:block_survival/ui/hud/player_markers.dart';
 import 'package:block_survival/ui/hud/widgets.dart';
 import 'package:block_survival/ui/theme.dart';
+import 'package:block_survival/world/ores.dart';
 import 'package:block_survival/world/palette.dart';
 import 'package:block_survival/world/seed.dart';
 import 'package:flutter/material.dart';
@@ -191,6 +193,22 @@ class _HudLayerState extends State<HudLayer> {
                   child: PlayerMarkersLayer(camera: launch.game.camera, ui: u),
                 ),
               ),
+            // and where the ore is (issue #25)
+            if (u.locked && !widget.paused && !u.aiming)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: OreMarkersLayer(camera: launch.game.camera, ui: u),
+                ),
+              ),
+            if (u.locked && !widget.paused && u.prospector != null)
+              Positioned(
+                bottom: widget.touch ? 182 : 104,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: Center(child: ProspectorReadout(ui: u)),
+                ),
+              ),
             Positioned(
               bottom: widget.touch ? 100 : 22,
               left: 0,
@@ -300,10 +318,11 @@ class _HudLayerState extends State<HudLayer> {
   Widget _debug(GameUiState u) {
     final target = u.targetBlock == 0
         ? ''
-        : ' · ${blockNames[u.targetBlock].replaceAll('_', ' ')}${u.canBreak ? '' : ' (needs pickaxe)'}';
+        : ' · ${blockNames[u.targetBlock].replaceAll('_', ' ')}${u.canBreak ? '' : ' (needs a better pickaxe)'}';
     return HudPanel(
       child: Text(
         '${u.x.toStringAsFixed(1)}, ${u.y.toStringAsFixed(1)}, ${u.z.toStringAsFixed(1)}'
+        ' · ${depthNote(u.y, u.surfaceY)} · ${depthBand(u.y.round())}'
         '$target · ${u.cameraMode == CameraMode.first ? '1st' : '3rd'} person · kills ${u.kills}',
         style: const TextStyle(
           fontSize: 12,

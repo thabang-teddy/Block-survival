@@ -4,6 +4,7 @@ library;
 
 import 'package:block_survival/game/day_night.dart';
 import 'package:block_survival/game/locator.dart';
+import 'package:block_survival/game/prospector.dart';
 import 'package:block_survival/items/inventory.dart';
 import 'package:flutter/foundation.dart';
 
@@ -72,6 +73,24 @@ final class Ammo {
   final int reserve;
 }
 
+/// what the prospector in hand is doing; null when none is held (issue #25)
+final class ProspectorState {
+  const ProspectorState({
+    required this.ore,
+    required this.range,
+    required this.found,
+  });
+
+  /// the block id it is tuned to
+  final int ore;
+
+  /// how far it senses, in metres
+  final double range;
+
+  /// pockets within range
+  final int found;
+}
+
 final class GameUiState extends ChangeNotifier {
   /// pointer captured / touch controls active: the game is being played
   bool locked = false;
@@ -124,6 +143,13 @@ final class GameUiState extends ChangeNotifier {
 
   /// the other players' positions this frame; the HUD projects them onto the screen
   List<PlayerPose> poses = const [];
+
+  /// where the prospector says the ore is; the HUD projects these the same way (issue #25)
+  List<OreFix> oreFixes = const [];
+  ProspectorState? prospector;
+
+  /// top block of the player's column, so the HUD can say how far down they are
+  int surfaceY = 0;
   String? roomCode;
   Role role = Role.host;
   NetStatus netStatus = NetStatus.none;
