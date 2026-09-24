@@ -4,7 +4,9 @@
 
 One project per folder: `server/` (Laravel + web client — run every `php`,
 `composer` and `npm` command from there), `client/` (native Flutter client),
-`shared/` (contracts both clients load). The CI artefact is `server/` itself.
+`shared/` (contracts both clients load), `node-server/` (the AdonisJS duplicate of
+`server/` in which the server hosts the game — run its `npm` and `node ace`
+commands from there; see node-server/README.md). The CI artefact is `server/` itself.
 
 ## Branch flow (enforced)
 
@@ -20,6 +22,7 @@ never push directly to `staging` or `master`.
 
 ## Testing
 
-`php artisan test` and `npm test` (both in `server/`) must pass before a PR is opened.
+`php artisan test` and `npm test` (both in `server/`) must pass before a PR is opened,
+and `npm run typecheck` and `npm test` in `node-server/`.
 `phpunit.xml` pins `APP_MAINTENANCE_MODE=false`; do not read maintenance state
 from `.env` in tests.
