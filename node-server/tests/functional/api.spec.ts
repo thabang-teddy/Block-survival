@@ -8,6 +8,7 @@ import User from '#models/user'
 import World from '#models/world'
 import Setting from '#models/setting'
 import rooms from '#game-server/registry'
+import { MAX_INFLATED_BYTES } from '#services/world_store'
 import { freshState, player } from '#tests/helpers'
 
 type Player = Awaited<ReturnType<typeof player>>
@@ -161,6 +162,9 @@ test.group('Worlds, scores and rules', (group) => {
     const p = await player()
     ;(await withGzip(as(client, p).put('/api/world/own'), Buffer.from('plain'))).assertStatus(422)
     ;(await withGzip(as(client, p).put('/api/world/global'), save())).assertStatus(409)
+    // a small gzip that inflates past the cap (a zip bomb) is refused, not unpacked
+    const bomb = gzipSync(Buffer.alloc(MAX_INFLATED_BYTES + 1024, 0x20))
+    ;(await withGzip(as(client, p).put('/api/world/own'), bomb)).assertStatus(422)
     // a refused upload stores nothing
     assert.lengthOf(await World.all(), 0)
     ;(await as(client, p).get('/api/world/own')).assertStatus(404)

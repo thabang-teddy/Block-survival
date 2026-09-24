@@ -5,6 +5,7 @@ import { Autosave } from '#game/game/autosave'
 import type { Avatar } from '#game/game/Avatar'
 import type { SaveData } from '#game/game/saveTypes'
 import type { WorldKind } from '#models/world'
+import logger from '@adonisjs/core/services/logger'
 
 /** one player's connection, as the room sees it (a WebSocket in production, a fake in tests) */
 export interface Peer {
@@ -36,6 +37,8 @@ interface Seat extends Player {
   avatar: Avatar | null
   /** messages received in the current one-second window */
   received: number
+  /** when the socket was seated (ms), to drop one that never says hello */
+  since: number
 }
 
 export const TICK_HZ = 30
@@ -45,6 +48,10 @@ const ROW_REFRESH_SECONDS = 15
 const ACCESS_CHECK_SECONDS = 30
 /** inputs at 30 Hz plus actions; a client sending more than this in a second is dropped */
 const MAX_MESSAGES_PER_SECOND = 240
+/** a socket that has not said hello by then is dropped (ms) */
+const HELLO_TIMEOUT_MS = 10_000
+/** sockets waiting for their hello, at most; a ticket each, so this only bites a misbehaving client */
+const MAX_WAITING = 8
 
 /**
  * One running game: a HostSim ticked at TICK_HZ, the players connected to it, and its
@@ -122,10 +129,26 @@ export class GameRoom {
       seat.peer.close()
       this.disconnect(seat.peer)
     }
-    this.seats.set(peer.id, { ...player, name: player.name.slice(0, 16) || 'Survivor', peer, avatar: null, received: 0 })
+    if (this.seats.size - this.playerCount >= MAX_WAITING) {
+      peer.close()
+      return
+    }
+    this.seats.set(peer.id, { ...player, name: player.name.slice(0, 16) || 'Survivor', peer, avatar: null, received: 0, since: this.now() })
   }
 
+  /**
+   * One message from a player. Every room shares the process, so a message that trips a
+   * bug is logged and dropped rather than allowed to take the server down.
+   */
   receive(peer: Peer, bytes: Uint8Array): void {
+    try {
+      this.handle(peer, bytes)
+    } catch (err) {
+      logger.error({ err, code: this.code }, 'a game message failed')
+    }
+  }
+
+  private handle(peer: Peer, bytes: Uint8Array): void {
     const seat = this.seats.get(peer.id)
     if (!seat) return
     if (++seat.received > MAX_MESSAGES_PER_SECOND) {
@@ -194,8 +217,17 @@ export class GameRoom {
   }
 
   // ================================================================ tick
+  /** one step of the room; a failure is logged and the room carries on with the next */
   tick(dt: number): void {
     if (this.closed) return
+    try {
+      this.step(dt)
+    } catch (err) {
+      logger.error({ err, code: this.code }, 'a game tick failed')
+    }
+  }
+
+  private step(dt: number): void {
     if (this.playerCount > 0) this.sim.tick(dt)
 
     const edits = this.sim.takeBlockEdits()
@@ -233,6 +265,12 @@ export class GameRoom {
   }
 
   private tickHousekeeping(dt: number): void {
+    const now = this.now()
+    for (const seat of [...this.seats.values()]) {
+      if (seat.avatar || now - seat.since < HELLO_TIMEOUT_MS) continue
+      seat.peer.close()
+      this.seats.delete(seat.peer.id)
+    }
     this.rowTimer += dt
     if (this.rowTimer >= ROW_REFRESH_SECONDS) {
       this.rowTimer = 0
@@ -274,16 +312,21 @@ export class GameRoom {
    */
   async close(reason: string, opts: { save?: boolean } = {}): Promise<void> {
     if (this.closed) return
+    // closed first: whatever goes wrong below, nothing feeds this room again
+    this.closed = true
     if (this.timer) clearInterval(this.timer)
     this.timer = null
     for (const seat of [...this.seats.values()]) {
-      this.sendState(seat.peer, reason)
-      this.send(seat.peer, { t: 'bye' })
-      seat.peer.close()
-      if (seat.avatar) this.sim.removePlayer(seat.avatar.id)
+      try {
+        this.sendState(seat.peer, reason)
+        this.send(seat.peer, { t: 'bye' })
+        seat.peer.close()
+        if (seat.avatar) this.sim.removePlayer(seat.avatar.id)
+      } catch (err) {
+        logger.error({ err, code: this.code }, 'sending a player off failed')
+      }
     }
     this.seats.clear()
-    this.closed = true
     if (opts.save !== false) {
       this.autosave.markDirty()
       await this.autosave.saveNow().catch(() => {})

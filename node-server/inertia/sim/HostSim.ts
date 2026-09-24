@@ -59,6 +59,15 @@ const INITIAL_LOAD_RADIUS = 2
 const MAX_DT = 1 / 20
 /** a crate is lootable from this far */
 const CRATE_REACH = 5
+/**
+ * Players move themselves, so the server only checks that a move is one a player could
+ * make: at most this fast (m/s — sprinting, falling and riding an updraft, generously)
+ * plus a little slack for a packet that took its time. Anything further (a modified
+ * client teleporting, which would also make the server generate terrain wherever it
+ * pleases) is refused and the player is put back where the server has them.
+ */
+export const MAX_MOVE_SPEED = 60
+const MOVE_SLACK = 4
 
 type Ray = { ox: number; oy: number; oz: number; dx: number; dy: number; dz: number }
 
@@ -104,6 +113,10 @@ export class HostSim {
   private blockEdits: BlockEdit[] = []
   /** players who left (or have not reconnected since the load), by account id */
   private readonly visitors = new Visitors()
+  /** sim time of each player's last accepted move */
+  private readonly lastMove = new Map<string, number>()
+  /** where each player joined: their controller puts them back there if they fall out of the world */
+  private readonly joinedAt = new Map<string, { x: number; y: number; z: number }>()
 
   constructor(opts: HostSimOptions) {
     this.seed = opts.restore?.seed ?? opts.seed
@@ -154,6 +167,7 @@ export class HostSim {
     else this.visitors.arrive(a, userId)
     this.streamer.loadNow(a.x, a.z, INITIAL_LOAD_RADIUS)
     this.avatars.set(id, a)
+    this.joinedAt.set(id, { x: a.x, y: a.y, z: a.z })
     return a
   }
 
@@ -162,6 +176,8 @@ export class HostSim {
     if (!a) return null
     this.visitors.leave(a, a.userId)
     this.avatars.delete(id)
+    this.lastMove.delete(id)
+    this.joinedAt.delete(id)
     return a
   }
 
@@ -300,7 +316,8 @@ export class HostSim {
   apply(a: Avatar, msg: ClientMessage): void {
     switch (msg.t) {
       case 'input':
-        a.x = msg.x; a.y = msg.y; a.z = msg.z; a.yaw = msg.yaw; a.pitch = msg.pitch
+        this.move(a, msg.x, msg.y, msg.z)
+        a.yaw = msg.yaw; a.pitch = msg.pitch
         a.anim = msg.anim; a.slot = msg.slot; a.aiming = msg.aiming
         return
       case 'break': this.doBreak(a, msg.x, msg.y, msg.z); return
@@ -318,6 +335,25 @@ export class HostSim {
       case 'save':
         return
     }
+  }
+
+  /** accept a client's position if it is a move a player can make, else put them back */
+  private move(a: Avatar, x: number, y: number, z: number): void {
+    const since = this.time - (this.lastMove.get(a.id) ?? this.time - 1)
+    const allowed = MAX_MOVE_SPEED * Math.max(since, 1 / 30) + MOVE_SLACK
+    if (Math.hypot(x - a.x, y - a.y, z - a.z) > allowed && !this.outOfTheVoid(a, x, y, z)) {
+      a.push({ teleport: { x: a.x, y: a.y, z: a.z } })
+      return
+    }
+    a.x = x; a.y = y; a.z = z
+    this.lastMove.set(a.id, this.time)
+  }
+
+  /** below the bedrock the client puts its player back where they joined, or at their spawn */
+  private outOfTheVoid(a: Avatar, x: number, y: number, z: number): boolean {
+    if (a.y >= PLAYER.voidY) return false
+    const near = (p: { x: number; y: number; z: number } | undefined) => !!p && Math.hypot(x - p.x, y - p.y, z - p.z) < 1
+    return near(this.joinedAt.get(a.id)) || near(a.spawn)
   }
 
   applyBlockEdits(edits: readonly BlockEdit[]): void {

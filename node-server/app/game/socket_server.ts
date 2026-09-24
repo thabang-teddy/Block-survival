@@ -43,7 +43,9 @@ async function onSocket(ws: WebSocket, ticket: string | null): Promise<void> {
     send: (bytes) => {
       if (ws.readyState === ws.OPEN) ws.send(bytes)
     },
-    close: () => ws.close(),
+    close: () => {
+      if (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING) ws.close()
+    },
   }
   // messages that arrive while the ticket is checked are held, then replayed
   const early: Uint8Array[] = []
@@ -53,7 +55,13 @@ async function onSocket(ws: WebSocket, ticket: string | null): Promise<void> {
     if (room) room.receive(peer, bytes)
     else if (early.length < 32) early.push(bytes)
   })
-  ws.on('close', () => room?.disconnect(peer))
+  ws.on('close', () => {
+    try {
+      room?.disconnect(peer)
+    } catch (err) {
+      logger.error({ err }, 'a player leaving failed')
+    }
+  })
   ws.on('error', (err) => logger.debug({ err }, 'game socket error'))
 
   const admitted = await rooms.admit(peer, ticket).catch((err) => {

@@ -22,15 +22,27 @@ export async function readBody(req: IncomingMessage, limit: number): Promise<Buf
   return Buffer.concat(chunks)
 }
 
-/** how many accounts the save holds gear for; older formats held only the host */
-export function playerCount(gzip: Buffer): number {
+/**
+ * The most a save may inflate to. Real saves are a few hundred KB of JSON; the cap keeps
+ * a crafted gzip (a few MB that expands to gigabytes) from stalling the process every
+ * room shares.
+ */
+export const MAX_INFLATED_BYTES = 64 * 1024 * 1024
+
+/** the save's JSON, or null when it is not gzip, too big once inflated, or not JSON */
+export function inflateSave(gzip: Buffer): unknown {
   try {
-    const data = JSON.parse(gunzipSync(gzip).toString('utf8')) as { players?: unknown }
-    if (!data.players || typeof data.players !== 'object' || Array.isArray(data.players)) return 1
-    return Math.max(1, Math.min(65535, Object.keys(data.players).length))
+    return JSON.parse(gunzipSync(gzip, { maxOutputLength: MAX_INFLATED_BYTES }).toString('utf8'))
   } catch {
-    return 1
+    return null
   }
+}
+
+/** how many accounts the save holds gear for; older formats held only the host */
+export function playerCount(data: unknown): number {
+  const players = (data as { players?: unknown } | null)?.players
+  if (!players || typeof players !== 'object' || Array.isArray(players)) return 1
+  return Math.max(1, Math.min(65535, Object.keys(players).length))
 }
 
 /**
@@ -44,12 +56,14 @@ export async function storeWorld(userId: number | null, kind: WorldKind, bytes: 
   if (bytes[0] !== GZIP_MAGIC[0] || bytes[1] !== GZIP_MAGIC[1]) {
     return { error: 'Save must be gzip-compressed JSON.', status: 422 }
   }
+  const data = inflateSave(bytes)
+  if (data === null) return { error: 'Save must be gzip-compressed JSON of a sensible size.', status: 422 }
   const values = {
     payload: bytes.toString('base64'),
     size: bytes.length,
     night: Math.max(0, Math.floor(night)),
     seconds: Math.max(0, Math.floor(seconds)),
-    players: playerCount(bytes),
+    players: playerCount(data),
   }
   const existing = userId === null ? await World.global() : await World.query().where('user_id', userId).where('kind', kind).first()
   const world = existing ?? new World().merge({ userId, kind })

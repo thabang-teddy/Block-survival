@@ -158,3 +158,37 @@ describe('HostSim saving', () => {
     expect(s.saveSignature()).not.toBe(before)
   })
 })
+
+describe('HostSim movement', () => {
+  const input = (x: number, y: number, z: number): ClientMessage => ({ t: 'input', x, y, z, yaw: 0, pitch: 0, anim: 'Walk', slot: 0, aiming: false })
+
+  test('a walk is accepted; a teleport is refused and the player is put back', () => {
+    const s = sim()
+    const a = s.addPlayer('p1', 'Sam', 7)
+    const start = { x: a.x, y: a.y, z: a.z }
+    s.apply(a, input(start.x + 0.2, start.y, start.z))
+    expect(a.x).toBeCloseTo(start.x + 0.2)
+    s.takeState(a)
+    s.apply(a, input(start.x + 5000, start.y, start.z))
+    expect(a.x).toBeCloseTo(start.x + 0.2)
+    expect(s.takeState(a)?.teleport).toEqual({ x: a.x, y: a.y, z: a.z })
+  })
+
+  test('the further apart two inputs are in time, the further the player may have gone', () => {
+    const s = sim()
+    const a = s.addPlayer('p1', 'Sam', 7)
+    s.apply(a, input(a.x, a.y, a.z))
+    for (let i = 0; i < 20; i++) s.tick(1 / 20) // one second
+    s.apply(a, input(a.x + 40, a.y, a.z))
+    expect(s.takeState(a)?.teleport).toBeUndefined()
+  })
+
+  test('a player below the bedrock may go back to where they joined', () => {
+    const s = sim()
+    const a = s.addPlayer('p1', 'Sam', 7)
+    const joined = { x: a.x, y: a.y, z: a.z }
+    a.y = -20
+    s.apply(a, input(joined.x, joined.y, joined.z))
+    expect(a.y).toBeCloseTo(joined.y)
+  })
+})

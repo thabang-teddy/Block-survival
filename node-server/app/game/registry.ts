@@ -1,5 +1,5 @@
 import { promisify } from 'node:util'
-import { gzip as gzipCb, gunzipSync } from 'node:zlib'
+import { gzip as gzipCb } from 'node:zlib'
 import { DateTime } from 'luxon'
 import logger from '@adonisjs/core/services/logger'
 import { HostSim, type Run } from '#game/sim/HostSim'
@@ -15,7 +15,7 @@ import Score from '#models/score'
 import User from '#models/user'
 import World, { type WorldKind } from '#models/world'
 import AccessPolicy from '#services/access_policy'
-import { storeWorld } from '#services/world_store'
+import { inflateSave, storeWorld } from '#services/world_store'
 import GameRules from '#support/game_rules'
 import { sqlTime } from '#support/time'
 import { GameRoom, type Peer, type RoomStore } from '#game-server/game_room'
@@ -44,6 +44,8 @@ export class RoomRegistry {
   private readonly rooms = new Map<string, GameRoom>()
   /** rooms being opened, so two requests at once share one */
   private readonly opening = new Map<string, Promise<GameRoom>>()
+  /** codes handed to rooms still being opened, so two rooms opening at once never draw the same */
+  private readonly reserved = new Set<string>()
   readonly tickets = new TicketBook()
   private sweeper: ReturnType<typeof setInterval> | null = null
 
@@ -107,11 +109,12 @@ export class RoomRegistry {
     return { room }
   }
 
+  /** stop a room; never throws, so a sweep or shutdown carries on with the other rooms */
   async close(code: string, reason: string, opts: { save?: boolean } = {}): Promise<void> {
     const room = this.rooms.get(code.toUpperCase())
     if (!room) return
     this.rooms.delete(room.code)
-    await room.close(reason, opts)
+    await room.close(reason, opts).catch((err) => logger.error({ err, code: room.code }, 'closing a room failed'))
   }
 
   async closeOwn(userId: number, reason: string, opts: { save?: boolean } = {}): Promise<void> {
@@ -130,7 +133,9 @@ export class RoomRegistry {
   /** start closing rooms that stay empty */
   startSweeping(): void {
     if (this.sweeper) return
-    this.sweeper = setInterval(() => void this.sweep(), SWEEP_MS)
+    this.sweeper = setInterval(() => {
+      this.sweep().catch((err) => logger.error({ err }, 'sweeping rooms failed'))
+    }, SWEEP_MS)
     this.sweeper.unref()
   }
 
@@ -166,6 +171,14 @@ export class RoomRegistry {
 
   private async create(o: { kind: WorldKind; ownerId: number | null; hostName: string; save: SaveData | null; seed: number }): Promise<GameRoom> {
     const code = await this.freeCode()
+    try {
+      return await this.createWith(code, o)
+    } finally {
+      this.reserved.delete(code)
+    }
+  }
+
+  private async createWith(code: string, o: { kind: WorldKind; ownerId: number | null; hostName: string; save: SaveData | null; seed: number }): Promise<GameRoom> {
     const rules = parseRules((await GameRules.fromSettings()).toJSON())
     const sim = new HostSim({ seed: o.seed, rules, restore: o.save ?? undefined, ownerId: o.ownerId })
     await Room.create({
@@ -192,7 +205,9 @@ export class RoomRegistry {
   private async freeCode(): Promise<string> {
     for (;;) {
       const code = makeRoomCode()
-      if (this.rooms.has(code)) continue
+      if (this.rooms.has(code) || this.reserved.has(code)) continue
+      // reserved before the first await, so a room opening alongside cannot pick it too
+      this.reserved.add(code)
       const row = await Room.findBy('code', code)
       if (!row) return code
       if (row.expiresAt <= DateTime.now()) {
@@ -200,17 +215,15 @@ export class RoomRegistry {
         await row.delete()
         return code
       }
+      this.reserved.delete(code)
     }
   }
 
   private async loadSave(world: World | null, ownerId: number): Promise<SaveData | null> {
     if (!world) return null
-    try {
-      return migrateSave(JSON.parse(gunzipSync(world.bytes()).toString('utf8')), ownerId)
-    } catch (error) {
-      logger.error({ err: error, world: world.id }, 'unreadable save; starting the world fresh')
-      return null
-    }
+    const save = migrateSave(inflateSave(world.bytes()), ownerId)
+    if (!save) logger.error({ world: world.id }, 'unreadable save; starting the world fresh')
+    return save
   }
 
   private storeFor(code: string, kind: WorldKind, ownerId: number | null): RoomStore {
