@@ -117,7 +117,7 @@ router
         router.post('/global/leave', [ApiGlobalWorldController, 'leave'])
         // sendBeacon on unload: multipart, CSRF token as a form field
         router.post('/world/beacon', [WorldController, 'beacon'])
-        router.post('/world/:kind/beacon', [WorldController, 'beacon']).where('kind', /^(own|global)$/)
+        router.post('/world/:kind/beacon', [WorldController, 'beacon']).where('kind', /^(own|global)$/).as('world.beacon_kind')
         // the player's own world (no kind = own) and the shared `global` one; only the
         // player's own can be started over — an admin resets the global world
         router.get('/world/:kind?', [WorldController, 'show']).where('kind', /^(own|global)$/)

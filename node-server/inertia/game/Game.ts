@@ -176,6 +176,8 @@ export class Game {
     this.seed = welcome.seed
     this.terrain = new TerrainGenerator(this.seed)
     this.world.setGenerator((cx, cy, cz) => this.terrain.generateChunk(cx, cy, cz), WORLD_CHUNKS_Y)
+    // edits must stay resident: the welcome's land in columns that have not streamed in yet
+    this.world.trackEdits = true
     this.applyBlockEdits(welcome.edits)
     this.dayNight.time = welcome.time
     this.dayNight.update(0)

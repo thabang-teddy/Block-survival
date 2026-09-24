@@ -20,8 +20,7 @@ const metaValidator = vine.create({
  */
 export default class WorldController {
   async update(ctx: HttpContext) {
-    const refused = refusal(ctx)
-    if (refused) return refused
+    if (refused(ctx)) return
     const meta = await ctx.request.validateUsing(metaValidator, { data: ctx.request.qs() })
     const bytes = await readBody(ctx.request.request, World.MAX_BYTES)
     return store(ctx, bytes, meta)
@@ -29,8 +28,7 @@ export default class WorldController {
 
   /** `navigator.sendBeacon` on unload: multipart with the gzip as a file */
   async beacon(ctx: HttpContext) {
-    const refused = refusal(ctx)
-    if (refused) return refused
+    if (refused(ctx)) return
     const meta = await ctx.request.validateUsing(metaValidator)
     const file = ctx.request.file('payload')
     if (!file?.tmpPath) return ctx.response.unprocessableEntity({ message: 'The payload field is required.', errors: { payload: ['The payload field is required.'] } })
@@ -59,15 +57,26 @@ export default class WorldController {
   }
 }
 
-/** uploads the server would overwrite (or that are its to make) are refused up front */
-function refusal({ params, response, auth }: HttpContext) {
+/**
+ * Uploads the server would overwrite (or that are its to make) are refused up front.
+ * True when refused (the answer is already set): the response helpers return nothing,
+ * so the caller must stop on this flag.
+ */
+function refused({ params, response, auth }: HttpContext): boolean {
   const kind = params.kind ?? World.OWN
-  if (!World.isKind(kind)) return response.notFound({ message: 'Not Found' })
-  if (kind === World.GLOBAL) return response.conflict({ message: 'The global world is hosted by the server.' })
-  if (rooms.ownRoomOf((auth.user as User).id)) {
-    return response.conflict({ message: 'Your world is running on the server right now — leave it before saving from here.' })
+  if (!World.isKind(kind)) {
+    response.notFound({ message: 'Not Found' })
+    return true
   }
-  return null
+  if (kind === World.GLOBAL) {
+    response.conflict({ message: 'The global world is hosted by the server.' })
+    return true
+  }
+  if (rooms.ownRoomOf((auth.user as User).id)) {
+    response.conflict({ message: 'Your world is running on the server right now — leave it before saving from here.' })
+    return true
+  }
+  return false
 }
 
 async function store({ response, auth }: HttpContext, bytes: Buffer | null, meta: { night?: number; seconds?: number }) {

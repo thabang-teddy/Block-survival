@@ -33,7 +33,8 @@ export default class Device extends DeviceSchema {
   })
 
   isApproved(): boolean {
-    return this.approvedAt !== null
+    // a row created in this request has no value yet (undefined), not null
+    return this.approvedAt != null
   }
 
   static newToken(): string {

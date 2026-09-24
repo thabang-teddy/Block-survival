@@ -37,13 +37,15 @@
     "#config/*": "./config/*.js",
     "#game/*": "./inertia/*.js",
     "#support/*": "./app/support/*.js",
-    "#game-server/*": "./app/game/*.js"
+    "#game-server/*": "./app/game/*.js",
+    "#commands/*": "./commands/*.js"
   },
   "devDependencies": {
     "@adonisjs/assembler": "^8.5.0",
     "@adonisjs/eslint-config": "^3.1.0",
     "@adonisjs/prettier-config": "^1.5.0",
     "@adonisjs/tsconfig": "^2.0.0",
+    "@japa/api-client": "^3.2.1",
     "@japa/assert": "^4.2.0",
     "@japa/browser-client": "^2.3.0",
     "@japa/plugin-adonisjs": "^5.2.0",
