@@ -79,6 +79,36 @@ their gear at their spawn point (as in the Laravel app).
 - Sessions live in an encrypted cookie for 30 days instead of Laravel's database
   sessions with "remember me".
 
+## Deploying
+
+CI builds node-server on every push to `staging` and `master` (after its tests pass)
+and force-pushes the result as one orphan commit to an artefact branch, the same way
+the Laravel app ships:
+
+| source branch | artefact branch | pm2 process |
+|---|---|---|
+| `staging` | `deploy/node-staging` | `block-survival-node-staging` |
+| `master` | `deploy/node-production` | `block-survival-node-production` |
+
+An artefact holds the compiled server, the web client's bundle, `.env.example`, a
+`BUILD_INFO` stamp and `deploy/node-deploy.sh`. On the host, once per environment:
+
+```bash
+npm install -g pm2
+git clone --branch deploy/node-staging --single-branch <repo-url> ~/node-staging/app
+cp ~/node-staging/app/.env.example ~/node-staging/app/.env   # then edit it (below)
+bash ~/node-staging/app/deploy/node-deploy.sh ~/node-staging/app
+pm2 startup                                                  # once: bring pm2 back after a reboot
+```
+
+In that `.env`: `NODE_ENV=production`, a fresh `APP_KEY`, `PORT` (staging and
+production need different ones), `APP_URL` (the public address), `DB_DATABASE` as an
+absolute path outside the app dir (the dir is reset on every deploy), and
+`ADMIN_EMAIL` / `ADMIN_PASSWORD`. Every later deploy is the last command again: it
+fetches the artefact, installs production dependencies, backs up the SQLite file,
+migrates, syncs the admin account, restarts under pm2 (which saves every running
+world first) and checks `/up`. Its log goes to `~/logs/node-deploy.log`.
+
 ## Hosting
 
 This needs a long-running Node 24 process that can accept WebSockets — a VPS or a

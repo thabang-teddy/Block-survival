@@ -255,3 +255,81 @@ jobs:
           # one orphan commit per build: the artefact branch carries no history
           git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/deploy/$DEPLOY_ENV"
           echo "deploy/$DEPLOY_ENV = $(git rev-parse --short HEAD)  (source ${GITHUB_SHA::7})" >> "$GITHUB_STEP_SUMMARY"
+
+  node-build:
+    name: Build node-server artefact (deploy/node-production from master, deploy/node-staging from staging)
+    needs: node-server
+    # as for the Laravel artefact: only real pushes to the two source branches deploy
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/staging')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: deploy-node-${{ github.ref_name }}
+      cancel-in-progress: true
+    env:
+      DEPLOY_ENV: ${{ github.ref_name == 'master' && 'node-production' || 'node-staging' }}
+    defaults:
+      run:
+        working-directory: node-server
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: node-server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # compiles the server to build/ and bundles the web client into build/public/build
+      - name: Build
+        run: node ace build
+
+      - name: Assemble deployable tree
+        run: |
+          set -euo pipefail
+          ART="$RUNNER_TEMP/artefact"
+          mkdir -p "$ART"
+          # the compiled app, without dev-only leftovers; node_modules is installed on the host
+          rsync -a --exclude='node_modules/' --exclude='tests/' --exclude='vitest.config.*' ./build/ "$ART/"
+          mkdir -p "$ART/deploy"
+          cp deploy/node-deploy.sh "$ART/deploy/"
+          cp .env.example "$ART/.env.example"
+
+          # only runtime state stays untracked, so `git reset --hard` on the host never touches it
+          cat > "$ART/.gitignore" <<'EOF'
+          /.env
+          /node_modules/
+          /tmp/
+          .deploy.lock
+          EOF
+
+          cat > "$ART/BUILD_INFO" <<EOF
+          env=$DEPLOY_ENV
+          source_branch=$GITHUB_REF_NAME
+          source_sha=$GITHUB_SHA
+          run=$GITHUB_RUN_NUMBER
+          built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          node=$NODE_VERSION
+          EOF
+
+          du -sh "$ART" "$ART/public/build"
+
+      - name: Publish deploy/${{ env.DEPLOY_ENV }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/artefact"
+          git init -q -b "deploy/$DEPLOY_ENV"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "build($DEPLOY_ENV): ${GITHUB_SHA::7} from $GITHUB_REF_NAME (run #$GITHUB_RUN_NUMBER)"
+          # one orphan commit per build: the artefact branch carries no history
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/deploy/$DEPLOY_ENV"
+          echo "deploy/$DEPLOY_ENV = $(git rev-parse --short HEAD)  (source ${GITHUB_SHA::7})" >> "$GITHUB_STEP_SUMMARY"
