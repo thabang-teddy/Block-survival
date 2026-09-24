@@ -1,0 +1,1 @@
+{"version":3,"file":"game_rules_controller.js","sourceRoot":"","sources":["../../../../app/controllers/api/game_rules_controller.ts"],"names":[],"mappings":"AAAA,OAAO,SAAS,MAAM,qBAAqB,CAAA;AAG3C,MAAM,CAAC,OAAO,OAAO,mBAAmB;IACtC,KAAK,CAAC,MAAM;QACV,OAAO,EAAE,KAAK,EAAE,CAAC,MAAM,SAAS,CAAC,YAAY,EAAE,CAAC,CAAC,MAAM,EAAE,EAAE,CAAA;IAC7D,CAAC;CACF"}

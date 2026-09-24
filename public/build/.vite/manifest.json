@@ -1,0 +1,163 @@
+{
+  "_AdminLayout-D144wocD.js": {
+    "file": "AdminLayout-D144wocD.js",
+    "name": "AdminLayout",
+    "imports": [
+      "inertia/app.tsx"
+    ],
+    "css": [
+      "AdminLayout-D__QbswP.css",
+      "hud-pxmqIEcE.css"
+    ]
+  },
+  "_AdminLayout-D__QbswP.css": {
+    "file": "AdminLayout-D__QbswP.css",
+    "src": "_AdminLayout-D__QbswP.css"
+  },
+  "_hud-pxmqIEcE.css": {
+    "file": "hud-pxmqIEcE.css",
+    "src": "_hud-pxmqIEcE.css"
+  },
+  "_score--vXbDtDY.js": {
+    "file": "score--vXbDtDY.js",
+    "name": "score"
+  },
+  "_types-8P1HhV2K.js": {
+    "file": "types-8P1HhV2K.js",
+    "name": "types"
+  },
+  "inertia/Pages/Admin/Dashboard.tsx": {
+    "file": "Dashboard-DmwjV6HV.js",
+    "name": "Dashboard",
+    "src": "inertia/Pages/Admin/Dashboard.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "inertia/app.tsx",
+      "_AdminLayout-D144wocD.js",
+      "_types-8P1HhV2K.js",
+      "_score--vXbDtDY.js"
+    ]
+  },
+  "inertia/Pages/Admin/Devices.tsx": {
+    "file": "Devices-DKgEFiYf.js",
+    "name": "Devices",
+    "src": "inertia/Pages/Admin/Devices.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "inertia/app.tsx",
+      "_AdminLayout-D144wocD.js",
+      "_types-8P1HhV2K.js"
+    ]
+  },
+  "inertia/Pages/Admin/Hours.tsx": {
+    "file": "Hours-B5Q18_YG.js",
+    "name": "Hours",
+    "src": "inertia/Pages/Admin/Hours.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "inertia/app.tsx",
+      "_AdminLayout-D144wocD.js",
+      "_types-8P1HhV2K.js"
+    ]
+  },
+  "inertia/Pages/Admin/Rooms.tsx": {
+    "file": "Rooms-Cl8wHFr5.js",
+    "name": "Rooms",
+    "src": "inertia/Pages/Admin/Rooms.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "inertia/app.tsx",
+      "_AdminLayout-D144wocD.js",
+      "_types-8P1HhV2K.js"
+    ]
+  },
+  "inertia/Pages/Admin/Rules.tsx": {
+    "file": "Rules-CVnMJrfm.js",
+    "name": "Rules",
+    "src": "inertia/Pages/Admin/Rules.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "inertia/app.tsx",
+      "_AdminLayout-D144wocD.js"
+    ]
+  },
+  "inertia/Pages/Admin/UserForm.tsx": {
+    "file": "UserForm-DpAd_dW5.js",
+    "name": "UserForm",
+    "src": "inertia/Pages/Admin/UserForm.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "inertia/app.tsx",
+      "_AdminLayout-D144wocD.js",
+      "_types-8P1HhV2K.js",
+      "_score--vXbDtDY.js"
+    ]
+  },
+  "inertia/Pages/Admin/Users.tsx": {
+    "file": "Users-C08nYZEm.js",
+    "name": "Users",
+    "src": "inertia/Pages/Admin/Users.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "inertia/app.tsx",
+      "_AdminLayout-D144wocD.js",
+      "_types-8P1HhV2K.js",
+      "_score--vXbDtDY.js"
+    ]
+  },
+  "inertia/Pages/Login.tsx": {
+    "file": "Login-DoFbsesC.js",
+    "name": "Login",
+    "src": "inertia/Pages/Login.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "inertia/app.tsx"
+    ],
+    "css": [
+      "hud-pxmqIEcE.css"
+    ]
+  },
+  "inertia/Pages/PendingApproval.tsx": {
+    "file": "PendingApproval-CI6_abH3.js",
+    "name": "PendingApproval",
+    "src": "inertia/Pages/PendingApproval.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "inertia/app.tsx"
+    ],
+    "css": [
+      "hud-pxmqIEcE.css"
+    ]
+  },
+  "inertia/Pages/Play.tsx": {
+    "file": "Play-DVJuZrgc.js",
+    "name": "Play",
+    "src": "inertia/Pages/Play.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "inertia/app.tsx",
+      "_score--vXbDtDY.js"
+    ],
+    "css": [
+      "hud-pxmqIEcE.css"
+    ]
+  },
+  "inertia/app.tsx": {
+    "file": "app-BLbKJGRp.js",
+    "name": "app",
+    "src": "inertia/app.tsx",
+    "isEntry": true,
+    "dynamicImports": [
+      "inertia/Pages/Admin/Dashboard.tsx",
+      "inertia/Pages/Admin/Devices.tsx",
+      "inertia/Pages/Admin/Hours.tsx",
+      "inertia/Pages/Admin/Rooms.tsx",
+      "inertia/Pages/Admin/Rules.tsx",
+      "inertia/Pages/Admin/UserForm.tsx",
+      "inertia/Pages/Admin/Users.tsx",
+      "inertia/Pages/Login.tsx",
+      "inertia/Pages/PendingApproval.tsx",
+      "inertia/Pages/Play.tsx"
+    ]
+  }
+}
