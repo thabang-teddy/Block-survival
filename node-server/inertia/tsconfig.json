@@ -1,0 +1,20 @@
+{
+  "extends": "@adonisjs/tsconfig/tsconfig.client.json",
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowArbitraryExtensions": true,
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["./**/*.ts", "./**/*.tsx"]
+}
