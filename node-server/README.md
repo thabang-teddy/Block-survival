@@ -15,7 +15,7 @@ npm install
 cp .env.example .env && node ace generate:key
 node ace migration:run
 node ace admin:sync            # optional: creates ADMIN_EMAIL / ADMIN_PASSWORD from .env
-npm run dev                    # http://localhost:3333 (Vite runs inside the server)
+npm run dev                    # http://localhost:4000 (Vite runs inside the server)
 ```
 
 In development the sign-in page offers a one-click guest account (approved on the
@@ -89,7 +89,8 @@ instance.
 
 Known limits:
 
-- Movement is client-authoritative (as it was with a browser host): a modified
-  client can teleport. Actions are range-checked on the server.
+- Movement is client-authoritative (as it was with a browser host), within limits:
+  the server refuses moves faster than 60 m/s and puts the player back, and checks
+  the range of every action.
 - Existing Laravel accounts are not imported: passwords are hashed with scrypt here
   and bcrypt there. Saves can be copied row for row.

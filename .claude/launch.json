@@ -36,8 +36,8 @@
         "run",
         "dev"
       ],
-      "port": 3333,
-      "url": "http://localhost:3333"
+      "port": 4000,
+      "url": "http://localhost:4000"
     }
   ]
 }
