@@ -106,6 +106,39 @@ jobs:
           LARAVEL_BYPASS_ENV_CHECK: '1'
         run: npm test
 
+  node-server:
+    name: Test node-server (Japa + Vitest)
+    # the Node duplicate of the site (node-server/): the server hosts the game there,
+    # so its sim, sockets and API are tested on every push like the Laravel app's
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: node-server
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: node-server/package-lock.json
+
+      # not --ignore-scripts: better-sqlite3 fetches its native binding in an install script
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare test environment
+        run: |
+          cp .env.example .env
+          node ace generate:key
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Japa (server) and Vitest (game)
+        run: npm test
+
   build:
     name: Build artefact (deploy/production from master, deploy/staging from staging)
     needs: test

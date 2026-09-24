@@ -134,7 +134,7 @@ export function MainMenu() {
           </section>
           <section className="option">
             <h3>Global world</h3>
-            <p>The classic map ({seedTag(GLOBAL_SEED)}) everyone builds in together, running on the server whoever comes and goes.</p>
+            <p>The classic map ({seedTag(GLOBAL_SEED)}) everyone builds in together, kept running by the server however players come and go.</p>
             <p className="fine">{summary(worlds.global, 'Nobody has played the global world yet.')} {whoIsIn}</p>
             <button className="wide primary" onClick={() => void play('global')} disabled={!!busy}>
               {busy === 'global' ? 'Entering…' : 'Enter'}

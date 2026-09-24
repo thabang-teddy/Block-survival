@@ -49,7 +49,7 @@ export default function Dashboard() {
               : 'Nobody has played the global world yet.'}
             {' '}
             {globalWorld.online > 0
-              ? `${globalWorld.online} online now, hosted by ${globalWorld.host_name ?? 'someone'}.`
+              ? `${globalWorld.online} online now.`
               : 'Nobody is in it right now.'}
           </p>
         </header>

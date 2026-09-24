@@ -30,7 +30,7 @@ export default function Login({ guestLogin, guestExists }: Props) {
       <div className="menu-card">
         <h1>Block Survival</h1>
         <p className="tagline">Build by day. Hold the line by night.</p>
-        <p className="account-line">Sign in to play — solo, host a room, or join a friend&apos;s. No account yet? Ask the admin for one.</p>
+        <p className="account-line">Sign in to play — your own world, the global one, or a friend&apos;s. No account yet? Ask the admin for one.</p>
         <AccountForm />
         {guestLogin && (
           <p className="dev-guest">

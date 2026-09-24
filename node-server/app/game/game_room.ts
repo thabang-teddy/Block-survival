@@ -202,7 +202,8 @@ export class GameRoom {
     if (edits.length) this.broadcast({ t: 'blocks', edits })
     this.snapshotTimer += dt
     if (this.snapshotTimer >= 1 / SNAPSHOT_HZ) {
-      this.snapshotTimer = 0
+      // carry the remainder: at TICK_HZ ticks this still averages SNAPSHOT_HZ
+      this.snapshotTimer = Math.min(this.snapshotTimer - 1 / SNAPSHOT_HZ, 1 / SNAPSHOT_HZ)
       if (this.playerCount > 0) this.broadcast(this.sim.snapshot())
     }
     for (const seat of this.seats.values()) {
