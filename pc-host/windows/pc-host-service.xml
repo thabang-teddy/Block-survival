@@ -1,0 +1,32 @@
+<!--
+  WinSW service definition for the Block Survival PC host (docs/pc-host-research.md §5.2).
+  Put WinSW-x64.exe next to this file, renamed to pc-host-service.exe, then run
+  `pc-host-service.exe install` once from an administrator prompt.
+
+  The service starts with Windows (no login needed). Stopping it (an update, a reboot,
+  `pc-host-service.exe stop`) sends Ctrl+C: the app saves the world and tells the site
+  it is restarting, so players stay paused. `pc-host offline` hands the world to the
+  browsers instead; the app then exits cleanly and the service stays stopped until it
+  is started again. A crash exits non-zero and WinSW starts the app again, which loads
+  the last save.
+-->
+<service>
+  <id>block-survival-pc-host</id>
+  <name>Block Survival PC host</name>
+  <description>Hosts the Block Survival global world for the site.</description>
+  <executable>%BASE%\node.exe</executable>
+  <arguments>"%BASE%\dist\pc-host.mjs" run</arguments>
+  <workingdirectory>%BASE%</workingdirectory>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <onfailure action="restart" delay="10 sec"/>
+  <onfailure action="restart" delay="30 sec"/>
+  <onfailure action="restart" delay="2 min"/>
+  <resetfailure>1 hour</resetfailure>
+  <!-- time to save the world and send the last heartbeat before Windows gives up -->
+  <stoptimeout>30 sec</stoptimeout>
+  <log mode="roll-by-size">
+    <sizeThreshold>5120</sizeThreshold>
+    <keepFiles>3</keepFiles>
+  </log>
+</service>

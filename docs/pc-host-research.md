@@ -1,8 +1,58 @@
 # Hosting the global world on my own PC, with the PHP site as the front door
 
-Research only. Written 2026-09-25; revised the same day with your decisions. Branch
-`docs/pc-host-research`, on top of `dev` at `00f0df3` (after node-server was removed).
-No code has changed.
+Written 2026-09-25 and revised the same day with your decisions. **Implemented the same
+day** on branch `feat/pc-host` (on top of this doc's branch). See *Implementation status*
+below. The research text is unchanged except where that section says so.
+
+## Implementation status (2026-09-25)
+
+| Step (§5.6) | Where | State |
+|---|---|---|
+| 1. Invites follow the host | `Room::HOSTING_SECONDS`, `Room::adoptInvitesOfHost`, `rooms.last_seen_at` | Done, PHPUnit |
+| 2. Site side of the PC | `GameHost`, `/api/host/*` (`HostController`, `AuthenticateGameHost`), `GlobalWorld` (three states, standby, take-back), mailbox identities, admin panel | Done, PHPUnit |
+| 3. `pc-host/` sim + transport | `pc-host/src` (HostSim, GameRoom, HostTransport on node-datachannel) | Done, Vitest (with real DataChannels) |
+| 4. Save, scores, access | `pc-host/src/site.ts`, `/api/host/world·scores·access` | Done |
+| 5. Pause and reconnect | `GameRoom.freeze/resume` + held places; web `ClientSession` `paused`, `awaitHostPc`; Flutter same | Done, Vitest + Flutter tests |
+| 6. `/api/ice-servers` + Cloudflare TURN | `App\Support\IceServers`; both clients and the PC fetch it | Done (HTTP faked in tests) |
+| 7. Packaging, power, logs | `pc-host/scripts/package.mjs`, `windows/pc-host-service.xml` (WinSW), `src/power.ts`, `src/log.ts` | Done, see *not verified* |
+
+**Verified live on the dev machine** (site on PHP 8.4 in Docker, PC host on Node, the
+web client in a browser):
+
+- a browser joined the PC through the real mailbox, over a direct `host` candidate;
+- pausing the site for 30 s froze the PC's world after 15 s; the browser paused after
+  3 s of silence and resumed over the same link when the site was back;
+- killing the PC left the world **paused** (not handed to browsers); starting it again
+  reloaded the last save under a new room code;
+- `pc-host offline` saved, handed the world to the browsers and exited cleanly.
+
+**Not verified yet:** the WinSW service itself (install, Ctrl+C on stop, restart on
+crash); a real Cloudflare TURN key; players on other networks (CGNAT, mobile data, UDP
+blocked); the HUD's rejoin after a dropped link in a visible browser tab (unit-tested
+only, because the browser pane here renders no frames); the Flutter client against the
+PC; the keep-awake helper; a sleep/wake cycle.
+
+**Where the build differs from the plan above:**
+
+- The PC reads and writes the mailbox through its own `GET /api/host/signals` and
+  `POST /api/host/signal`, not `POST /api/rooms/{code}/signal` with host auth. The PC
+  never touches the players' routes.
+- A PC that comes back after a clean shutdown or a release **stands by**. It takes the
+  world back when the browser host's room closes (it leaves, or its seat goes stale),
+  or at the next heartbeat that finds nobody in the world. It never interrupts a
+  browser game (§5.1).
+- The lobby now lists **accepted** invites as well as pending ones, so an invitee who
+  left can go back in while the host is hosting (decision 4). Before, an accepted
+  invite disappeared from the lobby.
+- A `bye` from the PC (restart or handover) is a pause for PC-hosted sessions, and the
+  client asks the site what comes next.
+- The game rules reach the PC in the heartbeat reply. A change in the admin applies
+  when the PC next opens its room (after a restart or a standby), as a browser host
+  reads them once per match.
+- Chosen: autosave every 60 s while players are in (`Autosave`'s default). A player's
+  place is kept for the whole pause, plus a 60 s return window once the PC is back.
+- Left open (§6): no notification when the PC has been paused a long time, and no
+  minimum PC version. The heartbeat stores the version and the admin shows it.
 
 **The question.** A program on a Windows PC at home hosts the game. The Laravel site on
 cPanel stays the front door: the host registers with it, players sign in there as now
