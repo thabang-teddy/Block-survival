@@ -295,3 +295,16 @@ export const useUiStore = create<UiState>((set, get) => ({
     })
   },
 }))
+
+/**
+ * What a client session's status means for the net overlay: the match ended
+ * (`host-left`), it failed (`error`), the host PC paused it (`paused`), or a pause
+ * ended by itself over the same link (`joined` again).
+ */
+export function followClientStatus(session: ClientSession, status: ClientSession['status']): void {
+  const { netStatus, setNetStatus } = useUiStore.getState()
+  if (status === 'host-left') setNetStatus('host-left')
+  else if (status === 'error') setNetStatus('error', session.error)
+  else if (status === 'paused') setNetStatus('paused')
+  else if (status === 'joined' && netStatus === 'paused') setNetStatus('')
+}

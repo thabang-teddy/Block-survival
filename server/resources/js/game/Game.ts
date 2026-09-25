@@ -187,6 +187,8 @@ export class Game {
   set hotbarSlot(v: number) { this.local.slot = v }
   get magazine(): number { return this.local.magazine }
   get dead(): boolean { return this.local.dead }
+  /** the host PC went away (docs/pc-host-research.md §5.4): no moving, no predicting, the last frame stays */
+  get paused(): boolean { return this.session.role === 'client' && this.session.paused }
   get deaths(): number { return this.local.deaths }
   get hurtAt(): number { return this.local.hurtAt }
   get heldItem(): string | null { return this.local.heldItem }
@@ -297,12 +299,14 @@ export class Game {
     const dt = Math.min(rawDt, MAX_DT)
     this.time += dt
     const look = this.input.takeLook()
-    if (!this.dead) this.player.look(look.dx, look.dy)
+    // dead, or the host PC paused the world: the player holds still
+    const held = this.dead || this.paused
+    if (!held) this.player.look(look.dx, look.dy)
     this.reportLookSpikes()
-    for (const ev of this.input.takeEvents()) if (!this.dead) this.handleEvent(ev)
+    for (const ev of this.input.takeEvents()) if (!held) this.handleEvent(ev)
     // never integrate physics over ground that has not streamed in yet (e.g. right after a teleport)
     const p = this.player.state
-    if (this.world.isColumnLoaded(Math.floor(p.x), Math.floor(p.z))) this.player.update(dt, this.input, this.dead)
+    if (this.world.isColumnLoaded(Math.floor(p.x), Math.floor(p.z))) this.player.update(dt, this.input, held)
     this.mirrorLocalPose()
     this.updateAiming(dt)
     this.syncCamera()

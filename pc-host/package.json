@@ -1,0 +1,27 @@
+{
+  "name": "block-survival-pc-host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "description": "Hosts the Block Survival global world on a home PC, behind the PHP site (docs/pc-host-research.md).",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node dist/pc-host.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "package": "node build.mjs && node scripts/package.mjs"
+  },
+  "dependencies": {
+    "node-datachannel": "^0.33.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.6",
+    "esbuild": "^0.28.2",
+    "typescript": "~6.0.2",
+    "vitest": "^5.0.2"
+  }
+}

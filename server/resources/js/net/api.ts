@@ -204,6 +204,8 @@ export const api = {
   invites: () => request<{ invites: Invite[] }>('GET', '/invites').then(r => r.invites),
   acceptInvite: (id: number) => request<{ invite: Invite; room: RoomInfo }>('POST', `/invites/${id}/accept`),
   declineInvite: (id: number) => request<{ ok: boolean }>('POST', `/invites/${id}/decline`).then(() => undefined),
+  /** STUN, plus short-lived TURN credentials when the site has a Cloudflare TURN key */
+  iceServers: () => request<{ ice_servers: RTCIceServer[] }>('GET', '/ice-servers').then(r => r.ice_servers),
   /** drop one WebRTC signalling message into the room's mailbox */
   signal: (code: string, msg: { from: string; to: string; type: string; data: Record<string, unknown> }) =>
     request<{ id: number }>('POST', `/rooms/${code}/signal`, msg).then(() => undefined),
