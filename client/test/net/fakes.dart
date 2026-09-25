@@ -35,7 +35,8 @@ final class FakeMailbox {
 }
 
 /// the endpoints the transport and the sessions use; anything else throws
-final class FakeSignalApi implements GameApi {
+// base, not final: the PC tests add the global world's answers on top
+base class FakeSignalApi implements GameApi {
   @override
   dynamic noSuchMethod(Invocation invocation) =>
       throw UnimplementedError('FakeSignalApi: ${invocation.memberName}');

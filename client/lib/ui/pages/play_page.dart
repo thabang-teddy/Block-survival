@@ -37,6 +37,8 @@ class PlayPage extends StatefulWidget {
     required this.launch,
     required this.api,
     required this.onExit,
+    this.launcher,
+    this.onRelaunch,
   });
 
   final Launch launch;
@@ -44,6 +46,12 @@ class PlayPage extends StatefulWidget {
 
   /// back to the lobby; the launch is disposed by then
   final VoidCallback onExit;
+
+  /// how a paused host PC's world is joined again (docs/pc-host-research.md §5.4)
+  final Launcher? launcher;
+
+  /// the next launch after a pause; this one is disposed by then
+  final void Function(Launch next)? onRelaunch;
 
   @override
   State<PlayPage> createState() => _PlayPageState();
@@ -116,9 +124,19 @@ class _PlayPageState extends State<PlayPage>
     super.dispose();
   }
 
+  bool _waitingForPc = false;
+
   void _onClientStatus(ClientStatus st) {
     if (!mounted) return;
     switch (st) {
+      case ClientStatus.paused:
+        game.ui.setNetStatus(NetStatus.paused, pausedText);
+        unawaited(_awaitHostPc());
+      case ClientStatus.joined:
+        // the PC lifted the pause over the same link
+        if (game.ui.netStatus == NetStatus.paused) {
+          game.ui.setNetStatus(NetStatus.none);
+        }
       case ClientStatus.hostLeft:
         game.ui.setNetStatus(NetStatus.hostLeft);
       case ClientStatus.error:
@@ -130,6 +148,38 @@ class _PlayPageState extends State<PlayPage>
         game.ui.setNetStatus(NetStatus.error, 'The game is full');
       default:
         break;
+    }
+  }
+
+  /// wait for the host PC — however long — and go back into its world, or
+  /// follow the queue if it was released to the players
+  Future<void> _awaitHostPc() async {
+    final launcher = widget.launcher;
+    final relaunch = widget.onRelaunch;
+    if (_waitingForPc || launcher == null || relaunch == null) return;
+    _waitingForPc = true;
+    bool stillPaused() =>
+        mounted && !_exiting && game.ui.netStatus == NetStatus.paused;
+    try {
+      final next = await launcher.awaitHostPc(
+        Game.savedPlayerOf(game.me),
+        stillPaused: stillPaused,
+        onStatus: (t) {
+          if (stillPaused()) game.ui.setNetStatus(NetStatus.paused, t);
+        },
+      );
+      if (next == null) return;
+      if (!stillPaused()) {
+        await next.dispose();
+        return;
+      }
+      _exiting = true;
+      await widget.launch.dispose();
+      relaunch(next);
+    } on Object catch (e) {
+      if (stillPaused()) game.ui.setNetStatus(NetStatus.error, e.toString());
+    } finally {
+      _waitingForPc = false;
     }
   }
 
@@ -175,6 +225,7 @@ class _PlayPageState extends State<PlayPage>
     _dropHeld = false;
     _togglePanel = false;
     _selectSlot = null;
+    game.netPaused = widget.launch.client?.paused ?? false;
     game.update(dt, input);
     widget.launch.host?.tick(dt);
     widget.launch.client?.tick(dt);
