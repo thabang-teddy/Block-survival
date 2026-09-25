@@ -28,13 +28,12 @@ change, certificate or open TCP port. The browsers and the Flutter app keep thei
 transport code. The fallback in decision 2 already exists because it is how the global
 world works today.
 
-> **One interpretation to confirm.** Decisions 2 and 3 pull in opposite directions
-> during an outage: pause and wait for the PC, or hand the world to a browser? This doc
-> uses a **grace period**. For the first 10 minutes after the PC drops out, the world
-> is *paused* and players are reconnected automatically when it returns. After that
-> it is *offline* and the browser queue takes over. See §5.4. If you want the world to
-> stay paused however long the PC is gone, set the grace period to infinity. The
-> fallback then only applies when the PC was already off before anyone arrived.
+> **How decisions 2 and 3 fit together** (the grace period is set to infinite,
+> 2026-09-25). An outage the PC did not announce **pauses the world until the PC is
+> back**, however long that takes; browsers never take over from a paused PC. The
+> browser fallback applies only when the PC is deliberately *offline*: it shut down
+> cleanly, you pressed "release to browsers" in the admin, or it has never been
+> registered. See §5.4.
 
 ---
 
@@ -141,8 +140,8 @@ connection adds a detour through a Cloudflare PoP. Because the DataChannel is
 reliable and ordered, a lost packet delays the ones after it, as in today's
 peer-to-peer play.
 
-**When the PC is off or asleep.** See §5.4: paused during the grace period, then the
-browser queue takes over. Own worlds and invites are unaffected, because they never
+**When the PC is off or asleep.** See §5.4: paused until the PC returns, unless it
+shut down cleanly or was released, in which case the browser queue takes over. Own worlds and invites are unaffected, because they never
 touch the PC.
 
 **Security.**
@@ -264,14 +263,17 @@ can be measured.
 ### 5.1 PHP endpoints (`server/`)
 
 New table `game_hosts`: `id`, `name`, `token_hash`, `peer_id`, `version`,
-`last_seen_at`, `enabled`. An admin page creates the host, shows its token once, can
-revoke it, and shows the PC's current state. The host routes use `auth:host`
+`last_seen_at`, `enabled`, `offline_at` (set by a clean shutdown or a release; cleared by
+the next heartbeat). An admin page creates the host, shows its token once, can revoke
+it, shows the PC's current state, and has a **"release to browsers"** button that sets
+`offline_at` — the way out when the PC is paused and will not be back soon, since the
+pause never ends by itself (§5.4). The host routes use `auth:host`
 middleware (bearer token → `GameHost`), which is **separate from user auth and never
 reuses `APP_KEY`**.
 
 | Endpoint | Caller | Does |
 |---|---|---|
-| `POST /api/host/heartbeat` | PC, every 15 s | Stores the version and peer id and updates `last_seen_at`. Body: the global room's code, players and connected user ids. PHP refreshes the room row and the players' seats (as `GlobalWorld::touch` does for a browser host). Replies with the game rules and commands such as "reset the global world" or "shut down". A `going_offline: true` body means a clean shutdown (§5.4). |
+| `POST /api/host/heartbeat` | PC, every 15 s | Stores the version and peer id and updates `last_seen_at`. Body: the global room's code, players and connected user ids. PHP refreshes the room row and the players' seats (as `GlobalWorld::touch` does for a browser host). Replies with the game rules and commands such as "reset the global world" or "shut down". A final heartbeat with `going: 'offline'` (a shutdown) sets `offline_at`; `going: 'restart'` (an update or reboot) leaves the PC paused (§5.4). |
 | `GET /api/host/signals?after=` | PC, 1 s idle / 0.5 s during a join | The global room's mailbox. Each offer row carries `from_user_id` and `from_device_id`, taken from the session or token that posted it. |
 | `POST /api/rooms/{code}/signal` | PC | Existing route; host auth is accepted for the global room. |
 | `GET /api/host/world` | PC, when it opens the room | The global world's gzipped save (the same storage as `WorldController::show`). |
@@ -287,7 +289,7 @@ Changes to the global world queue (`GlobalWorld`):
   its browser.
 - `join()`, `claim()` and `state()` return a new host kind (`pc`) and a `paused` flag, so the
   client can tell "joining the PC", "the PC is paused, wait" and "you host" apart.
-- **The PC coming back while a browser hosts** (after the grace period has run out):
+- **The PC coming back while a browser hosts** (after a clean shutdown or a release):
   PHP does not interrupt the browser-hosted game. The PC takes the world back when that
   room closes or empties, and the browser host's last save is the one the PC loads.
   This needs one check in `GlobalWorld::roomClosed` and one in `host()`.
@@ -335,8 +337,12 @@ TypeScript.
   the site URL, token and port range. Start it with Windows using **WinSW** (a service,
   no login needed) or a Task Scheduler "At log on" task.
 - **Power.** While any player is connected, keep the PC awake with
-  `SetThreadExecutionState` through a tiny helper. On a clean shutdown, save the world
-  and send `going_offline`.
+  `SetThreadExecutionState` through a tiny helper. Whenever the app stops cleanly it
+  saves the world first. When Windows stops the service (an update, a reboot or a
+  shutdown) it sends `going: 'restart'`, so players stay paused: the app cannot tell
+  those apart, and the PC normally comes back. Only an explicit `pc-host offline`
+  command (or the admin's release button) sends `going: 'offline'` and hands the world
+  to the browsers.
 - **Logs.** Write to a rolling file. Report ICE failures and connection types (host,
   srflx or relay) in the heartbeat.
 
@@ -355,20 +361,21 @@ TypeScript.
 - **If approach 2 is ever used:** PHP signs tickets with an Ed25519 private key
   (`sodium_crypto_sign_detached`), and the PC verifies them with the public key only.
 
-### 5.4 PC downtime: pause, reconnect, then fall back (decisions 2 and 3)
+### 5.4 PC downtime: pause until it is back; fall back only when released (decisions 2 and 3)
 
-**PC states** (PHP derives them from `last_seen_at`; the grace period G is a setting,
-10 minutes suggested):
+**PC states.** PHP derives them from `last_seen_at` and `offline_at`. There is no
+grace period: a pause lasts until the PC is back.
 
 | State | When | Global world |
 |---|---|---|
 | **online** | last heartbeat ≤ 45 s ago | Hosted on the PC. |
-| **paused** | 45 s < last heartbeat ≤ 45 s + G, and no `going_offline` | Frozen. Players already in it wait on a "paused" screen and rejoin automatically. New arrivals see "the world is paused, waiting for the host PC" and wait the same way. |
-| **offline** | past the grace period, or a clean `going_offline`, or the host disabled | Hosted by the browser queue, as today (decision 2). |
+| **paused** | last heartbeat > 45 s ago (or a `going: 'restart'`), and `offline_at` is not set | Frozen, **for as long as it takes**. Players already in it wait on a "paused" screen and rejoin automatically. New arrivals see "the world is paused, waiting for the host PC" and wait the same way, or go back to the lobby and play their own world. |
+| **offline** | `offline_at` set (`pc-host offline`, or the admin's release button), the host disabled, or no host ever registered | Hosted by the browser queue, as today (decision 2). |
 
-A clean shutdown goes straight to **offline**, because nothing is coming back soon.
-Should a planned restart, such as an update, pause instead? That is an open question
-(§6).
+**The cost of an infinite pause.** If the PC crashes, loses power or loses its
+connection while you are away, the global world stays paused, even for players who
+arrive hours later, until the PC is back or you press "release to browsers" (which can
+be done from a phone). Own worlds and invites keep working throughout.
 
 **What the player sees.**
 
@@ -389,13 +396,15 @@ Should a planned restart, such as an update, pause instead? That is an open ques
 
 - **Network blip or IP change** (the process keeps running):
   - All DataChannels drop, or heartbeats fail for more than 15 s. The PC **freezes the
-    sim**: no ticks, so zombies cannot kill players who cannot move. It keeps each
-    player's avatar seat for the grace period.
+    sim**: no ticks, so zombies cannot kill players who cannot move. It keeps every
+    player's avatar seat for as long as the pause lasts.
   - When a player reconnects, the avatar they left is theirs again, in the same place,
     same state. When the first player is back the sim unfreezes. Only players who have
     reconnected are in it.
-  - Players who do not return within G are removed as if they had left: they are saved
-    and dropped.
+  - Once the PC is back online, players who do not reconnect within a **return window**
+    (60 s, the same as an empty room's grace in the old `RoomRegistry`) are removed as
+    if they had left: saved and dropped. Without that, a player who gave up waiting
+    would hold a frozen avatar forever.
 - **Sleep:** the process is suspended, which freezes the world by itself. On wake,
   `GameRoom`'s tick sees one huge `dt`. `HostSim` already clamps a step to
   `MAX_DT = 1/20 s`, but the room must also **discard the elapsed time** so day and
@@ -408,9 +417,9 @@ Should a planned restart, such as an update, pause instead? That is an open ques
 **Code this needs.**
 
 - `ClientSession` (web and Flutter) gets a `paused` status: freeze, poll, rejoin.
-- `GameRoom` gets `freeze()` and `resume()`, and keeps seats of disconnected players
-  for G.
-- `GlobalWorld` gets the three states.
+- `GameRoom` gets `freeze()` and `resume()`. It keeps disconnected players' seats
+  while frozen, and drops them after the return window once it is back.
+- `GlobalWorld` gets the three states. The admin gets the release button.
 
 ### 5.5 Invites into own worlds (decisions 1 and 4)
 
@@ -446,7 +455,8 @@ long as user 1 is hosting":
      accepted invites whose room is no longer hosting to the new room (one `UPDATE …
      WHERE from_user_id = ?`).
    - The invite ends when user 1 stops hosting cleanly (`DELETE`), or when user 1's
-     room has not been seen for the grace period.
+     room has not been seen for 45 s. This is the room's own staleness rule and has
+     nothing to do with the PC's pause.
 
 **Result.** User 2 can join user 1 whenever user 1 is hosting, across reloads, and the
 invite disappears when user 1 stops. The Flutter client uses the same API, so it gets
@@ -463,8 +473,8 @@ this for free.
 4. **`PhpRoomStore`:** save, score and access endpoints. Play a full night.
 5. **Pause and reconnect:** client `paused` status, `GameRoom` freeze and resume, seat
    holding. Test by pulling the PC's network cable, sleeping it, and killing the
-   process. Then check the handover to the browser queue after G, and the PC taking the
-   world back.
+   process, including a pause of several hours. Then check `pc-host offline` and the
+   release button handing over to the browser queue, and the PC taking the world back.
 6. **`/api/ice-servers` with Cloudflare TURN.** Test from a phone on mobile data and
    from a network that blocks UDP.
 7. **Packaging** (WinSW), the power helper, logs. Then promote dev → staging with the
@@ -474,10 +484,15 @@ this for free.
 
 ## 6. Risks and open questions
 
-1. **Grace period G** (§5.4). Is 10 minutes right? Infinity means "always pause, never
-   fall back while players are waiting".
-2. **Planned restarts.** Should a clean `going_offline` (an update or reboot) pause for
-   G like a blip, or hand over to browsers straight away? This doc hands over.
+1. **An unattended outage pauses the global world indefinitely** (decided: the grace
+   period is infinite). It ends only when the PC is back or you release it from the
+   admin. Decide whether you want a notification when the PC has been paused for a
+   while, e.g. an email from the next request that sees it paused for more than an
+   hour. No cron is needed.
+2. **Restarts pause, quitting hands over.** A service stop by Windows (update, reboot,
+   shutdown) keeps players paused. Only `pc-host offline` or the release button hands
+   over to the browsers. So shutting the PC down for the night keeps the world paused
+   until morning, unless you run `pc-host offline` first.
 3. **The PC taking the world back** only when the browser-hosted room empties (§5.1).
    The alternative is to interrupt the browser game, which would need a save handoff
    mid-game.
