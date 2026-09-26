@@ -77,3 +77,19 @@ export function browserName(ua: string | null): string {
   const browser = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser'
   return os ? `${browser} on ${os}` : browser
 }
+
+/** the host PC, as the admin dashboard shows it */
+export interface AdminPcHost {
+  id: number
+  name: string
+  /** online: it hosts the global world; paused: the world waits for it; offline: browsers host */
+  state: 'online' | 'paused' | 'offline'
+  /** released or shut down, but running again: it takes the world back once the browsers are done */
+  standing_by: boolean
+  enabled: boolean
+  version: string | null
+  players: number
+  last_seen_at: string | null
+  offline_at: string | null
+  stats: Record<string, unknown> | null
+}

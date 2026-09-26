@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import { ApiError, type GlobalState, type SaveData, type SavedPlayer } from '../api'
-import { CLAIM_POLL_MS, enterGlobal, HANDOVER_TIMEOUT_MS, handover, reconnectGlobal, rejoinRoom, type GlobalWorldDeps } from '../globalWorld'
+import { awaitHostPc, CLAIM_POLL_MS, enterGlobal, HANDOVER_TIMEOUT_MS, handover, PAUSE_POLL_MS, PAUSED_TEXT, reconnectGlobal, rejoinRoom, type GlobalWorldDeps } from '../globalWorld'
 import { GLOBAL_SEED } from '../../world/seed'
 import type { HostSession } from '../HostSession'
 
@@ -8,6 +8,8 @@ const room = (code: string) => ({ code, host_peer_id: `peer-${code}`, host_name:
 const host: GlobalState = { status: 'host', online: 1 }
 const client = (code: string): GlobalState => ({ status: 'client', room: room(code), online: 2 })
 const pending: GlobalState = { status: 'pending', host_name: 'Ana', online: 2 }
+const pc = (code: string): GlobalState => ({ status: 'client', host: 'pc', room: { ...room(code), host_name: 'HomePC' }, online: 2 })
+const paused: GlobalState = { status: 'paused', host: 'pc', host_name: 'HomePC', online: 2 }
 
 const save: SaveData = {
   version: 3, seed: GLOBAL_SEED, time: 100, edits: [], savedAt: 0, zombies: [], drops: [], crates: [],
@@ -55,7 +57,7 @@ describe('enterGlobal', () => {
     const { deps } = fakeDeps([client('ABCDEF')])
     const launch = await enterGlobal('Me', deps)
     expect(launch).toMatchObject({ role: 'client', worldKind: 'global', session: { code: 'ABCDEF' } })
-    expect(deps.connect).toHaveBeenCalledWith('ABCDEF', 'Me')
+    expect(deps.connect).toHaveBeenCalledWith('ABCDEF', 'Me', 'browser')
     expect(deps.loadWorld).not.toHaveBeenCalled()
   })
 
@@ -152,8 +154,83 @@ describe('rejoinRoom', () => {
     const { deps } = fakeDeps([host])
     const launch = await rejoinRoom('FRIEND', 'Me', 'own', deps)
     expect(launch).toMatchObject({ role: 'client', worldKind: 'own', session: { code: 'FRIEND' } })
-    expect(deps.connect).toHaveBeenCalledWith('FRIEND', 'Me')
+    expect(deps.connect).toHaveBeenCalledWith('FRIEND', 'Me', 'browser')
     expect(deps.claim).not.toHaveBeenCalled()
     expect(deps.join).not.toHaveBeenCalled()
+  })
+})
+
+describe('the host PC (docs/pc-host-research.md)', () => {
+  test('entering while the PC hosts joins it as a PC-hosted session', async () => {
+    const { deps } = fakeDeps([pc('PCPCPC')])
+    const launch = await enterGlobal('Me', deps)
+    expect(launch).toMatchObject({ role: 'client', worldKind: 'global', session: { code: 'PCPCPC' } })
+    expect(deps.connect).toHaveBeenCalledWith('PCPCPC', 'Me', 'pc')
+  })
+
+  test('a paused PC is waited for without a deadline, then joined', async () => {
+    const hours = Math.ceil((5 * 3600_000) / PAUSE_POLL_MS)
+    const { deps } = fakeDeps([...Array.from({ length: hours }, () => paused), pc('PCPCPC')])
+    const launch = await enterGlobal('Me', deps)
+    expect(launch).toMatchObject({ role: 'client', session: { code: 'PCPCPC' } })
+    expect(deps.sleep).toHaveBeenCalledWith(PAUSE_POLL_MS)
+    expect(deps.onStatus).toHaveBeenCalledWith(PAUSED_TEXT)
+    expect(deps.now()).toBeGreaterThan(HANDOVER_TIMEOUT_MS * 100)
+  })
+
+  test('after a bye from the PC, its room is joined again even though the code is the same', async () => {
+    const { deps } = fakeDeps([paused, pc('PCPCPC')])
+    const launch = await handover('Me', mine, 'PCPCPC', deps)
+    expect(launch).toMatchObject({ role: 'client', session: { code: 'PCPCPC' } })
+  })
+
+  describe('awaitHostPc', () => {
+    test('polls every 5 s while the PC is paused, and rejoins it when it is back', async () => {
+      const { deps } = fakeDeps([paused, paused, pc('PCPCPC')])
+      const launch = await awaitHostPc('Me', mine, deps, () => true)
+      expect(launch).toMatchObject({ role: 'client', session: { code: 'PCPCPC' } })
+      expect(deps.claim).toHaveBeenCalledTimes(3)
+      expect(deps.sleep).toHaveBeenCalledTimes(3)
+      expect(deps.sleep).toHaveBeenCalledWith(PAUSE_POLL_MS)
+    })
+
+    test('a pause the PC lifted over the same link ends the wait with nothing to do', async () => {
+      const { deps } = fakeDeps([paused])
+      let polls = 0
+      const launch = await awaitHostPc('Me', mine, deps, () => ++polls < 3)
+      expect(launch).toBeNull()
+      expect(deps.connect).not.toHaveBeenCalled()
+    })
+
+    test('a PC that the site still counts as online but does not answer is more waiting', async () => {
+      const { deps } = fakeDeps([pc('PCPCPC'), pc('PCPCPC'), pc('QRSTUV')])
+      deps.connect = vi.fn(async (code: string) => {
+        if (code === 'PCPCPC') throw new Error('Could not reach the host (is the game still open?)')
+        return { kind: 'client', code } as never
+      })
+      const launch = await awaitHostPc('Me', mine, deps, () => true)
+      // it came back after a restart, under a new code
+      expect(launch).toMatchObject({ role: 'client', session: { code: 'QRSTUV' } })
+      expect(deps.connect).toHaveBeenCalledTimes(3)
+    })
+
+    test('a PC released to the browsers hands us to the queue, our gear carried if we host', async () => {
+      const { deps } = fakeDeps([paused, host])
+      const launch = await awaitHostPc('Me', mine, deps, () => true)
+      expect(launch).toMatchObject({ role: 'host', restore: { players: { '7': mine } } })
+    })
+
+    test('the site being unreachable for a while is waited out; a swept seat is taken again', async () => {
+      const { deps } = fakeDeps([pc('PCPCPC')])
+      let calls = 0
+      deps.claim = vi.fn(async () => {
+        calls++
+        if (calls === 1) throw new ApiError(0, 'Could not reach the server')
+        throw new ApiError(404, 'You are not in the global world')
+      })
+      const launch = await awaitHostPc('Me', mine, deps, () => true)
+      expect(launch).toMatchObject({ role: 'client', session: { code: 'PCPCPC' } })
+      expect(deps.join).toHaveBeenCalledOnce()
+    })
   })
 })

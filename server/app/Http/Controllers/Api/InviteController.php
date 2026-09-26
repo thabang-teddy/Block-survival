@@ -71,12 +71,15 @@ class InviteController extends Controller
         ]);
     }
 
-    /** my pending invites into rooms that are still open and have a seat */
+    /**
+     * My invites into rooms whose host is hosting right now and that have a seat: pending
+     * ones, and accepted ones (I left and may go back in for as long as the host hosts).
+     */
     public function index(Request $request): JsonResponse
     {
-        $invites = RoomInvite::query()->pending()
+        $invites = RoomInvite::query()->whereIn('status', [RoomInvite::PENDING, RoomInvite::ACCEPTED])
             ->where('to_user_id', $request->user()->id)
-            ->whereHas('room', fn ($q) => $q->live()->where('players', '<', RoomController::MAX_PLAYERS))
+            ->whereHas('room', fn ($q) => $q->hosting()->where('players', '<', RoomController::MAX_PLAYERS))
             ->with('room')
             ->latest('id')
             ->get()
@@ -92,7 +95,7 @@ class InviteController extends Controller
             return response()->json(['message' => 'Not your invite.'], 403);
         }
         $room = $invite->room;
-        if (! $room || $room->expires_at->isPast()) {
+        if (! $room || ! $room->isHosting()) {
             return response()->json(['message' => 'That game is over.'], 410);
         }
         if ($invite->status === RoomInvite::DECLINED) {

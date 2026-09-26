@@ -5,11 +5,13 @@ use App\Http\Controllers\Admin\DeviceController;
 use App\Http\Controllers\Admin\GameRulesController as AdminGameRulesController;
 use App\Http\Controllers\Admin\GlobalWorldController as AdminGlobalWorldController;
 use App\Http\Controllers\Admin\LoginWindowController;
+use App\Http\Controllers\Admin\PcHostController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Api\AuthController as ApiAuthController;
 use App\Http\Controllers\Api\GameRulesController;
 use App\Http\Controllers\Api\GlobalWorldController;
+use App\Http\Controllers\Api\IceServerController;
 use App\Http\Controllers\Api\InviteController;
 use App\Http\Controllers\Api\RoomController;
 use App\Http\Controllers\Api\ScoreController;
@@ -83,6 +85,8 @@ Route::middleware(['auth:sanctum', 'access'])->group(function () {
         // the shared global world: enter its queue, ask who hosts now, leave
         Route::get('/global/presence', [GlobalWorldController::class, 'presence']);
         Route::get('/rules', GameRulesController::class);
+        // STUN, plus short-lived TURN credentials when Cloudflare TURN is configured
+        Route::get('/ice-servers', IceServerController::class);
         Route::post('/global/join', [GlobalWorldController::class, 'join']);
         Route::post('/global/claim', [GlobalWorldController::class, 'claim']);
         Route::post('/global/leave', [GlobalWorldController::class, 'leave']);
@@ -117,6 +121,10 @@ Route::middleware(['auth', 'access'])->group(function () {
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
         Route::delete('/users/{user}/world', [UserController::class, 'resetWorld'])->name('users.reset-world');
         Route::delete('/global-world', AdminGlobalWorldController::class)->name('global-world.reset');
+        Route::post('/pc-host', [PcHostController::class, 'store'])->name('pc-host.store');
+        Route::post('/pc-host/token', [PcHostController::class, 'rotate'])->name('pc-host.rotate');
+        Route::post('/pc-host/release', [PcHostController::class, 'release'])->name('pc-host.release');
+        Route::delete('/pc-host', [PcHostController::class, 'destroy'])->name('pc-host.destroy');
         Route::get('/rooms', [AdminRoomController::class, 'index'])->name('rooms.index');
         Route::delete('/rooms/{code}', [AdminRoomController::class, 'destroy'])->name('rooms.destroy');
     });

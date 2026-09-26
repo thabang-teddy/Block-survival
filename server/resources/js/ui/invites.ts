@@ -9,8 +9,9 @@ import type { WorldKind } from '../world/seed'
 /** how often the lobby re-fetches the list while it is on screen */
 export const INVITES_POLL_MS = 5000
 
+/** pending, or accepted earlier (the invitee left and may go back in while the host is hosting) */
 export function isJoinable(invite: Invite, now: number = Date.now()): boolean {
-  return invite.status === 'pending' && invite.players < invite.max_players && Date.parse(invite.expires_at) > now
+  return invite.status !== 'declined' && invite.players < invite.max_players && Date.parse(invite.expires_at) > now
 }
 
 /** "2/4" */

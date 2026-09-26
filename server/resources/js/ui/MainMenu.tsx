@@ -8,7 +8,7 @@
  */
 import { useEffect, useState } from 'react'
 import { router, usePage } from '@inertiajs/react'
-import { useUiStore } from '../state/uiStore'
+import { followClientStatus, useUiStore } from '../state/uiStore'
 import { HostSession } from '../net/HostSession'
 import { ClientSession, type ClientStatus } from '../net/ClientSession'
 import { api, type Invite, type SaveData, type WorldMeta } from '../net/api'
@@ -46,10 +46,7 @@ export function MainMenu() {
     worlds.own ? (await api.loadWorld('own')) ?? undefined : undefined
 
   /** a client hears about the end of the match through the net-status overlay */
-  const onClientStatus = (session: ClientSession, st: ClientStatus) => {
-    if (st === 'host-left') setNetStatus('host-left')
-    else if (st === 'error') setNetStatus('error', session.error)
-  }
+  const onClientStatus = (session: ClientSession, st: ClientStatus) => followClientStatus(session, st)
   const watch = (session: ClientSession) => { session.onStatus = st => onClientStatus(session, st) }
 
   const solo = async () => {
@@ -141,9 +138,14 @@ export function MainMenu() {
       ? `Night ${w.night} · ${formatTime(w.seconds)} survived · ${w.players} player${w.players === 1 ? '' : 's'} have played · saved ${timeAgo(w.updated_at)}.`
       : fresh
 
-  const whoIsIn = presence.online > 0
-    ? `${presence.online} online now, hosted by ${presence.host_name ?? 'someone'} — you would join them.`
-    : 'Nobody is in it right now — you would host it.'
+  // host_name with nobody in is the host PC, which holds the world whether or not anyone plays
+  const whoIsIn = presence.paused
+    ? `Paused — waiting for ${presence.host_name ?? 'the host PC'} to come back${presence.online > 0 ? ` (${presence.online} waiting)` : ''}.`
+    : presence.online > 0
+      ? `${presence.online} online now, hosted by ${presence.host_name ?? 'someone'} — you would join them.`
+      : presence.host_name
+        ? `Nobody is in it right now — ${presence.host_name} hosts it.`
+        : 'Nobody is in it right now — you would host it.'
 
   return (
     <div className="menu">

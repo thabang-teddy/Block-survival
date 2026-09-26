@@ -55,16 +55,21 @@ export interface RoomInfo {
 export interface GlobalPresence {
   online: number
   host_name: string | null
+  /** the host PC holds the world but is away: the world waits for it */
+  paused?: boolean
 }
 
 /**
  * What the global world tells a player who is in it: open a room (`host`), connect to
- * the host's (`client`), or wait for the chosen host to open theirs (`pending`).
+ * the host's (`client`: the host PC's or a browser's), wait for the chosen host to open
+ * theirs (`pending`), or wait for the paused host PC (`paused`).
  */
 export type GlobalState =
-  | { status: 'host'; online: number }
-  | { status: 'client'; room: RoomInfo; online: number }
-  | { status: 'pending'; host_name: string; online: number }
+  | { status: 'host'; online: number; host?: 'browser' }
+  | { status: 'client'; room: RoomInfo; online: number; host?: 'pc' | 'browser' }
+  | { status: 'pending'; host_name: string; online: number; host?: 'browser' }
+  /** the host PC holds the world but is away (docs/pc-host-research.md §5.4): wait for it */
+  | { status: 'paused'; host_name: string; online: number; host: 'pc' }
 
 export interface LeaderboardRow {
   name: string
@@ -199,6 +204,8 @@ export const api = {
   invites: () => request<{ invites: Invite[] }>('GET', '/invites').then(r => r.invites),
   acceptInvite: (id: number) => request<{ invite: Invite; room: RoomInfo }>('POST', `/invites/${id}/accept`),
   declineInvite: (id: number) => request<{ ok: boolean }>('POST', `/invites/${id}/decline`).then(() => undefined),
+  /** STUN, plus short-lived TURN credentials when the site has a Cloudflare TURN key */
+  iceServers: () => request<{ ice_servers: RTCIceServer[] }>('GET', '/ice-servers').then(r => r.ice_servers),
   /** drop one WebRTC signalling message into the room's mailbox */
   signal: (code: string, msg: { from: string; to: string; type: string; data: Record<string, unknown> }) =>
     request<{ id: number }>('POST', `/rooms/${code}/signal`, msg).then(() => undefined),

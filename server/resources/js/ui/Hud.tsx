@@ -2,7 +2,7 @@
  * HUD: logo, health/stamina bars, ammo, hotbar, crosshair with break progress,
  * click-to-play overlay. All React DOM over the canvas; state comes from the UI store.
  */
-import { useUiStore } from '../state/uiStore'
+import { followClientStatus, useUiStore } from '../state/uiStore'
 import { BLOCK_DEFS, BLOCK_NAMES, type BlockId } from '../world/palette'
 import { depthBand, depthNote, oreOf } from '../world/ores'
 import { getItem } from '../items/registry'
@@ -18,7 +18,7 @@ import { verticalHint } from '../game/locator'
 import type { ScoreRow } from '../state/uiStore'
 import { savedPlayerOf } from '../game/saveState'
 import { api } from '../net/api'
-import { handover, liveDeps, reconnectGlobal, rejoinRoom } from '../net/globalWorld'
+import { awaitHostPc, handover, liveDeps, PAUSED_TEXT, reconnectGlobal, rejoinRoom } from '../net/globalWorld'
 import type { ClientSession } from '../net/ClientSession'
 import { router } from '@inertiajs/react'
 import { useEffect, useState } from 'react'
@@ -125,10 +125,7 @@ export function Hud() {
   const isGlobal = launch?.worldKind === 'global'
 
   /** wired onto every session a handover or reconnect opens, so the HUD hears when that match ends too */
-  const onClientStatus = (session: ClientSession, st: ClientSession['status']) => {
-    if (st === 'host-left') setNetStatus('host-left')
-    else if (st === 'error') setNetStatus('error', session.error)
-  }
+  const onClientStatus = (session: ClientSession, st: ClientSession['status']) => followClientStatus(session, st)
   const onHostLost = (reason: string) => setNetStatus('error', reason)
 
   // the global world's host left: keep our seat and follow the queue — either we host
@@ -149,6 +146,29 @@ export function Hud() {
       e => { if (useUiStore.getState().netStatus === 'handover') setNetStatus('error', errorText(e)) },
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per host-left
+  }, [netStatus])
+
+  // the host PC went quiet (docs/pc-host-research.md §5.4): the game is frozen; wait for
+  // the PC — however long — and go back in, or follow the queue if it was released. A
+  // pause the PC lifts over the same link just clears the overlay (followClientStatus).
+  useEffect(() => {
+    if (netStatus !== 'paused' || !launch || launch.role !== 'client' || !game) return
+    setNetText(PAUSED_TEXT)
+    const old = launch.session
+    const mine = api.user ? savedPlayerOf(game.local) : null
+    const stillPaused = () => useUiStore.getState().netStatus === 'paused' && useUiStore.getState().launch?.session === old
+    const deps = liveDeps({ onStatus: setNetText, onClientStatus, onHostLost })
+    awaitHostPc(launch.name, mine, deps, stillPaused).then(
+      next => {
+        if (!next) return
+        if (!stillPaused()) { next.session.dispose(); return }
+        old.onStatus = null
+        old.dispose()
+        useUiStore.getState().start(next)
+      },
+      e => { if (stillPaused()) setNetStatus('error', errorText(e)) },
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per pause
   }, [netStatus])
 
   if (!launch) return <MainMenu />
@@ -301,12 +321,14 @@ export function Hud() {
       )}
 
       {netStatus && (
-        <div className={`overlay netdown${netStatus === 'reconnecting' ? ' busy' : ''}`}>
+        <div className={`overlay netdown${netStatus === 'reconnecting' || netStatus === 'paused' ? ' busy' : ''}`}>
           <h1>
-            {netStatus === 'host-left' || netStatus === 'handover' ? 'The host left' : netStatus === 'reconnecting' ? 'Reconnecting' : 'Connection lost'}
+            {netStatus === 'paused' ? 'Game paused' : netStatus === 'host-left' || netStatus === 'handover' ? 'The host left' : netStatus === 'reconnecting' ? 'Reconnecting' : 'Connection lost'}
           </h1>
           <p>
-            {netStatus === 'handover'
+            {netStatus === 'paused'
+              ? netText || PAUSED_TEXT
+              : netStatus === 'handover'
               ? `The world moves to the next player in. ${netText}`
               : netStatus === 'reconnecting'
                 ? netText

@@ -9,10 +9,6 @@ use Illuminate\Http\Request;
 
 class ScoreController extends Controller
 {
-    private const PER_NIGHT = 100;
-
-    private const PER_KILL = 5;
-
     private const LEADERBOARD_SIZE = 20;
 
     /**
@@ -21,17 +17,7 @@ class ScoreController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $data = $request->validate([
-            'nights' => ['required', 'integer', 'min:0', 'max:1000'],
-            'kills' => ['required', 'integer', 'min:0', 'max:100000'],
-            'deaths' => ['required', 'integer', 'min:0', 'max:100000'],
-            'seconds' => ['required', 'integer', 'min:0', 'max:604800'],
-        ]);
-
-        $score = $request->user()->scores()->create([
-            ...$data,
-            'score' => $data['nights'] * self::PER_NIGHT + $data['kills'] * self::PER_KILL,
-        ]);
+        $score = Score::record($request->user(), $request->validate(Score::RUN_RULES));
 
         $best = $request->user()->scores()->max('score');
 

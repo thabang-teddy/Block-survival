@@ -114,3 +114,7 @@ body:has(.admin) { user-select: text; }
   .admin-bar, .admin main, .admin .flash { padding-left: 14px; padding-right: 14px; margin-left: 0; margin-right: 0; }
   .admin-bar .account-line { margin-left: 0; }
 }
+
+/* host PC panel */
+.admin .pc-host-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.admin .flash code { user-select: all; word-break: break-all; }

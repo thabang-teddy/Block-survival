@@ -15,7 +15,7 @@ enum CameraMode { first, third }
 enum Role { host, client }
 
 /// why the game is showing the connection overlay
-enum NetStatus { none, hostLeft, handover, error }
+enum NetStatus { none, hostLeft, handover, paused, error }
 
 final class ScoreRow {
   const ScoreRow({

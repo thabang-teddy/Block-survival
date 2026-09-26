@@ -46,44 +46,16 @@ class WorldController extends Controller
     private function store(Request $request, string $kind, string $bytes, array $meta): JsonResponse
     {
         abort_unless(World::isKind($kind), 404);
-        if ($bytes === '' || strlen($bytes) > World::MAX_BYTES) {
-            return response()->json(['message' => 'Save must be between 1 byte and '.(World::MAX_BYTES / 1024 / 1024).' MB.'], 413);
+        if ($problem = World::uploadProblem($bytes)) {
+            return response()->json(['message' => $problem[0]], $problem[1]);
         }
-        if (! str_starts_with($bytes, "\x1f\x8b")) {
-            return response()->json(['message' => 'Save must be gzip-compressed JSON.'], 422);
-        }
-
+        // while the host PC holds the global world no browser is its host, so this refuses them all
         if ($kind === World::GLOBAL && ! $this->global->isHost($request->user())) {
             return response()->json(['message' => 'You are not hosting the global world.'], 409);
         }
-
-        $world = World::query()->updateOrCreate(
-            ['user_id' => $kind === World::GLOBAL ? null : $request->user()->id, 'kind' => $kind],
-            [
-                'payload' => base64_encode($bytes),
-                'size' => strlen($bytes),
-                'night' => (int) ($meta['night'] ?? 0),
-                'seconds' => (int) ($meta['seconds'] ?? 0),
-                'players' => self::playerCount($bytes),
-            ],
-        );
+        $world = World::put($kind === World::GLOBAL ? null : $request->user()->id, $kind, $bytes, $meta);
 
         return response()->json(['world' => $world->meta()]);
-    }
-
-    /** how many accounts the save holds gear for; older formats held only the host */
-    private static function playerCount(string $gzip): int
-    {
-        $json = @gzdecode($gzip);
-        if ($json === false) {
-            return 1;
-        }
-        $data = json_decode($json, true);
-        if (! is_array($data) || ! isset($data['players']) || ! is_array($data['players'])) {
-            return 1;
-        }
-
-        return max(1, min(65535, count($data['players'])));
     }
 
     public function show(Request $request, string $kind = World::OWN): Response|JsonResponse

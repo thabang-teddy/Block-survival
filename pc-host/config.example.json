@@ -1,0 +1,7 @@
+{
+  "site": "https://your-site.example",
+  "token": "paste the host token from the admin dashboard here",
+  "portRange": [50000, 50100],
+  "relayOnly": false,
+  "logDir": "logs"
+}

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Device;
+use App\Models\GameHost;
 use App\Models\Room;
 use App\Models\User;
 use App\Models\World;
@@ -32,6 +33,7 @@ class DashboardController extends Controller
             'loginWindow' => $window->toArray(),
             'windowOpen' => $window->isOpen(now()),
             'globalWorld' => ['save' => World::global()?->meta(), ...$global->presence()],
+            'pcHost' => GameHost::current()?->toAdmin(),
         ]);
     }
 }

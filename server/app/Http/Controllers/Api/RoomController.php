@@ -53,16 +53,20 @@ class RoomController extends Controller
                 'user_id' => $request->user()?->id,
                 'players' => 1,
                 'expires_at' => now()->addHours(Room::TTL_HOURS),
+                'last_seen_at' => now(),
             ],
         );
         if ($room->isGlobal()) {
             $this->global->roomOpened($request->user(), $room);
+        } else {
+            // invites follow the host: the ones into their earlier rooms move here
+            $room->adoptInvitesOfHost();
         }
 
         return response()->json(['room' => $room->toPublic()], 201);
     }
 
-    /** resolve a code to the host's peer id: the host, or a player with an accepted invite (issue #5) */
+    /** resolve a code to the host's peer id: the host, or a player with an accepted invite (issue #5) while it is hosting */
     public function show(Request $request, string $code): JsonResponse
     {
         $room = Room::query()->live()->where('code', strtoupper($code))->first();
@@ -103,7 +107,7 @@ class RoomController extends Controller
             }
         }
 
-        $room->update(['players' => $data['players'], 'expires_at' => now()->addHours(Room::TTL_HOURS)]);
+        $room->update(['players' => $data['players'], 'expires_at' => now()->addHours(Room::TTL_HOURS), 'last_seen_at' => now()]);
         if ($room->isGlobal()) {
             $this->global->touch($request->user(), $data['user_ids'] ?? []);
         }
