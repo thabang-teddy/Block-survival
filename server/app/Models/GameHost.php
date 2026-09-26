@@ -5,19 +5,22 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 /**
- * The PC that hosts the global world (docs/pc-host-research.md). There is at most one.
+ * A host key: one PC process that hosts one global world (docs/pc-host-research.md §8).
+ * A PC may run several, one per key. The key owns its world's save, seats and map seed.
  * Its state follows from the last heartbeat:
  *
- * - online: heard from within STALE_SECONDS — the PC holds the global world;
- * - paused: holds the world but went quiet (or announced a restart) — the world waits
- *   for it for as long as it takes; browsers never take over from a paused PC;
- * - offline: shut down cleanly, released by the admin, disabled or never registered —
- *   the browser queue hosts the world, as it did before the PC.
+ * - online: heard from within STALE_SECONDS — the PC runs the world;
+ * - paused: went quiet (or announced a restart) — the world waits for it for as long
+ *   as it takes;
+ * - offline: shut down cleanly, marked offline by the admin, disabled or never started —
+ *   nobody can enter the world until the PC runs it again. Browsers never host it.
  */
-#[Fillable(['name', 'token_hash', 'peer_id', 'version', 'room_code', 'players', 'last_seen_at', 'enabled', 'offline_at', 'paused_at', 'commands', 'stats'])]
+#[Fillable(['name', 'seed', 'token_hash', 'peer_id', 'version', 'room_code', 'players', 'last_seen_at', 'enabled', 'offline_at', 'paused_at', 'commands', 'stats'])]
 #[Hidden(['token_hash'])]
 class GameHost extends Model
 {
@@ -34,6 +37,12 @@ class GameHost extends Model
 
     public const COMMAND_RESET = 'reset';
 
+    /** the classic island (ISLAND_LARGE.seed in resources/js/world/islandGen.ts) */
+    public const CLASSIC_SEED = 11;
+
+    /** seeds are 31-bit, as the game's newWorldSeed makes them */
+    public const MAX_SEED = 0x7FFFFFFF;
+
     /**
      * @return array<string, string>
      */
@@ -43,16 +52,11 @@ class GameHost extends Model
             'last_seen_at' => 'datetime',
             'offline_at' => 'datetime',
             'paused_at' => 'datetime',
+            'seed' => 'integer',
             'enabled' => 'boolean',
             'commands' => 'array',
             'stats' => 'array',
         ];
-    }
-
-    /** the one host, if an admin has created it */
-    public static function current(): ?self
-    {
-        return static::query()->orderBy('id')->first();
     }
 
     public static function hashToken(string $token): string
@@ -60,13 +64,46 @@ class GameHost extends Model
         return hash('sha256', $token);
     }
 
-    /** a new host and its token, which is shown once and never stored in the clear */
-    public static function register(string $name): array
+    /**
+     * A new host key and its token, which is shown once and never stored in the clear.
+     * The first key adopts a global save left without a host (from before there were
+     * many, or after its host was removed while the migration ran).
+     *
+     * @return array{0: self, 1: string}
+     */
+    public static function register(string $name, ?int $seed = null): array
     {
         $token = Str::random(self::TOKEN_LENGTH);
-        $host = static::create(['name' => $name, 'token_hash' => self::hashToken($token)]);
+        $first = ! static::query()->exists();
+        $host = static::create([
+            'name' => $name,
+            'seed' => $seed ?? ($first ? self::CLASSIC_SEED : random_int(1, self::MAX_SEED)),
+            'token_hash' => self::hashToken($token),
+        ]);
+        if ($first) {
+            World::query()->whereNull('user_id')->whereNull('game_host_id')->where('kind', World::GLOBAL)
+                ->update(['game_host_id' => $host->id]);
+        }
 
         return [$host, $token];
+    }
+
+    /** @return HasOne<World, $this> the world's save, once the PC has uploaded one */
+    public function world(): HasOne
+    {
+        return $this->hasOne(World::class)->whereNull('user_id')->where('kind', World::GLOBAL);
+    }
+
+    /** @return HasMany<GlobalSeat, $this> the players inside the world */
+    public function seats(): HasMany
+    {
+        return $this->hasMany(GlobalSeat::class);
+    }
+
+    /** what the admin list shows instead of the token: enough to tell keys apart, useless to sign in with */
+    public function fingerprint(): string
+    {
+        return substr((string) $this->token_hash, 0, 8);
     }
 
     public function rotateToken(): string
@@ -104,16 +141,10 @@ class GameHost extends Model
         return self::ONLINE;
     }
 
-    /** online or paused: the global world is the PC's, and no browser may host it */
-    public function holdsWorld(): bool
+    /** online or paused: players may enter (and wait while it is paused) */
+    public function isOpen(): bool
     {
         return $this->state() !== self::OFFLINE;
-    }
-
-    /** released or shut down cleanly, but running again: it takes the world back once browsers are done with it */
-    public function isStandingBy(): bool
-    {
-        return $this->enabled && $this->offline_at !== null && $this->paused_at === null && $this->isAlive();
     }
 
     public function queueCommand(string $command): void
@@ -136,14 +167,16 @@ class GameHost extends Model
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'fingerprint' => $this->fingerprint(),
+            'seed' => $this->seed,
             'state' => $this->state(),
-            'standing_by' => $this->isStandingBy(),
             'enabled' => $this->enabled,
             'version' => $this->version,
             'players' => $this->players,
             'last_seen_at' => $this->last_seen_at?->toIso8601String(),
             'offline_at' => $this->offline_at?->toIso8601String(),
             'stats' => $this->stats,
+            'created_at' => $this->created_at?->toIso8601String(),
         ];
     }
 }

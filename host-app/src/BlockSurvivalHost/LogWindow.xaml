@@ -1,0 +1,19 @@
+<Window x:Class="BlockSurvivalHost.LogWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Log" Icon="Assets/host.ico" Width="860" Height="520"
+        Background="{StaticResource Bg}" FontFamily="Segoe UI" FontSize="13">
+    <DockPanel Margin="16">
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                <CheckBox x:Name="Follow" Content="Follow" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" />
+                <Button Content="Refresh" Click="OnRefresh" />
+                <Button Content="Copy" Click="OnCopy" Margin="0" />
+            </StackPanel>
+            <TextBlock x:Name="Heading" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
+        </DockPanel>
+        <TextBlock x:Name="Status" DockPanel.Dock="Bottom" Style="{StaticResource MutedText}" Margin="0,8,0,0" />
+        <TextBox x:Name="Lines" IsReadOnly="True" FontFamily="Cascadia Mono, Consolas" FontSize="12"
+                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" TextWrapping="NoWrap" />
+    </DockPanel>
+</Window>

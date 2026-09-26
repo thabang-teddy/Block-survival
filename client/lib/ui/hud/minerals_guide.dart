@@ -101,10 +101,7 @@ class _OreRow extends StatelessWidget {
             width: 76,
             child: Text(
               ore.drop,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-              ),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
             ),
           ),
           SizedBox(

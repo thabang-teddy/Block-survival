@@ -4,6 +4,12 @@ Written 2026-09-25 and revised the same day with your decisions. **Implemented t
 day** on branch `feat/pc-host` (on top of this doc's branch). See *Implementation status*
 below. The research text is unchanged except where that section says so.
 
+> **Since 1.0.0 (2026-09-27): many worlds, PC only.** Each host key is now a global
+> world of its own, a PC may run several, and browsers never host a global world any
+> more — the browser queue, standby and "release to browsers" below are gone. See
+> [§8](#8-many-global-worlds-pc-only-since-100). The rest of this document is kept as
+> it was written.
+
 ## Implementation status (2026-09-25)
 
 | Step (§5.6) | Where | State |
@@ -564,7 +570,58 @@ this for free.
 
 ---
 
-## Sources
+## 8. Many global worlds, PC only (since 1.0.0)
+
+Decided 2026-09-26, implemented 2026-09-27 on `feature/multi-world-host`.
+
+**Site (`server/`).**
+
+- Every host key (`game_hosts` row) is one global world: its save
+  (`saves.game_host_id`), its seats (`global_seats.game_host_id`) and its map seed
+  (`game_hosts.seed`; the first key keeps the classic island, later ones get a random
+  seed unless the admin picks one). The migration moves the old global save to the
+  first key; with no key yet, the first one created adopts it.
+- A world is **open only while its PC runs it**: online → players join its room;
+  paused → they wait (§5.4, unchanged); offline (clean shutdown, *Mark offline*, key
+  disabled or never started) → `join` is refused with "This world is offline — its
+  host PC isn't running" and seated players go back to the lobby. No browser ever
+  hosts a global world; `POST /api/rooms` with `world_kind: global` is refused, and
+  players can no longer read or write a global save.
+- `GET /api/global/worlds` lists every enabled world (name, seed, state, players,
+  save). `POST /api/global/join` takes `world`; a client that sends none (from before
+  1.0.0) gets the first open world, and `GET /api/global/presence` still answers for
+  it. A player sits in one world at a time.
+- The heartbeat reply carries the world's `seed`. The host API is otherwise unchanged:
+  the token picks the world.
+- Admin → **Host PCs** lists every key: name, key fingerprint (the first 8 characters
+  of the token's hash; the token itself is shown once), state, world (seed and save),
+  players, version, last seen, created — with create, new token, enable/disable, mark
+  offline, reset world and remove (which deletes that world's save).
+
+**The PC (`host-app/pc-host/`, moved there from `pc-host/`).** `pc-host service` is a supervisor: it reads a multi-world
+`config.json` (`site`, `relayOnly`, `portRange`, `controlPort`, `worlds[]`), forks one
+`pc-host worker` per world, and restarts a crashed one after 5 s, 15 s, 30 s, 1 min, then
+every 2 min (the count starts over after 10 minutes of running). Each world gets 20 UDP
+ports of the range and its own log (`logs\<world id>\pc-host.log`). Tokens are stored
+DPAPI-protected in machine scope and reach a worker only over IPC. A control API on
+127.0.0.1 (random key in `control.key`) starts, stops (offline), restarts (paused) and
+reports each world; requests addressed to any other host name are refused. A
+single-world `config.json` from before still works, as one world.
+
+**The Windows app (`host-app/`).** *Block Survival Host*, .NET 10 WPF with a tray icon.
+The MSI installs it and pc-host (with Node and WinSW) to Program Files; config and logs
+live in `%ProgramData%\BlockSurvivalHost` and survive upgrades. A first-run wizard asks
+for the site, the port range and the first host token (checked against the site's
+read-only `/api/host/ice-servers`), then **one UAC prompt** grants the owner the data
+folder, adds a UDP-only firewall rule for the range and installs the service. After
+that the app runs unelevated: add or remove worlds, start, stop, restart, stop all, view
+logs, change settings (a port change asks for UAC again, for the firewall rule).
+
+**Not verified yet:** installing the MSI and the elevated setup on a clean PC (both
+need an administrator); the code-signing path (no certificate yet — Smart App Control
+blocks the unsigned MSI, see `host-app/build.ps1`); several worlds with real players on
+other networks.
+
 
 All pages were read on 2026-09-25. Dates in brackets are the pages' own
 "last updated" dates.

@@ -72,7 +72,7 @@ class Room extends Model
 
     /**
      * Who may resolve the room and use its mailbox: the host, or a player holding an
-     * accepted invite — or, for the global world's room, anyone seated in it. Nobody but
+     * accepted invite — or, for a global world's room, anyone seated in that world. Nobody but
      * the host gets in while the room is not hosting.
      */
     public function admits(?User $user): bool
@@ -87,7 +87,8 @@ class Room extends Model
             return false;
         }
         if ($this->isGlobal()) {
-            return GlobalSeat::query()->fresh()->where('user_id', $user->id)->exists();
+            return GlobalSeat::query()->fresh()->where('user_id', $user->id)
+                ->whereHas('host', fn ($q) => $q->where('room_code', $this->code))->exists();
         }
 
         return $this->invites()->where('to_user_id', $user->id)->where('status', RoomInvite::ACCEPTED)->exists();

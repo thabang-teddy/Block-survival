@@ -8,16 +8,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * One player currently inside the shared global world. Rows are the queue in arrival
- * order: the fresh seat with the lowest id is the host. Leaving deletes the row, so a
- * player who comes back — the old host included — joins the back of the queue.
+ * One player currently inside a global world (one seat per player, so one world at a
+ * time). The PC's heartbeat vouches for everyone connected to it; a player waiting on a
+ * paused PC keeps their seat by asking. Leaving deletes the row.
  */
-#[Fillable(['user_id', 'room_code', 'last_seen_at'])]
+#[Fillable(['user_id', 'game_host_id', 'last_seen_at'])]
 class GlobalSeat extends Model
 {
     public const UPDATED_AT = null;
 
-    /** a seat nobody has vouched for this long is gone (the host refreshes every 15 s) */
+    /** a seat nobody has vouched for this long is gone (the PC vouches every 15 s) */
     public const STALE_SECONDS = 45;
 
     /**
@@ -32,6 +32,12 @@ class GlobalSeat extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** @return BelongsTo<GameHost, $this> */
+    public function host(): BelongsTo
+    {
+        return $this->belongsTo(GameHost::class, 'game_host_id');
     }
 
     /** @param Builder<GlobalSeat> $query */

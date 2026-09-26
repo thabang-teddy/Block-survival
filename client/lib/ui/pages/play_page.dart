@@ -152,17 +152,23 @@ class _PlayPageState extends State<PlayPage>
   }
 
   /// wait for the host PC — however long — and go back into its world, or
-  /// follow the queue if it was released to the players
+  /// say so if the world closed meanwhile
   Future<void> _awaitHostPc() async {
     final launcher = widget.launcher;
     final relaunch = widget.onRelaunch;
-    if (_waitingForPc || launcher == null || relaunch == null) return;
+    final world = widget.launch.globalWorld;
+    if (_waitingForPc ||
+        launcher == null ||
+        relaunch == null ||
+        world == null) {
+      return;
+    }
     _waitingForPc = true;
     bool stillPaused() =>
         mounted && !_exiting && game.ui.netStatus == NetStatus.paused;
     try {
       final next = await launcher.awaitHostPc(
-        Game.savedPlayerOf(game.me),
+        world,
         stillPaused: stillPaused,
         onStatus: (t) {
           if (stillPaused()) game.ui.setNetStatus(NetStatus.paused, t);

@@ -1,7 +1,7 @@
 /** Inertia props shared by HandleInertiaRequests and provided by PlayController. */
 import type { PageProps as InertiaPageProps } from '@inertiajs/core'
-import type { ApiUser, GlobalPresence, LeaderboardRow, WorldMeta } from './api'
-import type { AdminDevice, AdminPcHost, AdminRoom, AdminUser, GameRulesForm, LoginWindowForm } from '../ui/admin/types'
+import type { ApiUser, GlobalWorldInfo, LeaderboardRow, WorldMeta } from './api'
+import type { AdminDevice, AdminHostKey, AdminRoom, AdminUser, GameRulesForm, LoginWindowForm } from '../ui/admin/types'
 import type { GameRulesWire as GameRules } from '../game/rules'
 
 export interface SharedProps extends InertiaPageProps {
@@ -14,10 +14,10 @@ export interface SharedProps extends InertiaPageProps {
 export interface PlayProps extends SharedProps {
   auth: { user: ApiUser }
   leaderboard: LeaderboardRow[]
-  /** the player's own world and the shared global world; null before the first save of each */
-  worlds: { own: WorldMeta | null; global: WorldMeta | null }
-  /** who is in the shared global world right now */
-  presence: GlobalPresence
+  /** the player's own world; null before its first save */
+  worlds: { own: WorldMeta | null }
+  /** the global worlds, one per host PC, and who is in each */
+  globalWorlds: GlobalWorldInfo[]
   /** the admin's day/night clock and zombie schedule */
   rules: GameRules
 }
@@ -37,10 +37,26 @@ export interface AdminDashboardProps extends AdminProps {
   counts: { pendingDevices: number; approvedDevices: number; users: number; disabledUsers: number; rooms: number }
   loginWindow: LoginWindowForm
   windowOpen: boolean
-  /** the shared global world: its save (null before the first) and who is in it */
-  globalWorld: { save: WorldMeta | null } & GlobalPresence
-  /** the PC that hosts the global world (docs/pc-host-research.md), or null before one is created */
-  pcHost: AdminPcHost | null
+  /** the enabled global worlds: state, who is in each and its save */
+  globalWorlds: GlobalWorldInfo[]
+  /** how many host keys exist, enabled or not */
+  hostKeys: number
+}
+
+export interface AdminHostsProps extends AdminProps {
+  hosts: AdminHostKey[]
+  /** the newest Windows installer (deferred: undefined until it arrives, null when none is released) */
+  hostApp?: HostAppRelease | null
+}
+
+/** App\Support\HostAppRelease: a host-app-v* GitHub Release with its MSI */
+export interface HostAppRelease {
+  version: string
+  name: string
+  size: number
+  published_at: string | null
+  url: string
+  page: string
 }
 
 export interface AdminHoursProps extends AdminProps {

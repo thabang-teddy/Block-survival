@@ -8,3 +8,5 @@ Thumbs.db
 /.codex
 /.zed
 /.nova
+# the Node host moved to host-app/pc-host; a leftover local copy here holds tokens and runtime files
+/pc-host/

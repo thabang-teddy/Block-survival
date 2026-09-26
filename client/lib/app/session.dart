@@ -1,5 +1,5 @@
 /// The signed-in state of the app and the lobby's data — the native twin of
-/// what the Inertia page props (`auth`, `worlds`, `leaderboard`, `presence`)
+/// what the Inertia page props (`auth`, `worlds`, `leaderboard`, `globalWorlds`)
 /// and `useInvites` give the web lobby. One instance lives for the app; pages
 /// listen to it.
 library;
@@ -58,9 +58,11 @@ final class AppSession extends ChangeNotifier {
 
   AuthState state = AuthState.unknown;
   ApiUser? user;
-  Map<String, WorldMeta?> worlds = const {'own': null, 'global': null};
+  Map<String, WorldMeta?> worlds = const {'own': null};
   List<LeaderboardRow> leaderboard = const [];
-  GlobalPresence presence = GlobalPresence.empty;
+
+  /// the global worlds, one per host PC, and who is in each
+  List<GlobalWorldInfo> globalWorlds = const [];
   List<Invite> invites = const [];
   bool invitesLoaded = false;
   String invitesError = '';
@@ -73,7 +75,6 @@ final class AppSession extends ChangeNotifier {
   Timer? _approvalTimer;
 
   WorldMeta? get ownWorld => worlds['own'];
-  WorldMeta? get globalWorld => worlds['global'];
 
   /// Point the session at another server: the address is kept for next
   /// time, and a token from the previous server is forgotten.
@@ -164,7 +165,7 @@ final class AppSession extends ChangeNotifier {
     _set(AuthState.signedOut);
   }
 
-  /// the worlds, the leaderboard and who is in the global world change while a
+  /// the worlds, the leaderboard and who is in the global ones change while a
   /// run is in progress; pull fresh copies whenever the lobby comes back
   Future<void> refreshMenu() async {
     try {
@@ -174,7 +175,7 @@ final class AppSession extends ChangeNotifier {
         worlds = me.worlds;
       }
       leaderboard = await api.leaderboard();
-      presence = await api.presence();
+      globalWorlds = await api.globalWorlds();
     } on ApiError catch (e) {
       lastError = e.message;
     }
