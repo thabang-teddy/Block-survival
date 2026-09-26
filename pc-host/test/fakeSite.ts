@@ -24,6 +24,8 @@ export class FakeSite implements Site {
   /** what the next heartbeats answer (the last one repeats) */
   replies: (HeartbeatReply | Error)[] = []
   commands: string[] = []
+  /** the world's seed in the heartbeat reply; undefined as a site from before many worlds */
+  seed: number | undefined = undefined
 
   // ---------------------------------------------------------------- the PC's side
   async heartbeat(body: HeartbeatBody): Promise<HeartbeatReply> {
@@ -35,7 +37,7 @@ export class FakeSite implements Site {
     if (body.going) return { state: body.going === 'offline' ? 'offline' : 'paused' }
     const commands = this.commands
     this.commands = []
-    return { state: 'online', room: { code: body.room!.code, host_peer_id: body.peer_id, players: body.room!.players }, rules: rulesToWire(DEFAULT_RULES), commands }
+    return { state: 'online', room: { code: body.room!.code, host_peer_id: body.peer_id, players: body.room!.players }, seed: this.seed, rules: rulesToWire(DEFAULT_RULES), commands }
   }
 
   async signals(after: number): Promise<HostSignal[]> {

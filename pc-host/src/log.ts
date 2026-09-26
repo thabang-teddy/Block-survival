@@ -12,9 +12,9 @@ const KEEP = 3
 export class FileLog implements RoomLog {
   private readonly file: string
 
-  constructor(dir: string, private readonly echo = true) {
+  constructor(dir: string, private readonly echo = true, name = 'pc-host.log') {
     mkdirSync(dir, { recursive: true })
-    this.file = join(dir, 'pc-host.log')
+    this.file = join(dir, name)
   }
 
   info(msg: string, data?: Record<string, unknown>): void {

@@ -23,8 +23,8 @@ export interface RoomRow {
 }
 
 export type HeartbeatReply =
-  | { state: 'online'; room: RoomRow; rules: GameRulesWire; commands: string[] }
-  | { state: 'standby' }
+  /** `seed`: the world's map (sites from before many worlds leave it out: the classic island) */
+  | { state: 'online'; room: RoomRow; seed?: number; rules: GameRulesWire; commands: string[] }
   | { state: 'paused' }
   | { state: 'offline' }
 

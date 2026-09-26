@@ -1,16 +1,15 @@
 /**
- * The host PC's life (docs/pc-host-research.md §5.2, §5.4): register with the site,
- * hold the global world while the site says it is ours, and follow what the heartbeat
- * says —
+ * One global world's life on this PC (docs/pc-host-research.md §5.2, §5.4, §8): its host
+ * key picks the world; register with the site, run the world, and follow what the
+ * heartbeat says —
  *
- * - online: run the room and answer offers from the mailbox;
- * - standby: the browsers have the world (after a clean shutdown or the admin's
- *   release); send everyone off, save, and wait until the site hands it back;
+ * - online: run the room and answer offers from the mailbox; the reply carries the
+ *   world's seed, used when there is no save yet;
  * - the site cannot be reached for more than FREEZE_AFTER_MS: freeze the world where
  *   it is, keep everyone's place, and carry on once the heartbeat gets through again.
  *
  * Stopping cleanly always saves first. A restart (Windows stopping the service) keeps
- * the world paused for the players; only `offline` hands it to the browsers.
+ * the world paused for the players; `offline` closes it until the PC runs it again.
  */
 import { HostSim } from './sim/HostSim'
 import { GameRoom, type RoomLog } from './room/GameRoom'
@@ -29,7 +28,7 @@ const RETRY_MS = 5_000
 /** TURN credentials are refreshed this often (the site mints them for two hours) */
 const ICE_REFRESH_MS = 30 * 60_000
 
-export type HostPhase = 'starting' | 'online' | 'standby' | 'stopped'
+export type HostPhase = 'starting' | 'online' | 'stopped'
 
 export interface PcHostOptions {
   site: Site
@@ -53,6 +52,8 @@ export class PcHost {
   private code = makeRoomCode()
   readonly peerId: string
   private rules: GameRules = DEFAULT_RULES
+  /** the world's map, as the site says; the classic island until it has */
+  private seed = GLOBAL_SEED
   private lastOkAt: number
   /** the last heartbeat got through */
   private healthy = true
@@ -62,6 +63,11 @@ export class PcHost {
   private readonly now: () => number
   private readonly log: RoomLog
 
+  /** the room code the site knows this world by */
+  get roomCode(): string {
+    return this.code
+  }
+
   constructor(private readonly opts: PcHostOptions) {
     this.now = opts.now ?? Date.now
     this.log = opts.log
@@ -69,7 +75,7 @@ export class PcHost {
     this.lastOkAt = this.now()
   }
 
-  /** first heartbeat, then the world; resolves once the PC is hosting or standing by */
+  /** first heartbeat, then the world; resolves once the PC is hosting */
   async start(): Promise<void> {
     const ice = await this.opts.site.iceServers().catch(() => [])
     this.transport = new HostTransport(this.opts.site, {
@@ -86,7 +92,7 @@ export class PcHost {
 
   /**
    * Stop for good. `restart` (Windows stopping the service for an update or a reboot)
-   * keeps the players paused; `offline` hands the world to the browsers.
+   * keeps the players paused; `offline` closes the world until the PC runs it again.
    */
   async stop(going: 'offline' | 'restart'): Promise<void> {
     if (this.phase === 'stopped') return
@@ -96,7 +102,7 @@ export class PcHost {
     await this.beating?.catch(() => {})
     this.transport?.stopListening()
     const reason = going === 'offline'
-      ? 'The host PC is going offline — the world moves to your browsers.'
+      ? 'The host PC is going offline — this world is closed until it is back.'
       : 'The host PC is restarting — the game is paused until it is back.'
     await this.room?.close(reason)
     // the players' channels close once their bye has gone out; let that happen first
@@ -143,7 +149,6 @@ export class PcHost {
     // stop() may have run while the heartbeat was out
     if ((this.phase as HostPhase) === 'stopped') return
     if (reply.state === 'online') await this.online(reply)
-    else if (reply.state === 'standby') await this.standby()
     else this.log.info('the site says the PC is not hosting', { state: reply.state })
     this.opts.keepAwake?.((this.room?.playerCount ?? 0) > 0)
   }
@@ -169,34 +174,21 @@ export class PcHost {
   private async online(reply: Extract<HeartbeatReply, { state: 'online' }>): Promise<void> {
     if (!this.room || this.room.isClosed) {
       this.rules = parseRules(reply.rules)
+      if (typeof reply.seed === 'number') this.seed = reply.seed
       await this.openRoom()
     } else {
       this.room.resume()
     }
     if (reply.commands.includes('reset') && this.room) {
-      this.log.info('the admin reset the global world')
-      this.room.reset(this.newSim(undefined), 'The global world was reset — join again to start the new one.')
+      this.log.info('the admin reset the world')
+      this.room.reset(this.newSim(undefined), 'This world was reset — join again to start the new one.')
       await this.room.saveNow().catch(() => {})
     }
     this.transport?.listen()
     this.phase = 'online'
   }
 
-  /** the browsers have the world: everyone off (after a save), and wait to be handed it back */
-  private async standby(): Promise<void> {
-    if (this.phase === 'standby') return
-    this.phase = 'standby'
-    this.transport?.stopListening()
-    const room = this.room
-    this.room = null
-    if (room) {
-      this.log.info('standing by: the browsers host the global world for now')
-      await room.close('The global world moved to the players\' browsers.')
-    }
-    this.opts.keepAwake?.(false)
-  }
-
-  /** load the latest global save (browsers may have played it since) and open the room */
+  /** load the world's latest save and open the room */
   private async openRoom(): Promise<void> {
     const save = await this.opts.site.loadWorld()
     const room = new GameRoom(this.newSim(save ?? undefined), {
@@ -213,11 +205,11 @@ export class PcHost {
     room.start()
     this.room = room
     this.transport?.newRoom()
-    this.log.info('hosting the global world', { code: this.code, restored: save !== null, night: room.sim.dayNight.night })
+    this.log.info('hosting the world', { code: this.code, seed: room.sim.seed, restored: save !== null, night: room.sim.dayNight.night })
   }
 
   private newSim(restore: SaveData | undefined): HostSim {
-    return new HostSim({ seed: GLOBAL_SEED, rules: this.rules, restore })
+    return new HostSim({ seed: this.seed, rules: this.rules, restore })
   }
 
   private stats(): Record<string, unknown> {

@@ -98,27 +98,27 @@ describe('PcHost', () => {
     await until(() => messages(client).filter(m => m.t === 'snap').length > before)
   }, 30_000)
 
-  test('standby sends everyone off after a save, and the PC takes the world back with the browsers\' save', async () => {
+  test('a new world is generated from the seed the site gives its key; a save keeps its own', async () => {
     const site = new FakeSite()
+    site.save = null
+    site.seed = 424242
     const { host } = makeHost(site)
     cleanup.push(() => host.stop('restart'))
     await host.start()
-    const client = await joinWithHello(site, host)
-    cleanup.push(() => client.close())
+    expect(host.room!.sim.seed).toBe(424242)
 
-    site.replies = [{ state: 'standby' }]
+    // a reset starts over on the same map
+    site.commands = ['reset']
     await host.beat()
-    expect(host.phase).toBe('standby')
-    expect(host.room).toBeNull()
-    await until(() => messages(client).some(m => m.t === 'bye'))
-    expect(site.saves).toBeGreaterThanOrEqual(1)
+    expect(host.room!.sim.seed).toBe(424242)
 
-    // the browsers played on and saved a later clock
-    site.save = { ...site.save!, time: 5000 }
-    site.replies = []
-    await host.beat()
-    expect(host.phase).toBe('online')
-    expect(host.room!.sim.dayNight.time).toBe(5000)
+    const saved = new FakeSite()
+    saved.save = { ...site.save!, seed: 99 }
+    saved.seed = 424242
+    const other = makeHost(saved).host
+    cleanup.push(() => other.stop('restart'))
+    await other.start()
+    expect(other.room!.sim.seed).toBe(99)
   }, 30_000)
 
   test('the admin\'s reset starts a fresh world and saves it', async () => {

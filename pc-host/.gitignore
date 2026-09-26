@@ -3,6 +3,7 @@ dist/
 release/
 logs/
 config.json
+control.key
 pc-host.pid
 offline.request
 # the service runs from this folder on the dev PC: its runtime and WinSW are local
