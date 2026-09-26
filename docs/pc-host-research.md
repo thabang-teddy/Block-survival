@@ -598,7 +598,7 @@ Decided 2026-09-26, implemented 2026-09-27 on `feature/multi-world-host`.
   players, version, last seen, created — with create, new token, enable/disable, mark
   offline, reset world and remove (which deletes that world's save).
 
-**The PC (`pc-host/`).** `pc-host service` is a supervisor: it reads a multi-world
+**The PC (`host-app/pc-host/`, moved there from `pc-host/`).** `pc-host service` is a supervisor: it reads a multi-world
 `config.json` (`site`, `relayOnly`, `portRange`, `controlPort`, `worlds[]`), forks one
 `pc-host worker` per world, and restarts a crashed one after 5 s, 15 s, 30 s, 1 min, then
 every 2 min (the count starts over after 10 minutes of running). Each world gets 20 UDP

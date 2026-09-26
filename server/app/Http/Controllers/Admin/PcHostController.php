@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\GameHost;
 use App\Services\GlobalWorld;
+use App\Support\HostAppRelease;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -19,11 +20,13 @@ class PcHostController extends Controller
 {
     public function __construct(private readonly GlobalWorld $global) {}
 
-    public function index(): Response
+    public function index(HostAppRelease $release): Response
     {
         $online = collect($this->global->worlds())->pluck('online', 'id');
 
         return Inertia::render('Admin/Hosts', [
+            // the newest installer, fetched right after the page renders (GitHub may be slow)
+            'hostApp' => Inertia::defer(fn () => $release->latest()),
             'hosts' => GameHost::query()->orderBy('id')->with('world')->get()
                 ->map(fn (GameHost $h) => [
                     ...$h->toAdmin(),
@@ -31,6 +34,17 @@ class PcHostController extends Controller
                     'save' => $h->world?->meta(),
                 ])->all(),
         ]);
+    }
+
+    /** the newest installer: a redirect to its GitHub Release download */
+    public function download(HostAppRelease $release): RedirectResponse
+    {
+        $latest = $release->latest();
+        if ($latest === null) {
+            return back()->with('status', 'No Block Survival Host installer has been released yet (or GitHub could not be reached).');
+        }
+
+        return redirect()->away($latest['url']);
     }
 
     public function store(Request $request): RedirectResponse

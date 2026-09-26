@@ -123,6 +123,8 @@ Route::middleware(['auth', 'access'])->group(function () {
         Route::delete('/users/{user}/world', [UserController::class, 'resetWorld'])->name('users.reset-world');
         // host keys: one per global world, each run by a PC
         Route::get('/pc-hosts', [PcHostController::class, 'index'])->name('pc-hosts.index');
+        // the Windows installer (a GitHub Release, host-app-release.yml)
+        Route::get('/host-app/download', [PcHostController::class, 'download'])->name('host-app.download');
         Route::post('/pc-hosts', [PcHostController::class, 'store'])->name('pc-hosts.store');
         Route::post('/pc-hosts/{host}/token', [PcHostController::class, 'rotate'])->name('pc-hosts.rotate');
         Route::patch('/pc-hosts/{host}', [PcHostController::class, 'update'])->name('pc-hosts.update');

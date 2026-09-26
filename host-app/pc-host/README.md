@@ -1,6 +1,6 @@
 # pc-host — global worlds, hosted on a PC at home
 
-The design is in [`docs/pc-host-research.md`](../docs/pc-host-research.md) (§8 for
+The design is in [`docs/pc-host-research.md`](../../docs/pc-host-research.md) (§8 for
 many worlds). In short: this app runs the authoritative simulation of Block Survival's
 global worlds on a Windows PC. The Laravel site stays the front door (accounts, device
 approval, the login window). Players reach the PC over the same WebRTC path they use
@@ -21,7 +21,7 @@ process per world, so one world crashing never touches the others.
 
 ## Set up — the usual way: the Block Survival Host app
 
-Install `BlockSurvivalHost-<version>.msi` (built by [`host-app/build.ps1`](../host-app/README.md))
+Install `BlockSurvivalHost-<version>.msi` (built by [`host-app/build.ps1`](../README.md))
 and open *Block Survival Host*. Its wizard asks for the site, a UDP port range and the
 first world's host token (it checks the token with the site), then asks Windows once
 for administrator rights to add the firewall rule and install the service. From then
@@ -40,7 +40,7 @@ players whose networks block direct UDP cannot connect.
 
    ```bash
    cd server && npm ci        # the game code the PC imports lives here
-   cd ../pc-host && npm ci && npm run build
+   cd ../host-app/pc-host && npm ci && npm run build
    ```
 
    The service runs straight from this folder: `dist\pc-host.mjs`, with `node_modules`
@@ -120,7 +120,8 @@ npm run build     # dist/pc-host.mjs (esbuild; node-datachannel stays external)
 ```
 
 The game code is not copied. `@game/*` resolves to `server/resources/js/*` (see
-`aliases.mjs`), so `server/` must have its `node_modules` installed. The web client's
+`aliases.mjs`), so `server/` must have its `node_modules` installed. This folder lives in
+`host-app/` because the Windows app packages it; it has no build step of its own there. The web client's
 model loader is swapped for a headless stub (`src/headless/assets.ts`).
 
 To try it against a local site, run the service with `PC_HOST_HOME` pointing at a

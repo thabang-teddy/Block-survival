@@ -45,6 +45,18 @@ export interface AdminDashboardProps extends AdminProps {
 
 export interface AdminHostsProps extends AdminProps {
   hosts: AdminHostKey[]
+  /** the newest Windows installer (deferred: undefined until it arrives, null when none is released) */
+  hostApp?: HostAppRelease | null
+}
+
+/** App\Support\HostAppRelease: a host-app-v* GitHub Release with its MSI */
+export interface HostAppRelease {
+  version: string
+  name: string
+  size: number
+  published_at: string | null
+  url: string
+  page: string
 }
 
 export interface AdminHoursProps extends AdminProps {

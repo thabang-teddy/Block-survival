@@ -1,5 +1,5 @@
 // Assembles release/pc-host/: a folder to copy to another PC (docs/pc-host-research.md §5.2).
-// On the dev PC the service runs straight from pc-host/ instead (README).
+// On the dev PC the service can run straight from host-app/pc-host/ instead (README).
 // It holds a portable node.exe (the one running this script), the bundled app, the
 // production node_modules (node-datachannel's native .node file must sit there),
 // config.example.json and the WinSW service definition. WinSW itself is not bundled:

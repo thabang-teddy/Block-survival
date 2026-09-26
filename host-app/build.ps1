@@ -20,16 +20,17 @@
 
 .PARAMETER WinSW
   WinSW-x64.exe v2.12 (https://github.com/winsw/winsw/releases). Defaults to
-  ..\pc-host\pc-host-service.exe, the copy the dev PC's service already uses.
+  pc-host\pc-host-service.exe (next to this script), where the dev PC keeps it.
 #>
 param(
     [string]$Version = "1.0.0",
-    [string]$WinSW = (Join-Path $PSScriptRoot "..\pc-host\pc-host-service.exe"),
+    [string]$WinSW = (Join-Path $PSScriptRoot "pc-host\pc-host-service.exe"),
     [switch]$SkipTests
 )
 
 $ErrorActionPreference = "Stop"
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
+$pcHost = Join-Path $PSScriptRoot "pc-host"
 $out = Join-Path $PSScriptRoot "out"
 $stage = Join-Path $out "stage"
 
@@ -53,9 +54,9 @@ if (-not (Test-Path $WinSW)) { throw "WinSW not found at $WinSW - download WinSW
 Step "pc-host"
 if (-not (Test-Path (Join-Path $root "server\node_modules"))) { Run "npm" @("ci") (Join-Path $root "server") }
 # a running pc-host service locks node_modules; packaging makes its own clean install anyway
-if (-not (Test-Path (Join-Path $root "pc-host\node_modules"))) { Run "npm" @("ci") (Join-Path $root "pc-host") }
-if (-not $SkipTests) { Run "npm" @("test") (Join-Path $root "pc-host") }
-Run "npm" @("run", "package") (Join-Path $root "pc-host")
+if (-not (Test-Path (Join-Path $pcHost "node_modules"))) { Run "npm" @("ci") $pcHost }
+if (-not $SkipTests) { Run "npm" @("test") $pcHost }
+Run "npm" @("run", "package") $pcHost
 
 Step "app"
 if (-not $SkipTests) { Run "dotnet" @("test", "--configuration", "Release") $PSScriptRoot }
@@ -66,7 +67,7 @@ Run "dotnet" @("publish", "src\BlockSurvivalHost", "--configuration", "Release",
     "-p:Version=$Version", "--output", $appDir) $PSScriptRoot
 
 Step "staging"
-Copy-Item (Join-Path $root "pc-host\release\pc-host") $pcHostDir -Recurse
+Copy-Item (Join-Path $pcHost "release\pc-host") $pcHostDir -Recurse
 Copy-Item $WinSW (Join-Path $pcHostDir "pc-host-service.exe")
 # pc-host's hand-setup files are not part of an install: setup writes the service definition
 Remove-Item (Join-Path $pcHostDir "pc-host-service.xml"), (Join-Path $pcHostDir "pc-host.cmd"), (Join-Path $pcHostDir "config.example.json") -ErrorAction SilentlyContinue

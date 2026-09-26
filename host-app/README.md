@@ -2,7 +2,7 @@
 
 The desktop app that sets a PC up to host Block Survival's global worlds and runs them
 (docs/pc-host-research.md §8). It is a .NET 10 WPF app with a tray icon, on top of
-[`pc-host`](../pc-host/README.md): the app never runs a world itself; the Windows
+[`pc-host`](pc-host/README.md) (in `host-app/pc-host/`): the app never runs a world itself; the Windows
 service (`pc-host service`, wrapped by WinSW) does, and the app drives it through its
 control API on 127.0.0.1.
 
@@ -39,7 +39,7 @@ control API on 127.0.0.1.
 ```
 
 It needs Node 24 and npm (for pc-host), the .NET 10 SDK, and WinSW-x64.exe v2.12
-(defaults to `..\pc-host\pc-host-service.exe`; pass `-WinSW <path>` otherwise). NuGet
+(defaults to `pc-host\pc-host-service.exe`; pass `-WinSW <path>` otherwise). NuGet
 fetches WiX 5 on the first build. Output: `out\BlockSurvivalHost-<version>.msi`, about
 100 MB — the app is self-contained, so the PC needs no .NET install.
 
@@ -62,7 +62,7 @@ The app drives whatever answers on the control port, so in development run
 `pc-host service` yourself and point the app at the same folder:
 
 1. **A data folder** (e.g. `C:\bsh-dev`) with a `config.json` — the same schema as
-   [pc-host's](../pc-host/README.md#set-up--by-hand-the-dev-pc). Plain `token`s are fine
+   [pc-host's](pc-host/README.md#set-up--by-hand-the-dev-pc). Plain `token`s are fine
    here; give it its own `controlPort` (e.g. `47899`) so it never meets an installed copy:
 
    ```json
@@ -74,10 +74,10 @@ The app drives whatever answers on the control port, so in development run
    }
    ```
 
-2. **Run pc-host** (after `npm run build` in `pc-host/`):
+2. **Run pc-host** (after `npm run build` in `host-app/pc-host/`):
 
    ```powershell
-   cd ..\pc-host
+   cd pc-host
    $env:PC_HOST_HOME = "C:\bsh-dev"; node dist\pc-host.mjs service
    ```
 
@@ -85,7 +85,7 @@ The app drives whatever answers on the control port, so in development run
 
    ```powershell
    $env:BSH_DATA_DIR = "C:\bsh-dev"
-   $env:BSH_PCHOST_DIR = "C:\Users\Teddy\projects\Block survival\pc-host"
+   $env:BSH_PCHOST_DIR = "C:\Users\Teddy\projects\Block survival\host-app\pc-host"
    dotnet run --project src\BlockSurvivalHost
    ```
 
@@ -95,7 +95,7 @@ data folder, so this runs beside an installed one. Stopping the `node` process (
 pauses the worlds, as a service stop would.
 
 **Set up this PC / Repair setup** in a dev copy works too (one UAC prompt): it installs
-the Windows service from the repo's `pc-host\` (`BSH_PCHOST_DIR`) with its data in
+the Windows service from the repo's `host-app\pc-host\` (`BSH_PCHOST_DIR`) with its data in
 `BSH_DATA_DIR`, so the worlds run without the MSI and start with Windows. Stop the
 hand-run `node` first. If the MSI is installed as well, the two share one service name:
 whichever ran setup last owns it, and the other offers to take it back.

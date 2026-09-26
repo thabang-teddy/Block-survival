@@ -15,7 +15,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "paths": { "@game/*": ["../server/resources/js/*"] }
+    "paths": { "@game/*": ["../../server/resources/js/*"] }
   },
   "include": ["src", "test", "*.ts"]
 }

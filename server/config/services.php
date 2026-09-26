@@ -34,6 +34,13 @@ return [
         'api_token' => env('CLOUDFLARE_TURN_KEY_API_TOKEN'),
     ],
 
+    // where the Block Survival Host installer is released (host-app-v* GitHub Releases);
+    // a token only raises GitHub's rate limit, or reads a private repo
+    'host_app' => [
+        'repo' => env('HOST_APP_REPO', 'thabang-teddy/Block-survival'),
+        'github_token' => env('HOST_APP_GITHUB_TOKEN'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

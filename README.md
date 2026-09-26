@@ -15,7 +15,8 @@ The repo holds one project per folder:
 ```
 server/         the Laravel app and the web client (everything below)
 client/         the native Flutter client (Android, Windows, Linux) — planned, see docs/flutter-client-plan.md
-pc-host/        hosts the global world on a PC at home behind the site — see pc-host/README.md
+host-app/       the Windows app + installer that hosts global worlds on a PC at home — see host-app/README.md
+  pc-host/      the Node host it installs and drives — see host-app/pc-host/README.md
 shared/         contracts both clients must agree on: worldgen fixtures, protocol schema, item/recipe data
 Design/         Blender generators, concept art, the raw assets
 docs/           repo-wide docs (go-live runbook, client plan)
