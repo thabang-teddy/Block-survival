@@ -50,7 +50,8 @@ class OreMarkersLayer extends StatelessWidget {
         final vp = camera.viewProjection(w / h);
         return Stack(
           children: [
-            for (final fix in ui.oreFixes) ?_marker(vp, fix, name, colour, w, h),
+            for (final fix in ui.oreFixes)
+              ?_marker(vp, fix, name, colour, w, h),
           ],
         );
       },

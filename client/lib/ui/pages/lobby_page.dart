@@ -1,5 +1,6 @@
-/// Lobby for the signed-in player — twin of `ui/MainMenu.tsx`: the two worlds
-/// (own and global), the invitations other hosts sent, and the leaderboard.
+/// Lobby for the signed-in player — twin of `ui/MainMenu.tsx`: their own
+/// world, the global worlds (each run by a host PC, open only while it runs),
+/// the invitations other hosts sent, and the leaderboard.
 library;
 
 import 'dart:async';
@@ -38,7 +39,7 @@ class _LobbyPageState extends State<LobbyPage> {
   @override
   void initState() {
     super.initState();
-    // pull fresh worlds / leaderboard / presence whenever the lobby comes back
+    // pull fresh worlds / leaderboard / global worlds whenever the lobby comes back
     unawaited(widget.session.refreshMenu());
     widget.session.startInvitesPolling();
   }
@@ -102,11 +103,6 @@ class _LobbyPageState extends State<LobbyPage> {
       builder: (context, _) {
         final user = s.user;
         final hasOwn = s.ownWorld != null;
-        final presence = s.presence;
-        final whoIsIn = presence.online > 0
-            ? '${presence.online} online now, hosted by '
-                  '${presence.hostName ?? 'someone'} — you would join them.'
-            : 'Nobody is in it right now — you would host it.';
         return MenuCard(
           maxWidth: 960,
           children: [
@@ -178,29 +174,11 @@ class _LobbyPageState extends State<LobbyPage> {
                     ],
                   ),
                   _Option(
-                    title: 'Global world',
+                    title: 'Global worlds',
                     body:
-                        'The classic map (${seedTag(globalSeed)}) everyone builds in together. '
-                        'Whoever is in it hosts it; when they leave, the next player in takes over.',
-                    fine:
-                        '${_summary(s.globalWorld, 'Nobody has played the global world yet.')} $whoIsIn',
-                    children: [
-                      FilledButton(
-                        onPressed: _busy.isEmpty
-                            ? () => _run(
-                                'global',
-                                () => widget.launcher.enterGlobal(
-                                  onStatus: (t) => setState(() => _status = t),
-                                ),
-                              )
-                            : null,
-                        child: Text(
-                          _busy == 'global'
-                              ? (_status.isEmpty ? 'Entering…' : _status)
-                              : 'Enter',
-                        ),
-                      ),
-                    ],
+                        'Shared maps everyone builds in together, each run by a host PC. '
+                        'A world is open only while its PC is running.',
+                    children: [_globalWorlds(s)],
                   ),
                   _Option(
                     title: 'Invitations',
@@ -240,14 +218,85 @@ class _LobbyPageState extends State<LobbyPage> {
             ],
             const SizedBox(height: 12),
             const Fine(
-              "Up to 4 players. The host's device runs the world — in your own world "
-              'the match ends when you leave; in the global world the next player '
-              'takes over. Invite friends from the pause screen once you are hosting '
-              'your own world.',
+              'Up to 4 players per world. In your own world your device runs it and '
+              'the match ends when you leave; global worlds are run by their host '
+              'PCs. Invite friends from the pause screen once you are hosting your '
+              'own world.',
             ),
           ],
         );
       },
+    );
+  }
+
+  static String _worldState(GlobalWorldInfo w) => switch (w.state) {
+    WorldState.offline => "Offline — its host PC isn't running.",
+    WorldState.paused =>
+      'Paused — waiting for the host PC${w.online > 0 ? ' (${w.online} waiting)' : ''}.',
+    WorldState.online =>
+      w.online > 0
+          ? '${w.online}/4 playing now.'
+          : 'Online — nobody in it yet.',
+  };
+
+  Widget _globalWorlds(AppSession s) {
+    if (s.globalWorlds.isEmpty) {
+      return const Fine('No global worlds yet — an admin sets them up.');
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final w in s.globalWorlds)
+          Opacity(
+            opacity: w.state == WorldState.offline ? 0.5 : 1,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: w.name,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        TextSpan(
+                          text: ' · ${seedTag(w.seed)}',
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Fine(
+                    '${_worldState(w)} ${w.save == null ? '' : _summary(w.save, '')}',
+                  ),
+                  FilledButton(
+                    onPressed: _busy.isEmpty && w.state != WorldState.offline
+                        ? () => _run(
+                            'global:${w.id}',
+                            () => widget.launcher.enterGlobal(
+                              w.id,
+                              onStatus: (t) => setState(() => _status = t),
+                            ),
+                          )
+                        : null,
+                    child: Text(
+                      _busy == 'global:${w.id}'
+                          ? (_status.isEmpty ? 'Entering…' : _status)
+                          : w.state == WorldState.offline
+                          ? 'Offline'
+                          : 'Enter',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 

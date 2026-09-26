@@ -123,97 +123,99 @@ class _CraftingPanelState extends State<CraftingPanel> {
                           surfaceY: game.ui.surfaceY,
                         )
                       else
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 5,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                for (final r in list)
-                                  _RecipeRow(
-                                    recipe: r,
-                                    status: craftStatus(
-                                      inv,
-                                      r,
-                                      nearBench: bench,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 5,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  for (final r in list)
+                                    _RecipeRow(
+                                      recipe: r,
+                                      status: craftStatus(
+                                        inv,
+                                        r,
+                                        nearBench: bench,
+                                      ),
+                                      selected: r == selected,
+                                      onTap: () =>
+                                          setState(() => _selected = r),
                                     ),
-                                    selected: r == selected,
-                                    onTap: () => setState(() => _selected = r),
-                                  ),
-                                if (!bench)
-                                  const Padding(
-                                    padding: EdgeInsets.all(8),
-                                    child: Fine(
-                                      'Build a workbench for tools, weapons, the prospector, glass, walls and torches.',
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 4,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Row(
-                                  children: [
-                                    ItemIcon(out, large: true),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        '${out.name}${selected.output.count > 1 ? ' ×${selected.output.count}' : ''}',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                        ),
+                                  if (!bench)
+                                    const Padding(
+                                      padding: EdgeInsets.all(8),
+                                      child: Fine(
+                                        'Build a workbench for tools, weapons, the prospector, glass, walls and torches.',
                                       ),
                                     ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                for (final i in selected.inputs)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 6),
-                                    child: Row(
-                                      children: [
-                                        ItemIcon(getItem(i.id)),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(getItem(i.id).name),
-                                        ),
-                                        Text(
-                                          '${inv.count(i.id)} / ${i.count}',
-                                          style: TextStyle(
-                                            fontFamily: Hud.mono,
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 4,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      ItemIcon(out, large: true),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          '${out.name}${selected.output.count > 1 ? ' ×${selected.output.count}' : ''}',
+                                          style: const TextStyle(
+                                            fontSize: 16,
                                             fontWeight: FontWeight.w700,
-                                            color: inv.count(i.id) >= i.count
-                                                ? Hud.green
-                                                : Hud.danger,
                                           ),
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
-                                const SizedBox(height: 8),
-                                FilledButton(
-                                  onPressed: status == CraftStatus.ok
-                                      ? () => game.craftRecipe(selected.id)
-                                      : null,
-                                  child: Text(switch (status) {
-                                    CraftStatus.ok => 'Craft',
-                                    CraftStatus.needsBench =>
-                                      'Needs a workbench',
-                                    CraftStatus.missing => 'Missing materials',
-                                  }),
-                                ),
-                              ],
+                                  const SizedBox(height: 10),
+                                  for (final i in selected.inputs)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 6),
+                                      child: Row(
+                                        children: [
+                                          ItemIcon(getItem(i.id)),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(getItem(i.id).name),
+                                          ),
+                                          Text(
+                                            '${inv.count(i.id)} / ${i.count}',
+                                            style: TextStyle(
+                                              fontFamily: Hud.mono,
+                                              fontWeight: FontWeight.w700,
+                                              color: inv.count(i.id) >= i.count
+                                                  ? Hud.green
+                                                  : Hud.danger,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  const SizedBox(height: 8),
+                                  FilledButton(
+                                    onPressed: status == CraftStatus.ok
+                                        ? () => game.craftRecipe(selected.id)
+                                        : null,
+                                    child: Text(switch (status) {
+                                      CraftStatus.ok => 'Craft',
+                                      CraftStatus.needsBench =>
+                                        'Needs a workbench',
+                                      CraftStatus.missing =>
+                                        'Missing materials',
+                                    }),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
                       const SizedBox(height: 12),
                       Wrap(
                         children: [
