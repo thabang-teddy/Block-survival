@@ -16,6 +16,7 @@ import type { PlayProps } from '../net/pageProps'
 import { formatTime, timeAgo } from '../game/score'
 import { GLOBAL_SEED, newWorldSeed, seedTag } from '../world/seed'
 import { useInvites } from './useInvites'
+import { GraphicsToggle } from './GraphicsToggle'
 import { seatsText, worldLabel } from './invites'
 import { enterGlobal, liveDeps } from '../net/globalWorld'
 
@@ -220,6 +221,7 @@ export function MainMenu() {
           </div>
         )}
         <p className="fine">Up to 4 players. The host&apos;s browser runs the world — in your own world the match ends when you leave; in the global world the next player takes over. Invite friends from the pause screen once you are hosting your own world.</p>
+        <GraphicsToggle />
       </div>
     </div>
   )
