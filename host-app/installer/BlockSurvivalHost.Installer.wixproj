@@ -12,6 +12,10 @@
     <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
     <DefineConstants>ProductVersion=$(ProductVersion);AppDir=$(AppDir);PcHostDir=$(PcHostDir)</DefineConstants>
     <SuppressValidation>false</SuppressValidation>
+    <!-- ICE43/ICE57 expect shortcuts to be per-user (an HKCU key path). This package is
+         per-machine (Scope="perMachine", ALLUSERS=1): its shortcuts go to the all-users
+         Start Menu and Desktop, and a machine-wide key path is the right one. -->
+    <SuppressIces>ICE43;ICE57</SuppressIces>
   </PropertyGroup>
 
   <Target Name="CheckStaging" BeforeTargets="Build">
