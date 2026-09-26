@@ -128,6 +128,10 @@ final class PlayerRow {
   final String name;
 }
 
+/// who runs the world at the other end: the host PC
+/// (docs/pc-host-research.md), or another player's browser or app
+enum HostKind { pc, browser }
+
 /// what the global world tells a player who is in it
 sealed class GlobalState {
   const GlobalState(this.online);
@@ -139,7 +143,9 @@ sealed class GlobalState {
       'client' => GlobalClient(
         online,
         RoomInfo.fromJson(j['room'] as Map<String, dynamic>),
+        hostKind: j['host'] == 'pc' ? HostKind.pc : HostKind.browser,
       ),
+      'paused' => GlobalPaused(online, j['host_name'] as String? ?? ''),
       _ => GlobalPending(online, j['host_name'] as String? ?? ''),
     };
   }
@@ -154,9 +160,21 @@ final class GlobalHost extends GlobalState {
 
 /// connect to the host's room
 final class GlobalClient extends GlobalState {
-  const GlobalClient(super.online, this.room);
+  const GlobalClient(
+    super.online,
+    this.room, {
+    this.hostKind = HostKind.browser,
+  });
 
   final RoomInfo room;
+  final HostKind hostKind;
+}
+
+/// the host PC holds the world but is away: wait for it, however long
+final class GlobalPaused extends GlobalState {
+  const GlobalPaused(super.online, this.hostName);
+
+  final String hostName;
 }
 
 /// wait for the chosen host to open theirs
@@ -168,17 +186,25 @@ final class GlobalPending extends GlobalState {
 
 /// who is in the shared global world right now (the lobby card)
 final class GlobalPresence {
-  const GlobalPresence({required this.online, this.hostName});
+  const GlobalPresence({
+    required this.online,
+    this.hostName,
+    this.paused = false,
+  });
 
   factory GlobalPresence.fromJson(Map<String, dynamic> j) => GlobalPresence(
     online: j['online'] as int,
     hostName: j['host_name'] as String?,
+    paused: j['paused'] == true,
   );
 
   static const empty = GlobalPresence(online: 0);
 
   final int online;
   final String? hostName;
+
+  /// the host PC holds the world but is away
+  final bool paused;
 }
 
 final class LeaderboardRow {

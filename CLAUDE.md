@@ -4,6 +4,8 @@
 
 One project per folder: `server/` (Laravel + web client — run every `php`,
 `composer` and `npm` command from there), `client/` (native Flutter client),
+`pc-host/` (the Node app that hosts the global world on a home PC; it imports
+the game code from `server/resources/js`, so `server/` needs `npm ci` first),
 `shared/` (contracts both clients load). The CI artefact is `server/` itself.
 
 ## Branch flow (enforced)
@@ -20,6 +22,7 @@ never push directly to `staging` or `master`.
 
 ## Testing
 
-`php artisan test` and `npm test` (both in `server/`) must pass before a PR is opened.
+`php artisan test` and `npm test` (both in `server/`) must pass before a PR is opened,
+and `npm test` in `pc-host/` when it or the shared game code changed.
 `phpunit.xml` pins `APP_MAINTENANCE_MODE=false`; do not read maintenance state
 from `.env` in tests.

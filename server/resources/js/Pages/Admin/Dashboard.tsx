@@ -1,12 +1,13 @@
 /** Admin overview: what needs attention, and a card per section. */
 import { Link, router, usePage } from '@inertiajs/react'
 import { AdminLayout } from '../../ui/admin/AdminLayout'
+import { PcHostPanel } from '../../ui/admin/PcHostPanel'
 import { DAY_NAMES } from '../../ui/admin/types'
 import type { AdminDashboardProps } from '../../net/pageProps'
 import { formatTime, timeAgo } from '../../game/score'
 
 export default function Dashboard() {
-  const { counts, loginWindow, windowOpen, globalWorld } = usePage<AdminDashboardProps>().props
+  const { counts, loginWindow, windowOpen, globalWorld, pcHost } = usePage<AdminDashboardProps>().props
   const resetGlobal = () => {
     if (confirm("Reset the global world? Everyone's builds in it are deleted; the next player to enter starts a fresh map.")) {
       router.delete('/admin/global-world', { preserveScroll: true })
@@ -17,7 +18,7 @@ export default function Dashboard() {
     : 'no limit — players can sign in any time'
 
   return (
-    <AdminLayout title="Overview" refresh={['counts', 'windowOpen', 'globalWorld']}>
+    <AdminLayout title="Overview" refresh={['counts', 'windowOpen', 'globalWorld', 'pcHost']}>
       <div className="cards">
         <Link href="/admin/devices" className={`card${counts.pendingDevices > 0 ? ' attention' : ''}`}>
           <b>{counts.pendingDevices}</b>
@@ -49,7 +50,7 @@ export default function Dashboard() {
               : 'Nobody has played the global world yet.'}
             {' '}
             {globalWorld.online > 0
-              ? `${globalWorld.online} online now, hosted by ${globalWorld.host_name ?? 'someone'}.`
+              ? `${globalWorld.online} online now, ${globalWorld.paused ? `waiting for ${globalWorld.host_name ?? 'the host PC'}` : `hosted by ${globalWorld.host_name ?? 'someone'}`}.`
               : 'Nobody is in it right now.'}
           </p>
         </header>
@@ -59,6 +60,7 @@ export default function Dashboard() {
           </button>
         )}
       </section>
+      <PcHostPanel host={pcHost} />
     </AdminLayout>
   )
 }

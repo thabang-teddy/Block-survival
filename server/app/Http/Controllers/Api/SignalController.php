@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Room;
 use App\Models\RoomSignal;
+use App\Support\AccessPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,9 +16,11 @@ use Illuminate\Http\Request;
  */
 class SignalController extends Controller
 {
-    private const PEER_ID = 'regex:/^[A-Za-z0-9_-]{8,64}$/';
+    public const PEER_ID = 'regex:/^[A-Za-z0-9_-]{8,64}$/';
 
-    private const MAX_BYTES = 16 * 1024;
+    public const MAX_BYTES = 16 * 1024;
+
+    public function __construct(private readonly AccessPolicy $policy) {}
 
     public function store(Request $request, string $code): JsonResponse
     {
@@ -43,6 +46,9 @@ class SignalController extends Controller
             'to_peer' => $data['to'],
             'type' => $data['type'],
             'data' => $data['data'],
+            // who posted it: the host PC answers only offers whose sender the site vouched for
+            'from_user_id' => $request->user()->id,
+            'from_device_id' => $this->policy->knownDevice($request)?->id,
         ]);
 
         return response()->json(['id' => $signal->id], 201);

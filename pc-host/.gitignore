@@ -1,0 +1,11 @@
+node_modules/
+dist/
+release/
+logs/
+config.json
+pc-host.pid
+offline.request
+# the service runs from this folder on the dev PC: its runtime and WinSW are local
+/node.exe
+/pc-host-service.exe
+/pc-host-service*.log

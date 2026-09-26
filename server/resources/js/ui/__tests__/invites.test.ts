@@ -12,12 +12,13 @@ const invite = (code: string, players: number, expiresInMin: number, status: Inv
 })
 
 describe('invitations list', () => {
-  test('an invite is joinable while pending, with a free seat, before the room expires', () => {
+  test('an invite is joinable while pending or accepted, with a free seat, before the room expires', () => {
     expect(isJoinable(invite('AAAAAA', 3, 30), NOW)).toBe(true)
     expect(isJoinable(invite('BBBBBB', 4, 30), NOW)).toBe(false)
     expect(isJoinable(invite('CCCCCC', 1, -1), NOW)).toBe(false)
     expect(isJoinable(invite('DDDDDD', 1, 30, 'declined'), NOW)).toBe(false)
-    expect(isJoinable(invite('EEEEEE', 1, 30, 'accepted'), NOW)).toBe(false)
+    // accepted earlier: the invitee left and can go back in
+    expect(isJoinable(invite('EEEEEE', 1, 30, 'accepted'), NOW)).toBe(true)
   })
 
   test('seats read as taken/max', () => {

@@ -80,6 +80,13 @@ class GameApi implements GameApiSignals {
   // ---- the shared global world
   Future<GlobalPresence> presence() async =>
       GlobalPresence.fromJson((await _client.get('/global/presence')).json!);
+
+  /// STUN, plus short-lived TURN credentials when the site has a Cloudflare
+  /// TURN key: RTCIceServer maps, as flutter_webrtc takes them
+  Future<List<Map<String, dynamic>>> iceServers() async =>
+      ((await _client.get('/ice-servers')).json!['ice_servers'] as List)
+          .cast<Map<String, dynamic>>();
+
   Future<GlobalState> joinGlobal() async =>
       GlobalState.fromJson((await _client.post('/global/join')).json!);
   Future<GlobalState> claimGlobal() async =>

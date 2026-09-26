@@ -1,12 +1,13 @@
 /** Inertia props shared by HandleInertiaRequests and provided by PlayController. */
 import type { PageProps as InertiaPageProps } from '@inertiajs/core'
 import type { ApiUser, GlobalPresence, LeaderboardRow, WorldMeta } from './api'
-import type { AdminDevice, AdminRoom, AdminUser, GameRulesForm, LoginWindowForm } from '../ui/admin/types'
+import type { AdminDevice, AdminPcHost, AdminRoom, AdminUser, GameRulesForm, LoginWindowForm } from '../ui/admin/types'
 import type { GameRulesWire as GameRules } from '../game/rules'
 
 export interface SharedProps extends InertiaPageProps {
   auth: { user: ApiUser | null }
-  flash: { status: string | null }
+  /** `host_token`: a new host PC token, shown to the admin once */
+  flash: { status: string | null; host_token?: string | null }
 }
 
 /** the game page sits behind `auth`, so the user is never null there */
@@ -38,6 +39,8 @@ export interface AdminDashboardProps extends AdminProps {
   windowOpen: boolean
   /** the shared global world: its save (null before the first) and who is in it */
   globalWorld: { save: WorldMeta | null } & GlobalPresence
+  /** the PC that hosts the global world (docs/pc-host-research.md), or null before one is created */
+  pcHost: AdminPcHost | null
 }
 
 export interface AdminHoursProps extends AdminProps {

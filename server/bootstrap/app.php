@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AuthenticateGameHost;
 use App\Http\Middleware\EnforceAccessPolicy;
 use App\Http\Middleware\EnforceMaintenanceToggle;
 use App\Http\Middleware\EnsureUserIsAdmin;
@@ -14,6 +15,8 @@ use Illuminate\Http\Request;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        // only the host PC's token-authenticated routes (/api/host/*)
+        api: __DIR__.'/../routes/host.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -24,7 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // the native client authenticates /api calls with a bearer token, not a session
             replace: [PreventRequestForgery::class => PreventRequestForgeryUnlessBearer::class],
         );
-        $middleware->alias(['admin' => EnsureUserIsAdmin::class, 'access' => EnforceAccessPolicy::class]);
+        $middleware->alias(['admin' => EnsureUserIsAdmin::class, 'access' => EnforceAccessPolicy::class, 'host' => AuthenticateGameHost::class]);
         // an SDP must keep its trailing CRLF: Chrome rejects the last line without it
         $middleware->trimStrings(except: ['data.sdp']);
         // the JSON endpoints under /api share the session; unauthenticated calls get a 401, never a redirect
