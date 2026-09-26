@@ -9,10 +9,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * A saved world: the gzipped save the host uploads (table `saves`). Every player has
- * their own world (`own`, a random seed, `user_id` set); the shared global world
- * (`global`, the classic seed) is one row with no owner, uploaded by whoever hosts it.
+ * their own world (`own`, a random seed, `user_id` set); each global world (`global`)
+ * is a row with no owner, tied to the host key whose PC runs it and uploads it.
  */
-#[Fillable(['user_id', 'kind', 'payload', 'size', 'night', 'seconds', 'players'])]
+#[Fillable(['user_id', 'game_host_id', 'kind', 'payload', 'size', 'night', 'seconds', 'players'])]
 #[Hidden(['payload'])]
 class World extends Model
 {
@@ -32,10 +32,10 @@ class World extends Model
         return in_array($kind, self::KINDS, true);
     }
 
-    /** the shared global world's row, or null before its first save */
-    public static function global(): ?self
+    /** a global world's row, or null before its PC's first save */
+    public static function global(GameHost $host): ?self
     {
-        return static::query()->whereNull('user_id')->where('kind', self::GLOBAL)->first();
+        return static::query()->whereNull('user_id')->where('game_host_id', $host->id)->where('kind', self::GLOBAL)->first();
     }
 
     /**
@@ -56,14 +56,14 @@ class World extends Model
     }
 
     /**
-     * Replace a save (a player's own world, or the global one when `$userId` is null).
+     * Replace a save: a player's own world, or a host key's global world.
      *
      * @param  array{night?: int, seconds?: int}  $meta
      */
-    public static function put(?int $userId, string $kind, string $bytes, array $meta): self
+    public static function put(?int $userId, string $kind, string $bytes, array $meta, ?GameHost $host = null): self
     {
         return static::query()->updateOrCreate(
-            ['user_id' => $userId, 'kind' => $kind],
+            ['user_id' => $userId, 'game_host_id' => $host?->id, 'kind' => $kind],
             [
                 'payload' => base64_encode($bytes),
                 'size' => strlen($bytes),

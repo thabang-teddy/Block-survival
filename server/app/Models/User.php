@@ -52,7 +52,7 @@ class User extends Authenticatable
         return $this->hasMany(Score::class);
     }
 
-    /** @return HasMany<World, $this> the player's own world and their copy of the global one */
+    /** @return HasMany<World, $this> the player's worlds (global worlds have no owner) */
     public function worlds(): HasMany
     {
         return $this->hasMany(World::class);
@@ -64,13 +64,10 @@ class User extends Authenticatable
         return $this->hasOne(World::class)->where('kind', World::OWN);
     }
 
-    /** @return array{own: array<string, mixed>|null, global: array<string, mixed>|null} the player's own world and the shared global one */
+    /** @return array{own: array<string, mixed>|null} the player's own world (the global worlds are listed separately) */
     public function worldsMeta(): array
     {
-        return [
-            World::OWN => $this->world()->first()?->meta(),
-            World::GLOBAL => World::global()?->meta(),
-        ];
+        return [World::OWN => $this->world()->first()?->meta()];
     }
 
     /** @return HasMany<Device, $this> */

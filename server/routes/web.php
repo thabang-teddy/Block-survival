@@ -82,7 +82,9 @@ Route::middleware(['auth:sanctum', 'access'])->group(function () {
         Route::post('/invites/{invite}/decline', [InviteController::class, 'decline']);
         Route::get('/leaderboard', [ScoreController::class, 'leaderboard']);
         Route::post('/scores', [ScoreController::class, 'store']);
-        // the shared global world: enter its queue, ask who hosts now, leave
+        // the global worlds, one per host PC: list them, enter one, ask where to go, leave
+        Route::get('/global/worlds', [GlobalWorldController::class, 'index']);
+        // clients from before there were many worlds: the first world's lobby card
         Route::get('/global/presence', [GlobalWorldController::class, 'presence']);
         Route::get('/rules', GameRulesController::class);
         // STUN, plus short-lived TURN credentials when Cloudflare TURN is configured
@@ -90,14 +92,13 @@ Route::middleware(['auth:sanctum', 'access'])->group(function () {
         Route::post('/global/join', [GlobalWorldController::class, 'join']);
         Route::post('/global/claim', [GlobalWorldController::class, 'claim']);
         Route::post('/global/leave', [GlobalWorldController::class, 'leave']);
-        // the player's own world (`own`, random seed; no kind = own) and the shared `global` one;
-        // only the player's own can be started over — an admin resets the global world
-        Route::get('/world/{kind?}', [WorldController::class, 'show'])->where('kind', 'own|global');
-        Route::put('/world/{kind?}', [WorldController::class, 'update'])->where('kind', 'own|global');
+        // the player's own world (`own`, random seed; no kind = own); global worlds are the PCs' to save
+        Route::get('/world/{kind?}', [WorldController::class, 'show'])->where('kind', 'own');
+        Route::put('/world/{kind?}', [WorldController::class, 'update'])->where('kind', 'own');
         Route::delete('/world/{kind?}', [WorldController::class, 'destroy'])->where('kind', 'own');
         // sendBeacon on unload: multipart, CSRF token as a form field
         Route::post('/world/beacon', [WorldController::class, 'beacon']);
-        Route::post('/world/{kind}/beacon', [WorldController::class, 'beacon'])->where('kind', 'own|global');
+        Route::post('/world/{kind}/beacon', [WorldController::class, 'beacon'])->where('kind', 'own');
     });
 });
 
@@ -120,11 +121,14 @@ Route::middleware(['auth', 'access'])->group(function () {
         Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
         Route::delete('/users/{user}/world', [UserController::class, 'resetWorld'])->name('users.reset-world');
-        Route::delete('/global-world', AdminGlobalWorldController::class)->name('global-world.reset');
-        Route::post('/pc-host', [PcHostController::class, 'store'])->name('pc-host.store');
-        Route::post('/pc-host/token', [PcHostController::class, 'rotate'])->name('pc-host.rotate');
-        Route::post('/pc-host/release', [PcHostController::class, 'release'])->name('pc-host.release');
-        Route::delete('/pc-host', [PcHostController::class, 'destroy'])->name('pc-host.destroy');
+        // host keys: one per global world, each run by a PC
+        Route::get('/pc-hosts', [PcHostController::class, 'index'])->name('pc-hosts.index');
+        Route::post('/pc-hosts', [PcHostController::class, 'store'])->name('pc-hosts.store');
+        Route::post('/pc-hosts/{host}/token', [PcHostController::class, 'rotate'])->name('pc-hosts.rotate');
+        Route::patch('/pc-hosts/{host}', [PcHostController::class, 'update'])->name('pc-hosts.update');
+        Route::post('/pc-hosts/{host}/offline', [PcHostController::class, 'offline'])->name('pc-hosts.offline');
+        Route::delete('/pc-hosts/{host}/world', AdminGlobalWorldController::class)->name('pc-hosts.reset');
+        Route::delete('/pc-hosts/{host}', [PcHostController::class, 'destroy'])->name('pc-hosts.destroy');
         Route::get('/rooms', [AdminRoomController::class, 'index'])->name('rooms.index');
         Route::delete('/rooms/{code}', [AdminRoomController::class, 'destroy'])->name('rooms.destroy');
     });

@@ -346,6 +346,11 @@ body { user-select: none; }
 .menu .open-games .seats { font: 700 12px ui-monospace, Consolas, monospace; color: var(--hud-accent); }
 .menu .open-games button { padding: 5px 12px; font-size: 12px; }
 .menu .open-games .empty { display: block; text-align: center; font-size: 12px; opacity: .55; background: none; }
+.menu .global-worlds { max-height: 220px; }
+.menu .global-worlds li { grid-template-columns: 1fr auto; }
+.menu .global-worlds .host { white-space: normal; }
+.menu .global-worlds .world-state { display: block; font-size: 11px; opacity: .75 !important; margin-top: 2px; }
+.menu .global-worlds li.offline { opacity: .5; }
 .menu .error { margin: 12px 0 0; color: #ff8a7a; font-size: 13px; }
 
 /* ---- pause actions / account / leaderboard */

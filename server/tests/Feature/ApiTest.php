@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\GameHost;
 use App\Models\Room;
 use App\Models\RoomInvite;
 use App\Models\RoomSignal;
@@ -51,7 +52,8 @@ class ApiTest extends TestCase
     {
         $user = $this->user();
         World::create(['user_id' => $user->id, 'payload' => base64_encode(gzencode('{}')), 'size' => 22, 'night' => 3, 'seconds' => 1800]);
-        World::create(['user_id' => null, 'kind' => 'global', 'payload' => base64_encode(gzencode('{}')), 'size' => 22, 'night' => 7, 'seconds' => 10]);
+        [$pc] = GameHost::register('HomePC');
+        World::put(null, World::GLOBAL, gzencode('{}'), ['night' => 7, 'seconds' => 10], $pc);
 
         $this->actingAs($user)->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('Play')
@@ -59,8 +61,8 @@ class ApiTest extends TestCase
             ->has('leaderboard', 0)
             ->where('worlds.own.night', 3)
             ->where('worlds.own.kind', 'own')
-            ->where('worlds.global.night', 7)
-            ->where('presence.online', 0));
+            ->where('globalWorlds.0.save.night', 7)
+            ->where('globalWorlds.0.online', 0));
     }
 
     // ------------------------------------------------------------ session auth
@@ -109,7 +111,7 @@ class ApiTest extends TestCase
         $this->postJson('/api/rooms/ABCDEF/signal', [])->assertUnauthorized();
         $this->getJson('/api/rooms/ABCDEF/signals')->assertUnauthorized();
         $this->getJson('/api/world')->assertUnauthorized();
-        $this->getJson('/api/world/global')->assertUnauthorized();
+        $this->getJson('/api/global/worlds')->assertUnauthorized();
         $this->postJson('/api/scores', [])->assertUnauthorized();
     }
 
@@ -441,33 +443,30 @@ class ApiTest extends TestCase
         $this->actingAs($a)->deleteJson('/api/world')->assertOk(); // idempotent
     }
 
-    public function test_own_and_global_worlds_are_saved_independently(): void
+    public function test_players_save_only_their_own_world_and_the_global_worlds_are_left_alone(): void
     {
         $a = $this->user();
-        $own = gzencode(json_encode(['version' => 3, 'seed' => 123456, 'edits' => [], 'players' => []]));
+        [$pc] = GameHost::register('HomePC');
         $global = gzencode(json_encode(['version' => 3, 'seed' => 11, 'edits' => [[1]], 'players' => []]));
-        $this->actingAs($a)->postJson('/api/global/join')->assertOk(); // the global world's host
+        World::put(null, World::GLOBAL, $global, ['night' => 9], $pc);
+        $own = gzencode(json_encode(['version' => 3, 'seed' => 123456, 'edits' => [], 'players' => []]));
 
         $this->putGzip($a, '/api/world/own?night=1', $own)->assertOk()->assertJsonPath('world.kind', 'own');
-        $this->putGzip($a, '/api/world/global?night=9', $global)->assertOk()->assertJsonPath('world.kind', 'global');
-        $this->putGzip($a, '/api/world/other', $global)->assertNotFound();
+        // global worlds are their PCs' to save
+        $this->putGzip($a, '/api/world/global?night=9', $own)->assertNotFound();
+        $this->putGzip($a, '/api/world/other', $own)->assertNotFound();
+        $this->actingAs($a)->getJson('/api/world/global')->assertNotFound();
+        $file = UploadedFile::fake()->createWithContent('world.json.gz', $own);
+        $this->actingAs($a)->post('/api/world/global/beacon', ['payload' => $file, 'night' => 2])->assertNotFound();
         $this->assertSame(1, World::query()->where('user_id', $a->id)->count());
-        $this->assertSame(1, World::query()->whereNull('user_id')->count());
-
         $this->assertSame($own, $this->actingAs($a)->get('/api/world')->assertOk()->getContent());
         $this->assertSame($own, $this->actingAs($a)->get('/api/world/own')->assertOk()->getContent());
-        $this->assertSame($global, $this->actingAs($a)->get('/api/world/global')->assertOk()->assertHeader('X-Save-Night', '9')->getContent());
 
         // starting over in the own world leaves the global one alone
         $this->actingAs($a)->deleteJson('/api/world/own')->assertOk();
         $this->actingAs($a)->getJson('/api/world/own')->assertNotFound();
-        $this->actingAs($a)->get('/api/world/global')->assertOk();
-        $this->actingAs($a)->get('/')->assertInertia(fn (Assert $page) => $page->where('worlds.own', null)->where('worlds.global.night', 9));
-
-        // the beacon takes a kind too
-        $file = UploadedFile::fake()->createWithContent('world.json.gz', $own);
-        $this->actingAs($a)->post('/api/world/global/beacon', ['payload' => $file, 'night' => 2])->assertOk()->assertJsonPath('world.kind', 'global');
-        $this->assertSame($own, $this->actingAs($a)->get('/api/world/global')->getContent());
+        $this->assertSame($global, base64_decode(World::global($pc)->payload));
+        $this->actingAs($a)->get('/')->assertInertia(fn (Assert $page) => $page->where('worlds.own', null)->where('globalWorlds.0.save.night', 9));
     }
 
     public function test_the_world_rejects_non_gzip_and_oversized_bodies(): void

@@ -19,10 +19,10 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
- * The host PC's side of the site (docs/pc-host-research.md §5.1): its heartbeat, the
- * global room's mailbox, the global save, scores and the access re-checks. Every route
- * is behind the host token (AuthenticateGameHost); none of them reaches a player's
- * account or session.
+ * The host PC's side of the site (docs/pc-host-research.md §5.1): its heartbeat, its
+ * world's room mailbox, its world's save, scores and the access re-checks. Every route
+ * is behind a host token (AuthenticateGameHost), and the token picks the world; none of
+ * them reaches a player's account or session.
  */
 class HostController extends Controller
 {
@@ -87,7 +87,7 @@ class HostController extends Controller
         }
         $pc = $this->online($request);
         if (! $pc) {
-            return response()->json(['message' => 'The PC does not hold the global world right now.'], 409);
+            return response()->json(['message' => 'This PC is not running its world right now.'], 409);
         }
         $signal = RoomSignal::create([
             'room_code' => $pc->room_code,
@@ -100,9 +100,9 @@ class HostController extends Controller
         return response()->json(['id' => $signal->id], 201);
     }
 
-    public function showWorld(): Response|JsonResponse
+    public function showWorld(Request $request): Response|JsonResponse
     {
-        $world = World::global();
+        $world = World::global(AuthenticateGameHost::host($request));
         if (! $world) {
             return response()->json(['message' => 'No world yet.'], 404);
         }
@@ -125,11 +125,10 @@ class HostController extends Controller
         if ($problem = World::uploadProblem($bytes)) {
             return response()->json(['message' => $problem[0]], $problem[1]);
         }
-        if (! AuthenticateGameHost::host($request)->holdsWorld()) {
-            return response()->json(['message' => 'The global world is hosted by the browsers right now.'], 409);
-        }
+        // the PC is the only one who ever writes its world, so it may save even while shutting down
+        $world = World::put(null, World::GLOBAL, $bytes, $meta, AuthenticateGameHost::host($request));
 
-        return response()->json(['world' => World::put(null, World::GLOBAL, $bytes, $meta)->meta()]);
+        return response()->json(['world' => $world->meta()]);
     }
 
     /** runs the PC's sim recorded (at dawn and on death), scored like a player's own */

@@ -118,3 +118,11 @@ body:has(.admin) { user-select: text; }
 /* host PC panel */
 .admin .pc-host-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .admin .flash code { user-select: all; word-break: break-all; }
+.admin .host-state { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: 2px 7px; border-radius: 8px; background: rgba(255,255,255,.08); }
+.admin .host-state.online { background: rgba(111,176,74,.22); color: #bfe8a5; }
+.admin .host-state.paused { background: rgba(232,178,58,.2); color: var(--hud-accent); }
+.admin .host-state.offline, .admin .host-state.disabled { opacity: .7; }
+.admin tr.disabled td { opacity: .55; }
+.admin .host-save { display: block; font-size: 11px; opacity: .7; }
+.admin .host-form { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); align-items: end; margin-top: 14px; }
+.admin .world-list { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; font-size: 13px; }

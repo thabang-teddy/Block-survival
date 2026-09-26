@@ -79,17 +79,27 @@ export function browserName(ua: string | null): string {
 }
 
 /** the host PC, as the admin dashboard shows it */
+/** a host key: one global world, run by a PC (docs/pc-host-research.md §8) */
 export interface AdminPcHost {
   id: number
   name: string
-  /** online: it hosts the global world; paused: the world waits for it; offline: browsers host */
+  /** the first 8 characters of the token's hash: tells keys apart, never signs in */
+  fingerprint: string
+  /** the map this world is generated from */
+  seed: number
+  /** online: its PC runs the world; paused: the world waits for the PC; offline: closed */
   state: 'online' | 'paused' | 'offline'
-  /** released or shut down, but running again: it takes the world back once the browsers are done */
-  standing_by: boolean
   enabled: boolean
   version: string | null
   players: number
   last_seen_at: string | null
   offline_at: string | null
   stats: Record<string, unknown> | null
+  created_at: string | null
+}
+
+/** a host key as the Host PCs page lists it: with who is inside and its save */
+export interface AdminHostKey extends AdminPcHost {
+  online: number
+  save: AdminWorld | null
 }
