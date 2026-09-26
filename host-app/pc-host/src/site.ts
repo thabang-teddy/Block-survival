@@ -61,7 +61,8 @@ export interface Site {
   iceServers(): Promise<IceServer[]>
 }
 
-const TIMEOUT_MS = 10_000
+/** a shared host can take several seconds under load; a heartbeat that gets through late still counts */
+const TIMEOUT_MS = 20_000
 
 export class HttpSite implements Site {
   private readonly base: string

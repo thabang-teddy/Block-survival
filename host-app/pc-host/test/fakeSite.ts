@@ -65,8 +65,15 @@ export class FakeSite implements Site {
     return players.map(p => this.problems.get(p.userId) ?? null)
   }
 
+  /** what /ice-servers answers next (an Error throws); the last one repeats */
+  ice: (IceServer[] | Error)[] = [[]]
+  iceCalls = 0
+
   async iceServers(): Promise<IceServer[]> {
-    return []
+    this.iceCalls++
+    const next = this.ice.length > 1 ? this.ice.shift()! : this.ice[0]
+    if (next instanceof Error) throw next
+    return next
   }
 
   // ---------------------------------------------------------------- a player's side

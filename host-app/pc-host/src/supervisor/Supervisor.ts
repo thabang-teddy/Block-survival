@@ -239,7 +239,8 @@ export class Supervisor {
       slot.phase = 'revoked'
       slot.error = 'The site refused this host token: it was rotated or removed. Paste the new one.'
     } else if (msg.t === 'error') {
-      slot.error = msg.message
+      // an empty message clears a problem that was fixed
+      slot.error = msg.message === '' ? null : msg.message
     }
   }
 

@@ -14,7 +14,7 @@
 import { HostSim } from './sim/HostSim'
 import { GameRoom, type RoomLog } from './room/GameRoom'
 import { CLOSE_GRACE_MS, HostTransport, type PeerConnectionFactory, type TransportOptions } from './net/HostTransport'
-import { SiteError, type HeartbeatReply, type Site } from './site'
+import { SiteError, type HeartbeatReply, type IceServer, type Site } from './site'
 import { makeRoomCode } from '@game/net/protocol'
 import { GLOBAL_SEED } from '@game/world/seed'
 import { DEFAULT_RULES, parseRules, type GameRules } from '@game/game/rules'
@@ -40,6 +40,8 @@ export interface PcHostOptions {
   keepAwake?: (on: boolean) => void
   /** the token was revoked: there is nothing more this process can do */
   onRevoked?: () => void
+  /** something the owner must fix before players can connect (null: it is fixed) */
+  onProblem?: (problem: string | null) => void
   now?: () => number
   /** a peer id for the mailbox (injectable for tests) */
   peerId?: string
@@ -59,6 +61,8 @@ export class PcHost {
   private healthy = true
   private heartbeatTimer: ReturnType<typeof setTimeout> | null = null
   private iceTimer: ReturnType<typeof setInterval> | null = null
+  /** no ICE list yet (the fetch failed): ask again on the next good heartbeat */
+  private iceMissing = false
   private beating: Promise<void> | null = null
   private readonly now: () => number
   private readonly log: RoomLog
@@ -77,17 +81,43 @@ export class PcHost {
 
   /** first heartbeat, then the world; resolves once the PC is hosting */
   async start(): Promise<void> {
-    const ice = await this.opts.site.iceServers().catch(() => [])
     this.transport = new HostTransport(this.opts.site, {
       onOpen: (link, player) => this.room?.connect(link, player),
       onData: (link, bytes) => this.room?.receive(link, bytes),
       onClose: link => this.room?.disconnect(link),
-    }, this.opts.makePeer, { ...this.opts.transport, iceServers: ice }, (msg, err) => this.log.error(msg, { err: String(err) }))
-    this.iceTimer = setInterval(() => {
-      this.opts.site.iceServers().then(s => this.transport?.setIceServers(s), () => {})
-    }, ICE_REFRESH_MS)
+    }, this.opts.makePeer, { ...this.opts.transport, iceServers: [] }, (msg, err) => this.log.error(msg, { err: describe(err) }))
+    await this.refreshIce()
+    this.iceTimer = setInterval(() => { void this.refreshIce() }, ICE_REFRESH_MS)
     await this.beat()
     this.schedule(HEARTBEAT_MS)
+  }
+
+  /**
+   * The STUN/TURN list from the site. Until one arrives the PC can connect nobody, so a
+   * failed fetch is tried again on the next good heartbeat, not in half an hour. Relay-only
+   * with no TURN server connects nobody either: that is said, loudly, rather than left to
+   * look like players timing out.
+   */
+  private async refreshIce(): Promise<void> {
+    let servers: IceServer[]
+    try {
+      servers = await this.opts.site.iceServers()
+    } catch (err) {
+      this.iceMissing = true
+      this.log.error('could not get the ICE servers from the site; trying again', { err: describe(err) })
+      return
+    }
+    this.iceMissing = servers.length === 0
+    this.transport?.setIceServers(servers)
+    const turn = servers.some(s => (Array.isArray(s.urls) ? s.urls : [s.urls]).some(u => /^turns?:/i.test(u)))
+    if (this.opts.transport.relayOnly && !turn) {
+      const problem = 'Relay-only is on, but the site has no TURN server, so no player can connect. '
+        + 'Turn relay-only off in the host app, or set CLOUDFLARE_TURN_KEY_ID and CLOUDFLARE_TURN_KEY_API_TOKEN in the site\'s .env.'
+      this.log.error(problem)
+      this.opts.onProblem?.(problem)
+    } else {
+      this.opts.onProblem?.(null)
+    }
   }
 
   /**
@@ -146,6 +176,7 @@ export class PcHost {
     }
     this.healthy = true
     this.lastOkAt = this.now()
+    if (this.iceMissing) void this.refreshIce()
     // stop() may have run while the heartbeat was out
     if ((this.phase as HostPhase) === 'stopped') return
     if (reply.state === 'online') await this.online(reply)
@@ -215,6 +246,19 @@ export class PcHost {
   private stats(): Record<string, unknown> {
     return { ...(this.transport?.stats ?? {}), frozen: this.room?.isFrozen ?? false, uptime_s: Math.round(process.uptime()) }
   }
+}
+
+/** an error, or the details object a transport error carries, as one log field */
+export function describe(err: unknown): string {
+  if (err instanceof Error) return err.message
+  if (typeof err === 'object' && err !== null) {
+    try {
+      return JSON.stringify(err)
+    } catch {
+      return String(err)
+    }
+  }
+  return String(err)
 }
 
 const ID_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
