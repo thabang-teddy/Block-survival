@@ -12,7 +12,11 @@ public sealed record HostPaths(string InstallDir, string DataDir)
     /// <summary>overrides the data folder (tests, a dev checkout)</summary>
     public const string DataDirVariable = "BSH_DATA_DIR";
 
-    public string PcHostDir => Path.Combine(InstallDir, "pc-host");
+    /// <summary>overrides where pc-host is (a dev build uses the repo's pc-host\ instead of one next to the exe)</summary>
+    public const string PcHostDirVariable = "BSH_PCHOST_DIR";
+
+    /// <summary>pc-host's folder: next to the app when installed</summary>
+    public string PcHostDir { get; init; } = Path.Combine(InstallDir, "pc-host");
     public string NodeExe => Path.Combine(PcHostDir, "node.exe");
     public string ServiceExe => Path.Combine(PcHostDir, "pc-host-service.exe");
     public string ServiceXml => Path.Combine(PcHostDir, "pc-host-service.xml");
@@ -27,6 +31,10 @@ public sealed record HostPaths(string InstallDir, string DataDir)
         {
             data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "BlockSurvivalHost");
         }
-        return new HostPaths(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar), data);
+        var install = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
+        var pcHost = Environment.GetEnvironmentVariable(PcHostDirVariable);
+        return string.IsNullOrWhiteSpace(pcHost)
+            ? new HostPaths(install, data)
+            : new HostPaths(install, data) { PcHostDir = Path.GetFullPath(pcHost) };
     }
 }

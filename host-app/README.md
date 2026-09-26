@@ -56,12 +56,51 @@ from a CA — and `signtool.exe` from the Windows SDK. Then either:
 and run `build.ps1` again: it signs the app's exe and the MSI. Without either it builds
 unsigned and says so. There is no way around Smart App Control short of signing.
 
-## Develop
+## Develop (no install, no admin)
+
+The app drives whatever answers on the control port, so in development run
+`pc-host service` yourself and point the app at the same folder:
+
+1. **A data folder** (e.g. `C:\bsh-dev`) with a `config.json` — the same schema as
+   [pc-host's](../pc-host/README.md#set-up--by-hand-the-dev-pc). Plain `token`s are fine
+   here; give it its own `controlPort` (e.g. `47899`) so it never meets an installed copy:
+
+   ```json
+   {
+     "site": "http://block-survival.test",
+     "portRange": [51000, 51059],
+     "controlPort": 47899,
+     "worlds": [{ "id": "home", "name": "Home", "token": "a host token from Admin -> Host PCs" }]
+   }
+   ```
+
+2. **Run pc-host** (after `npm run build` in `pc-host/`):
+
+   ```powershell
+   cd ..\pc-host
+   $env:PC_HOST_HOME = "C:\bsh-dev"; node dist\pc-host.mjs service
+   ```
+
+3. **Run the app** in another terminal:
+
+   ```powershell
+   $env:BSH_DATA_DIR = "C:\bsh-dev"
+   $env:BSH_PCHOST_DIR = "C:\Users\Teddy\projects\Block survival\pc-host"
+   dotnet run --project src\BlockSurvivalHost
+   ```
+
+The header then says *pc-host … is running (not as this app's service)*, and start,
+stop, restart, logs, adding and removing worlds all work. One copy of the app runs per
+data folder, so this runs beside an installed one. Stopping the `node` process (Ctrl+C)
+pauses the worlds, as a service stop would.
+
+Leave **Set up this PC / Repair setup** alone in a dev copy: it needs admin, and with
+`BSH_PCHOST_DIR` set it would register the Windows service from the repo's `pc-host\`
+in place of the installed app's.
 
 ```bash
 dotnet test                       # Core: config, DPAPI, site check, control client, admin steps
-dotnet run --project src/BlockSurvivalHost
 ```
 
-Set `BSH_DATA_DIR` to a scratch folder to run the app against a config other than
-`%ProgramData%\BlockSurvivalHost`.
+Freshly built unsigned binaries (the app, the test DLL) can be blocked by Smart App
+Control ("an Application Control policy has blocked this file"); allow them when it asks.

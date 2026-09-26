@@ -156,7 +156,11 @@ public sealed class MainViewModel : Observable
 
     // ------------------------------------------------------------------ polling
 
-    /// <summary>the service's state and every world's, every few seconds</summary>
+    /// <summary>
+    /// The service's state and every world's, every few seconds. Whatever answers on the
+    /// control port counts — the Windows service, or `pc-host service` run by hand while
+    /// developing; only when nothing answers does the Windows service's state explain why.
+    /// </summary>
     public async Task Refresh()
     {
         if (_polling) return;
@@ -164,44 +168,43 @@ public sealed class MainViewModel : Observable
         try
         {
             var state = AdminSetup.ServiceState();
-            ServiceInstalled = state is not null;
-            if (state is null)
-            {
-                ServiceOk = false;
-                ServiceText = "The host service is not installed — run Set up this PC.";
-                foreach (var w in Worlds) w.ApplyUnknown();
-                return;
-            }
             var registration = AdminSetup.Registration(_paths);
-            if (registration.Kind == ServiceKind.Foreign)
+            ServiceStatus? status = null;
+            string? unreachable = null;
+            try
             {
-                ServiceOk = false;
-                ServiceText = $"The host service on this PC runs from another folder ({Path.GetDirectoryName(registration.ExePath)}). Press Repair setup to switch it to this app.";
-                foreach (var w in Worlds) w.ApplyUnknown();
+                status = await _control.StatusAsync();
+            }
+            catch (ControlException e)
+            {
+                unreachable = e.Message;
+            }
+            ServiceInstalled = state is not null || status is not null;
+            if (status is not null)
+            {
+                ServiceOk = true;
+                ServiceText = registration.Kind == ServiceKind.Ours && state == ServiceControllerStatus.Running
+                    ? $"The host service is running (pc-host {status.Version})."
+                    : $"pc-host {status.Version} is running (not as this app's service — started by hand?).";
+                Problem = status.Problem;
+                foreach (var w in Worlds) w.Apply(status.Worlds.FirstOrDefault(s => s.Id == w.Id));
                 return;
             }
-            if (state != ServiceControllerStatus.Running)
-            {
-                ServiceOk = false;
-                ServiceText = $"The host service is {Describe(state.Value)}.";
-                foreach (var w in Worlds) w.ApplyUnknown();
-                return;
-            }
-            var status = await _control.StatusAsync();
-            ServiceOk = true;
-            ServiceText = $"The host service is running (pc-host {status.Version}).";
-            Problem = status.Problem;
-            foreach (var w in Worlds) w.Apply(status.Worlds.FirstOrDefault(s => s.Id == w.Id));
-        }
-        catch (ControlException e)
-        {
             ServiceOk = false;
-            ServiceText = e.Message;
+            ServiceText = state is null
+                ? "The host service is not installed — run Set up this PC."
+                : registration.Kind == ServiceKind.Foreign
+                    ? $"The host service on this PC runs from another folder ({Path.GetDirectoryName(registration.ExePath)}). Press Repair setup to switch it to this app."
+                    : state != ServiceControllerStatus.Running
+                        ? $"The host service is {Describe(state.Value)}."
+                        : unreachable!;
             foreach (var w in Worlds) w.ApplyUnknown();
         }
         finally
         {
             _polling = false;
+            // WPF re-asks CanExecute only after input: a poll that brought a world up must too
+            System.Windows.Input.CommandManager.InvalidateRequerySuggested();
         }
     }
 

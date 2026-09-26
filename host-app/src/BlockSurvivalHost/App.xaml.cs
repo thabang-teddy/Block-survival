@@ -10,8 +10,8 @@ namespace BlockSurvivalHost;
 /// <summary>
 /// Block Survival Host. Started plainly it shows the dashboard (or the first-run
 /// wizard); `--tray` starts it in the tray (Start with Windows); `--admin …` runs one
-/// elevated setup step and exits without a window. Only one copy runs: a second start
-/// brings the first one's window up. Closing the window keeps it in the tray — the
+/// elevated setup step and exits without a window. One copy runs per data folder: a
+/// second start brings the first one's window up. Closing the window keeps it in the tray — the
 /// worlds are run by the service either way.
 /// </summary>
 public partial class App : System.Windows.Application
@@ -34,8 +34,10 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        _instance = new Mutex(initiallyOwned: true, $@"Local\{InstanceName}", out var first);
-        _showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\{InstanceName}.Show");
+        // one copy per data folder: a dev copy with its own BSH_DATA_DIR runs beside the installed one
+        var name = $"{InstanceName}.{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(paths.DataDir.ToLowerInvariant())))[..16]}";
+        _instance = new Mutex(initiallyOwned: true, $@"Local\{name}", out var first);
+        _showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\{name}.Show");
         if (!first)
         {
             _showSignal.Set();
