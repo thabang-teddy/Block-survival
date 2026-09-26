@@ -14,7 +14,7 @@
  */
 import { HostSim } from './sim/HostSim'
 import { GameRoom, type RoomLog } from './room/GameRoom'
-import { HostTransport, type PeerConnectionFactory, type TransportOptions } from './net/HostTransport'
+import { CLOSE_GRACE_MS, HostTransport, type PeerConnectionFactory, type TransportOptions } from './net/HostTransport'
 import { SiteError, type HeartbeatReply, type Site } from './site'
 import { makeRoomCode } from '@game/net/protocol'
 import { GLOBAL_SEED } from '@game/world/seed'
@@ -99,6 +99,8 @@ export class PcHost {
       ? 'The host PC is going offline — the world moves to your browsers.'
       : 'The host PC is restarting — the game is paused until it is back.'
     await this.room?.close(reason)
+    // the players' channels close once their bye has gone out; let that happen first
+    await new Promise(r => setTimeout(r, CLOSE_GRACE_MS * 3))
     this.transport?.dispose()
     this.opts.keepAwake?.(false)
     await this.opts.site.heartbeat({ version: this.opts.version, peer_id: this.peerId, going }).catch(err => {

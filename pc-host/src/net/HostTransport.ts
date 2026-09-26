@@ -48,6 +48,26 @@ const POLL_PAGE = 50
 /** a player whose channel has not opened by then is given up on */
 const CONNECT_TIMEOUT_MS = 20_000
 
+/** a closing channel waits at most this long for what it still has to send */
+export const CLOSE_FLUSH_MS = 1000
+/** and this long after its buffer is empty, for the last packets to leave */
+export const CLOSE_GRACE_MS = 100
+
+/**
+ * Close a DataChannel once what was sent on it has gone out. Closing straight after a
+ * send can drop the message (libdatachannel discards what is still queued), so a player
+ * sent off would never hear why.
+ */
+export function closeWhenFlushed(dc: RTCDataChannel, after: () => void): void {
+  const until = Date.now() + CLOSE_FLUSH_MS
+  const close = () => setTimeout(() => { dc.close(); after() }, CLOSE_GRACE_MS)
+  const wait = () => {
+    if (dc.readyState !== 'open' || dc.bufferedAmount === 0 || Date.now() > until) close()
+    else setTimeout(wait, 20)
+  }
+  wait()
+}
+
 /** what the heartbeat reports, so ICE trouble can be measured (docs/pc-host-research.md §4) */
 export interface TransportStats {
   opened: number
@@ -222,7 +242,8 @@ export class HostTransport {
     const link: Link = {
       id: remoteId,
       send: bytes => { if (dc.readyState === 'open') dc.send(bytes as Uint8Array<ArrayBuffer>) },
-      close: () => { dc.close(); entry.pc.close() },
+      // the room's last word (a message and a bye) must go out before the channel does
+      close: () => closeWhenFlushed(dc, () => entry.pc.close()),
     }
     const close = () => {
       if (closed) return
