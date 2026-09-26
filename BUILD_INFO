@@ -1,0 +1,6 @@
+env=production
+source_branch=master
+source_sha=feb2f0bc2f4e5122fd7dcfe8b7cb2299bedc0d78
+run=89
+built_at=2026-09-26T20:51:00Z
+php=8.4
