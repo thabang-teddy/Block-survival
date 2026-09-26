@@ -1,92 +1,120 @@
-# pc-host — the global world, hosted on a PC at home
+# pc-host — global worlds, hosted on a PC at home
 
-The design is in [`docs/pc-host-research.md`](../docs/pc-host-research.md). In short:
-this app runs the global world's authoritative simulation on a Windows PC. The
-Laravel site stays the front door (accounts, device approval, the login window).
-Players reach the PC over the same WebRTC path they already use between browsers:
-the site's signalling mailbox, then a direct DataChannel. The PC needs no domain,
-certificate or open TCP port.
+The design is in [`docs/pc-host-research.md`](../docs/pc-host-research.md) (§8 for
+many worlds). In short: this app runs the authoritative simulation of Block Survival's
+global worlds on a Windows PC. The Laravel site stays the front door (accounts, device
+approval, the login window). Players reach the PC over the same WebRTC path they use
+between browsers: the site's signalling mailbox, then a direct DataChannel. The PC
+needs no domain, certificate or open TCP port.
 
-- **Online:** the PC hosts the global world. Players' own worlds are still hosted in
-  their browsers.
+Each **host key** made on the site (Admin → Host PCs) is one global world with its own
+map, save and players. One PC can run several: `pc-host service` runs one worker
+process per world, so one world crashing never touches the others.
+
+- **Online:** the PC runs the world; players pick it from the lobby and join it.
 - **Paused:** the PC went quiet (crash, power cut, lost connection, sleep, or Windows
   restarting the service). The world waits for it **for as long as it takes**, and
   players rejoin by themselves when it is back.
-- **Offline:** `pc-host offline`, the admin's **Release to browsers** button, or no
-  host PC set up. The browsers host the world, as they did before the PC. A PC that
-  comes back takes the world back when the browsers' room closes or nobody is in it.
+- **Offline:** the world was stopped, marked offline by the admin, or its key is
+  disabled. Nobody can enter it until its PC runs it again — browsers never host a
+  global world.
 
-## Set up
+## Set up — the usual way: the Block Survival Host app
 
-1. **Create the host on the site.** Admin → Overview → *Host PC* → name it → *Create
-   host PC*. Copy the token now; it is shown only once. *New token* rotates it, and
-   *Remove* revokes it.
-2. **TURN (recommended).** Create a Cloudflare Realtime TURN key and put it in the
-   site's `.env` as `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_KEY_API_TOKEN`.
-   Without it, players whose networks block direct UDP cannot connect.
-3. **Build it** (Node 24):
+Install `BlockSurvivalHost-<version>.msi` (built by [`host-app/build.ps1`](../host-app/README.md))
+and open *Block Survival Host*. Its wizard asks for the site, a UDP port range and the
+first world's host token (it checks the token with the site), then asks Windows once
+for administrator rights to add the firewall rule and install the service. From then
+on the app starts, stops and restarts each world, adds and removes worlds and shows
+their logs. Config and logs live in `%ProgramData%\BlockSurvivalHost`.
+
+**TURN (recommended):** create a Cloudflare Realtime TURN key and put it in the site's
+`.env` as `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_KEY_API_TOKEN`. Without it,
+players whose networks block direct UDP cannot connect.
+
+## Set up — by hand (the dev PC)
+
+1. **Create host keys on the site:** Admin → Host PCs → *Create host key*. Copy each
+   token now; it is shown only once.
+2. **Build it** (Node 24):
 
    ```bash
    cd server && npm ci        # the game code the PC imports lives here
    cd ../pc-host && npm ci && npm run build
    ```
 
-   The service runs straight from this `pc-host\` folder: `dist\pc-host.mjs`, with
-   `node_modules` next to it for node-datachannel's native module. Copy the Node you
-   built with into the folder as `node.exe` (gitignored), so the service does not
-   depend on whichever Node is on the PATH:
+   The service runs straight from this folder: `dist\pc-host.mjs`, with `node_modules`
+   next to it for node-datachannel's native module. Copy the Node you built with into
+   the folder as `node.exe` (gitignored). `npm run package` assembles `release\pc-host\`
+   instead: the same files with `node.exe` included, ready to copy to another PC.
+3. **Configure:** `config.json` (gitignored) next to this README:
 
-   ```bat
-   copy "C:\nvm4w\nodejs\node.exe" node.exe
+   ```json
+   {
+     "site": "https://your-site.example",
+     "portRange": [50000, 50199],
+     "relayOnly": false,
+     "controlPort": 47810,
+     "worlds": [
+       { "id": "home", "name": "Home", "token": "first host token" },
+       { "id": "attic", "name": "Attic", "token": "second host token", "autoStart": false }
+     ]
+   }
    ```
-
-   To host from another PC instead, `npm run package` assembles `release\pc-host\`:
-   the same files with `node.exe` included, ready to copy.
-4. **Configure:** copy `config.example.json` to `config.json` (gitignored) and fill
-   it in:
 
    | key | |
    |---|---|
    | `site` | the site's `https://` address (plain `http` only for localhost or a `.test` dev site) |
-   | `token` | the host token from step 1 |
-   | `portRange` | UDP ports WebRTC may use. Forwarding them on the router is optional (it helps when there is no CGNAT) |
+   | `portRange` | UDP ports WebRTC may use; each world takes 20 of them, in order. Forwarding them on the router is optional |
    | `relayOnly` | `true` sends all traffic through TURN, so players never see the PC's IP. Costs a little latency |
-   | `logDir` | where `pc-host.log` goes, rotated at 5 MB |
+   | `controlPort` | the control API's port on 127.0.0.1 (for the host app) |
+   | `worlds[].token` / `tokenProtected` | the host token, plain or DPAPI-protected in machine scope (the app writes the latter) |
+   | `worlds[].autoStart` | start with the service (default `true`) |
 
-5. **Try it in a window first:** `pc-host.cmd`. When Windows Firewall asks, allow
-   `node.exe` on private and public networks (it only needs UDP). The admin page
-   should now show the PC as online.
-6. **Run it as a service:** download `WinSW-x64.exe` (v2.12) from the WinSW GitHub
-   releases, put it in this folder next to `pc-host-service.xml` and rename it
-   `pc-host-service.exe` (gitignored). Then, from an administrator prompt:
+   A single-world `config.json` from before (`site` + `token` at the top) still works.
+4. **Try one world in a window:** `pc-host.cmd` runs `run` against a single-world
+   config. When Windows Firewall asks, allow `node.exe` (UDP only is enough).
+5. **Run the service:** download `WinSW-x64.exe` (v2.12) from the WinSW GitHub
+   releases, put it next to `pc-host-service.xml` renamed `pc-host-service.exe`
+   (gitignored), and from an administrator prompt:
 
    ```bat
-   cd "C:\Users\Teddy\projects\Block survival\pc-host"
    pc-host-service.exe install
    pc-host-service.exe start
    ```
 
-   The service starts with Windows, no login needed. A crash restarts it. After
-   `npm run build`, `pc-host-service.exe restart` picks up the new bundle.
+   It runs `pc-host service`, starts with Windows and restarts after a crash. Its
+   control key is written to `control.key` here.
 
 ## Everyday use
 
-- **Updates, reboots, shutting down:** Windows stops the service, the app saves the
-  world, and players wait on the pause screen until the PC is back.
-- **Going away for a while:** run `pc-host.cmd offline` first. It saves the world,
-  hands it to the browsers, and stops the service.
-- **The PC died while you were away:** press *Release to browsers* on the admin
-  dashboard (it works from a phone). Otherwise the world stays paused until the PC is
-  back.
-- **Logs:** `logs\pc-host.log` records starts, stops, freezes, and connection
-  problems. The admin page shows the PC's last heartbeat, version, player count,
-  connection types (`host` = direct, `srflx` = hole-punched, `relay` = TURN) and ICE
-  failures.
+- **Updates, reboots, shutting down:** Windows stops the service; every world saves and
+  its players wait on the pause screen until the PC is back.
+- **Going away for a while:** stop the worlds in the app (or `POST /stop-all`, below).
+  Each saves and goes offline; the lobby shows it greyed out.
+- **The PC died while you were away:** press *Mark offline* for that world on the site's
+  Host PCs page (it works from a phone). Its waiting players go back to the lobby.
+- **Logs:** `logs\service.log` is the supervisor's; `logs\<world id>\pc-host.log` each
+  world's (starts, stops, freezes, connection problems). The site's Host PCs page shows
+  each world's last heartbeat, version and players.
+
+### The control API
+
+The host app uses it; anything on the PC holding `control.key` can too:
+
+```bash
+curl -H "Authorization: Bearer $(cat control.key)" http://127.0.0.1:47810/status
+```
+
+`GET /status`, `POST /worlds/<id>/start|stop|restart`, `POST /stop-all`, `POST /reload`
+(re-read `config.json`), `GET /worlds/<id>/log?lines=200`. Stop means offline; restart
+keeps the players paused. It listens on 127.0.0.1 only and refuses requests addressed
+to any other host name.
 
 ## Develop
 
 ```bash
-npm test          # Vitest: sim, room, config, real WebRTC between node-datachannel peers
+npm test          # Vitest: sim, room, config, supervisor, control API, real WebRTC between node-datachannel peers
 npm run typecheck
 npm run build     # dist/pc-host.mjs (esbuild; node-datachannel stays external)
 ```
@@ -95,6 +123,7 @@ The game code is not copied. `@game/*` resolves to `server/resources/js/*` (see
 `aliases.mjs`), so `server/` must have its `node_modules` installed. The web client's
 model loader is swapped for a headless stub (`src/headless/assets.ts`).
 
-To try it against a local site, point `PC_HOST_CONFIG` at a config with
-`"site": "http://localhost:8000"` or a Herd site such as `"http://block-survival.test"`.
-Plain `http` is only accepted for localhost, 127.0.0.1 and `.test` hostnames.
+To try it against a local site, run the service with `PC_HOST_HOME` pointing at a
+folder holding a `config.json` with `"site": "http://localhost:8000"` or a Herd site
+such as `"http://block-survival.test"`. Plain `http` is only accepted for localhost,
+127.0.0.1 and `.test` hostnames.
