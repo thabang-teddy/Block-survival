@@ -1,0 +1,163 @@
+{
+  "_AdminLayout-C5H50un9.js": {
+    "file": "assets/AdminLayout-C5H50un9.js",
+    "name": "AdminLayout",
+    "imports": [
+      "resources/js/app.tsx"
+    ],
+    "css": [
+      "assets/AdminLayout-DETGw8U-.css",
+      "assets/hud-XPBaR6yx.css"
+    ]
+  },
+  "_AdminLayout-DETGw8U-.css": {
+    "file": "assets/AdminLayout-DETGw8U-.css",
+    "src": "_AdminLayout-DETGw8U-.css"
+  },
+  "_hud-XPBaR6yx.css": {
+    "file": "assets/hud-XPBaR6yx.css",
+    "src": "_hud-XPBaR6yx.css"
+  },
+  "_score--vXbDtDY.js": {
+    "file": "assets/score--vXbDtDY.js",
+    "name": "score"
+  },
+  "_types-8P1HhV2K.js": {
+    "file": "assets/types-8P1HhV2K.js",
+    "name": "types"
+  },
+  "resources/js/Pages/Admin/Dashboard.tsx": {
+    "file": "assets/Dashboard-BC20mvzz.js",
+    "name": "Dashboard",
+    "src": "resources/js/Pages/Admin/Dashboard.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx",
+      "_AdminLayout-C5H50un9.js",
+      "_score--vXbDtDY.js",
+      "_types-8P1HhV2K.js"
+    ]
+  },
+  "resources/js/Pages/Admin/Devices.tsx": {
+    "file": "assets/Devices-DxejpYmy.js",
+    "name": "Devices",
+    "src": "resources/js/Pages/Admin/Devices.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx",
+      "_AdminLayout-C5H50un9.js",
+      "_types-8P1HhV2K.js"
+    ]
+  },
+  "resources/js/Pages/Admin/Hours.tsx": {
+    "file": "assets/Hours-D3MYw0H6.js",
+    "name": "Hours",
+    "src": "resources/js/Pages/Admin/Hours.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx",
+      "_AdminLayout-C5H50un9.js",
+      "_types-8P1HhV2K.js"
+    ]
+  },
+  "resources/js/Pages/Admin/Rooms.tsx": {
+    "file": "assets/Rooms-BLdwIpA6.js",
+    "name": "Rooms",
+    "src": "resources/js/Pages/Admin/Rooms.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx",
+      "_AdminLayout-C5H50un9.js",
+      "_types-8P1HhV2K.js"
+    ]
+  },
+  "resources/js/Pages/Admin/Rules.tsx": {
+    "file": "assets/Rules-BL7lrZX5.js",
+    "name": "Rules",
+    "src": "resources/js/Pages/Admin/Rules.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx",
+      "_AdminLayout-C5H50un9.js"
+    ]
+  },
+  "resources/js/Pages/Admin/UserForm.tsx": {
+    "file": "assets/UserForm-DYxQXk-i.js",
+    "name": "UserForm",
+    "src": "resources/js/Pages/Admin/UserForm.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx",
+      "_AdminLayout-C5H50un9.js",
+      "_score--vXbDtDY.js",
+      "_types-8P1HhV2K.js"
+    ]
+  },
+  "resources/js/Pages/Admin/Users.tsx": {
+    "file": "assets/Users-BgtD2FN9.js",
+    "name": "Users",
+    "src": "resources/js/Pages/Admin/Users.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx",
+      "_AdminLayout-C5H50un9.js",
+      "_score--vXbDtDY.js",
+      "_types-8P1HhV2K.js"
+    ]
+  },
+  "resources/js/Pages/Login.tsx": {
+    "file": "assets/Login-CjcEnR3E.js",
+    "name": "Login",
+    "src": "resources/js/Pages/Login.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx"
+    ],
+    "css": [
+      "assets/hud-XPBaR6yx.css"
+    ]
+  },
+  "resources/js/Pages/PendingApproval.tsx": {
+    "file": "assets/PendingApproval-CT1Xvszn.js",
+    "name": "PendingApproval",
+    "src": "resources/js/Pages/PendingApproval.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx"
+    ],
+    "css": [
+      "assets/hud-XPBaR6yx.css"
+    ]
+  },
+  "resources/js/Pages/Play.tsx": {
+    "file": "assets/Play-REquUuua.js",
+    "name": "Play",
+    "src": "resources/js/Pages/Play.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.tsx",
+      "_score--vXbDtDY.js"
+    ],
+    "css": [
+      "assets/hud-XPBaR6yx.css"
+    ]
+  },
+  "resources/js/app.tsx": {
+    "file": "assets/app-Du2tCQbf.js",
+    "name": "app",
+    "src": "resources/js/app.tsx",
+    "isEntry": true,
+    "dynamicImports": [
+      "resources/js/Pages/Admin/Dashboard.tsx",
+      "resources/js/Pages/Admin/Devices.tsx",
+      "resources/js/Pages/Admin/Hours.tsx",
+      "resources/js/Pages/Admin/Rooms.tsx",
+      "resources/js/Pages/Admin/Rules.tsx",
+      "resources/js/Pages/Admin/UserForm.tsx",
+      "resources/js/Pages/Admin/Users.tsx",
+      "resources/js/Pages/Login.tsx",
+      "resources/js/Pages/PendingApproval.tsx",
+      "resources/js/Pages/Play.tsx"
+    ]
+  }
+}
