@@ -86,4 +86,5 @@ The game code is not copied. `@game/*` resolves to `server/resources/js/*` (see
 model loader is swapped for a headless stub (`src/headless/assets.ts`).
 
 To try it against a local site, point `PC_HOST_CONFIG` at a config with
-`"site": "http://localhost:8000"`. Plain `http` is only accepted for localhost.
+`"site": "http://localhost:8000"` or a Herd site such as `"http://block-survival.test"`.
+Plain `http` is only accepted for localhost, 127.0.0.1 and `.test` hostnames.

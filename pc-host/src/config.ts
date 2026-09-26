@@ -19,12 +19,15 @@ export interface Config {
 
 export class ConfigError extends Error {}
 
+/** plain http only to this machine: localhost, 127.0.0.1, or a `.test` dev site (Herd) — the whole hostname, then a port, a path or the end */
+const LOCAL_HTTP = /^http:\/\/(localhost|127\.0\.0\.1|[a-z0-9-]+(\.[a-z0-9-]+)*\.test)(:\d+)?(\/|$)/i
+
 export function parseConfig(raw: unknown): Config {
   if (typeof raw !== 'object' || raw === null) throw new ConfigError('config.json must hold an object')
   const r = raw as Record<string, unknown>
   if (typeof r.site !== 'string' || !/^https?:\/\/[^/]+/.test(r.site)) throw new ConfigError('"site" must be the site\'s http(s) address')
-  if (!r.site.startsWith('https://') && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(r.site)) {
-    throw new ConfigError('"site" must use https (plain http is only for a local test server)')
+  if (!r.site.startsWith('https://') && !LOCAL_HTTP.test(r.site)) {
+    throw new ConfigError('"site" must use https (plain http is only for localhost or a .test dev site)')
   }
   if (typeof r.token !== 'string' || r.token.length < 20) throw new ConfigError('"token" must be the host token from the admin page')
   let portRange: [number, number] | undefined
