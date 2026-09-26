@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\GameHost;
 use App\Models\Room;
 use App\Models\RoomInvite;
 use App\Models\RoomSignal;
@@ -9,6 +10,7 @@ use App\Models\User;
 use App\Models\World;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -50,7 +52,8 @@ class ApiTest extends TestCase
     {
         $user = $this->user();
         World::create(['user_id' => $user->id, 'payload' => base64_encode(gzencode('{}')), 'size' => 22, 'night' => 3, 'seconds' => 1800]);
-        World::create(['user_id' => null, 'kind' => 'global', 'payload' => base64_encode(gzencode('{}')), 'size' => 22, 'night' => 7, 'seconds' => 10]);
+        [$pc] = GameHost::register('HomePC');
+        World::put(null, World::GLOBAL, gzencode('{}'), ['night' => 7, 'seconds' => 10], $pc);
 
         $this->actingAs($user)->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('Play')
@@ -58,8 +61,8 @@ class ApiTest extends TestCase
             ->has('leaderboard', 0)
             ->where('worlds.own.night', 3)
             ->where('worlds.own.kind', 'own')
-            ->where('worlds.global.night', 7)
-            ->where('presence.online', 0));
+            ->where('globalWorlds.0.save.night', 7)
+            ->where('globalWorlds.0.online', 0));
     }
 
     // ------------------------------------------------------------ session auth
@@ -108,7 +111,7 @@ class ApiTest extends TestCase
         $this->postJson('/api/rooms/ABCDEF/signal', [])->assertUnauthorized();
         $this->getJson('/api/rooms/ABCDEF/signals')->assertUnauthorized();
         $this->getJson('/api/world')->assertUnauthorized();
-        $this->getJson('/api/world/global')->assertUnauthorized();
+        $this->getJson('/api/global/worlds')->assertUnauthorized();
         $this->postJson('/api/scores', [])->assertUnauthorized();
     }
 
@@ -202,8 +205,8 @@ class ApiTest extends TestCase
         $this->actingAs($guest)->postJson('/api/rooms/ABCDEF/signal', ['from' => 'guestBBBBBBB', 'to' => 'hostAAAAAAAA', 'type' => 'offer', 'data' => ['sdp' => 'v=0']])->assertCreated();
         $this->actingAs($host)->getJson('/api/rooms/ABCDEF/signals?to=hostAAAAAAAA')->assertOk()->assertJsonCount(1, 'signals');
         $this->actingAs($host)->getJson('/api/rooms/ABCDEF/invites')->assertOk()->assertJsonPath('invites.0.status', 'accepted');
-        // an accepted invite is no longer pending in the lobby
-        $this->actingAs($guest)->getJson('/api/invites')->assertOk()->assertJsonCount(0, 'invites');
+        // an accepted invite stays in the lobby, so the guest can go back in while the host is hosting
+        $this->actingAs($guest)->getJson('/api/invites')->assertOk()->assertJsonCount(1, 'invites')->assertJsonPath('invites.0.status', 'accepted');
     }
 
     public function test_declined_full_and_dead_invites_stay_out_of_the_lobby(): void
@@ -231,6 +234,86 @@ class ApiTest extends TestCase
         // invites die with their room
         $this->actingAs($host)->deleteJson('/api/rooms/ABCDEF', ['host_peer_id' => 'p'])->assertOk();
         $this->assertSame(0, RoomInvite::count());
+    }
+
+    public function test_a_room_whose_host_went_quiet_is_not_hosting_until_it_refreshes(): void
+    {
+        $host = $this->user('Host', 'host@example.com');
+        $guest = $this->user('Guest', 'guest@example.com');
+        $this->actingAs($host)->postJson('/api/rooms', ['code' => 'ABCDEF', 'host_peer_id' => 'hostAAAAAAAA', 'host_name' => 'Host'])->assertCreated();
+        $invite = $this->actingAs($host)->postJson('/api/rooms/ABCDEF/invites', ['user_id' => $guest->id])->json('invite.id');
+        $this->actingAs($guest)->getJson('/api/invites')->assertOk()->assertJsonCount(1, 'invites');
+
+        // the host's tab died without closing the room: two hours of TTL left, but not hosting
+        Carbon::setTestNow(now()->addSeconds(Room::HOSTING_SECONDS + 1));
+        $this->actingAs($guest)->getJson('/api/invites')->assertOk()->assertJsonCount(0, 'invites');
+        $this->actingAs($guest)->postJson("/api/invites/{$invite}/accept")->assertStatus(410);
+        // the host itself still reaches its room and mailbox
+        $this->actingAs($host)->getJson('/api/rooms/ABCDEF')->assertOk();
+        $this->actingAs($host)->getJson('/api/rooms/ABCDEF/signals?to=hostAAAAAAAA')->assertOk();
+
+        // a refresh is a sign of life: hosting again
+        $this->actingAs($host)->patchJson('/api/rooms/ABCDEF', ['host_peer_id' => 'hostAAAAAAAA', 'players' => 1])->assertOk();
+        $this->actingAs($guest)->postJson("/api/invites/{$invite}/accept")->assertOk();
+        $this->actingAs($guest)->getJson('/api/rooms/ABCDEF/signals?to=guestBBBBBBB')->assertOk();
+
+        // an accepted invitee is shut out again once the host goes quiet
+        Carbon::setTestNow(now()->addSeconds(Room::HOSTING_SECONDS + 1));
+        $this->actingAs($guest)->getJson('/api/rooms/ABCDEF')->assertForbidden();
+        $this->actingAs($guest)->postJson('/api/rooms/ABCDEF/signal', ['from' => 'guestBBBBBBB', 'to' => 'hostAAAAAAAA', 'type' => 'offer', 'data' => ['sdp' => 'v=0']])->assertForbidden();
+        Carbon::setTestNow();
+    }
+
+    public function test_invites_follow_the_host_into_their_next_room(): void
+    {
+        $host = $this->user('Host', 'host@example.com');
+        $ana = $this->user('Ana', 'ana@example.com');
+        $ben = $this->user('Ben', 'ben@example.com');
+        $cat = $this->user('Cat', 'cat@example.com');
+        $this->actingAs($host)->postJson('/api/rooms', ['code' => 'ABCDEF', 'host_peer_id' => 'hostAAAAAAAA', 'host_name' => 'Host'])->assertCreated();
+        foreach ([$ana, $ben, $cat] as $u) {
+            $this->actingAs($host)->postJson('/api/rooms/ABCDEF/invites', ['user_id' => $u->id])->assertCreated();
+        }
+        $accepted = RoomInvite::query()->where('to_user_id', $ana->id)->value('id');
+        $this->actingAs($ana)->postJson("/api/invites/{$accepted}/accept")->assertOk();
+        $declined = RoomInvite::query()->where('to_user_id', $cat->id)->value('id');
+        $this->actingAs($cat)->postJson("/api/invites/{$declined}/decline")->assertOk();
+
+        // a room that is still hosting keeps its invites when the host opens another one
+        $this->actingAs($host)->postJson('/api/rooms', ['code' => 'GHJKLM', 'host_peer_id' => 'hostCCCCCCCC', 'host_name' => 'Host'])->assertCreated();
+        $this->assertSame(3, Room::query()->where('code', 'ABCDEF')->first()->invites()->count());
+        $this->actingAs($host)->deleteJson('/api/rooms/GHJKLM', ['host_peer_id' => 'hostCCCCCCCC'])->assertOk();
+
+        // the host's tab crashed; after a reload they host again under a new code
+        Carbon::setTestNow(now()->addSeconds(Room::HOSTING_SECONDS + 1));
+        $this->actingAs($host)->postJson('/api/rooms', ['code' => 'NPQRST', 'host_peer_id' => 'hostBBBBBBBB', 'host_name' => 'Host'])->assertCreated();
+        $new = Room::query()->where('code', 'NPQRST')->first();
+        $this->assertEqualsCanonicalizing([$ana->id, $ben->id], $new->invites()->pluck('to_user_id')->all());
+
+        // Ana (accepted) goes straight back in; Ben still sees his invite, now to the new room
+        $this->actingAs($ana)->getJson('/api/rooms/NPQRST')->assertOk()->assertJsonPath('room.host_peer_id', 'hostBBBBBBBB');
+        $this->actingAs($ben)->getJson('/api/invites')->assertOk()->assertJsonCount(1, 'invites')->assertJsonPath('invites.0.code', 'NPQRST');
+        // Cat's decline stays with the old room
+        $this->actingAs($cat)->getJson('/api/invites')->assertOk()->assertJsonCount(0, 'invites');
+
+        // stopping cleanly ends the invites
+        $this->actingAs($host)->deleteJson('/api/rooms/NPQRST', ['host_peer_id' => 'hostBBBBBBBB'])->assertOk();
+        $this->actingAs($ben)->getJson('/api/invites')->assertOk()->assertJsonCount(0, 'invites');
+        Carbon::setTestNow();
+    }
+
+    public function test_an_invitee_invited_into_two_dead_rooms_keeps_one_invite(): void
+    {
+        $host = $this->user('Host', 'host@example.com');
+        $ana = $this->user('Ana', 'ana@example.com');
+        $old = Room::create(['code' => 'AAAAAA', 'host_peer_id' => 'p1', 'host_name' => 'Host', 'user_id' => $host->id, 'expires_at' => now()->addHour(), 'last_seen_at' => now()->subMinutes(5)]);
+        $older = Room::create(['code' => 'BBBBBB', 'host_peer_id' => 'p2', 'host_name' => 'Host', 'user_id' => $host->id, 'expires_at' => now()->addHour(), 'last_seen_at' => now()->subMinutes(9)]);
+        RoomInvite::create(['room_id' => $older->id, 'from_user_id' => $host->id, 'to_user_id' => $ana->id, 'status' => RoomInvite::ACCEPTED]);
+        $newest = RoomInvite::create(['room_id' => $old->id, 'from_user_id' => $host->id, 'to_user_id' => $ana->id]);
+
+        $this->actingAs($host)->postJson('/api/rooms', ['code' => 'CCCCCC', 'host_peer_id' => 'p3', 'host_name' => 'Host'])->assertCreated();
+        $this->assertSame(1, RoomInvite::count());
+        $this->assertSame($newest->id, RoomInvite::query()->where('room_id', Room::query()->where('code', 'CCCCCC')->value('id'))->value('id'));
     }
 
     // ------------------------------------------------------------ signalling
@@ -360,33 +443,30 @@ class ApiTest extends TestCase
         $this->actingAs($a)->deleteJson('/api/world')->assertOk(); // idempotent
     }
 
-    public function test_own_and_global_worlds_are_saved_independently(): void
+    public function test_players_save_only_their_own_world_and_the_global_worlds_are_left_alone(): void
     {
         $a = $this->user();
-        $own = gzencode(json_encode(['version' => 3, 'seed' => 123456, 'edits' => [], 'players' => []]));
+        [$pc] = GameHost::register('HomePC');
         $global = gzencode(json_encode(['version' => 3, 'seed' => 11, 'edits' => [[1]], 'players' => []]));
-        $this->actingAs($a)->postJson('/api/global/join')->assertOk(); // the global world's host
+        World::put(null, World::GLOBAL, $global, ['night' => 9], $pc);
+        $own = gzencode(json_encode(['version' => 3, 'seed' => 123456, 'edits' => [], 'players' => []]));
 
         $this->putGzip($a, '/api/world/own?night=1', $own)->assertOk()->assertJsonPath('world.kind', 'own');
-        $this->putGzip($a, '/api/world/global?night=9', $global)->assertOk()->assertJsonPath('world.kind', 'global');
-        $this->putGzip($a, '/api/world/other', $global)->assertNotFound();
+        // global worlds are their PCs' to save
+        $this->putGzip($a, '/api/world/global?night=9', $own)->assertNotFound();
+        $this->putGzip($a, '/api/world/other', $own)->assertNotFound();
+        $this->actingAs($a)->getJson('/api/world/global')->assertNotFound();
+        $file = UploadedFile::fake()->createWithContent('world.json.gz', $own);
+        $this->actingAs($a)->post('/api/world/global/beacon', ['payload' => $file, 'night' => 2])->assertNotFound();
         $this->assertSame(1, World::query()->where('user_id', $a->id)->count());
-        $this->assertSame(1, World::query()->whereNull('user_id')->count());
-
         $this->assertSame($own, $this->actingAs($a)->get('/api/world')->assertOk()->getContent());
         $this->assertSame($own, $this->actingAs($a)->get('/api/world/own')->assertOk()->getContent());
-        $this->assertSame($global, $this->actingAs($a)->get('/api/world/global')->assertOk()->assertHeader('X-Save-Night', '9')->getContent());
 
         // starting over in the own world leaves the global one alone
         $this->actingAs($a)->deleteJson('/api/world/own')->assertOk();
         $this->actingAs($a)->getJson('/api/world/own')->assertNotFound();
-        $this->actingAs($a)->get('/api/world/global')->assertOk();
-        $this->actingAs($a)->get('/')->assertInertia(fn (Assert $page) => $page->where('worlds.own', null)->where('worlds.global.night', 9));
-
-        // the beacon takes a kind too
-        $file = UploadedFile::fake()->createWithContent('world.json.gz', $own);
-        $this->actingAs($a)->post('/api/world/global/beacon', ['payload' => $file, 'night' => 2])->assertOk()->assertJsonPath('world.kind', 'global');
-        $this->assertSame($own, $this->actingAs($a)->get('/api/world/global')->getContent());
+        $this->assertSame($global, base64_decode(World::global($pc)->payload));
+        $this->actingAs($a)->get('/')->assertInertia(fn (Assert $page) => $page->where('worlds.own', null)->where('globalWorlds.0.save.night', 9));
     }
 
     public function test_the_world_rejects_non_gzip_and_oversized_bodies(): void

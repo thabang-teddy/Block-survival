@@ -29,6 +29,8 @@ class HandleInertiaRequests extends Middleware
             ],
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),
+                // a new host PC token, shown to the admin once
+                'host_token' => fn () => $request->user()?->isAdmin() ? $request->session()->get('host_token') : null,
             ],
             // the admin nav badge; only computed inside the admin section
             'pendingDevices' => fn () => $request->is('admin*') && $user?->isAdmin() ? Device::query()->pending()->count() : 0,

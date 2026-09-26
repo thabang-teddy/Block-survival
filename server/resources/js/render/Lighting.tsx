@@ -2,12 +2,12 @@
  * Sun, hemisphere light, sky colour and fog driven by the DayNight clock every frame.
  * Palettes are taken from the concept art (daylight, orange sunset, deep blue night).
  */
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Game } from '../game/Game'
-import { CHUNK } from '../world/chunkStore'
-import { LOAD_RADIUS } from '../world/chunkStreamer'
+import { fogFarFor, graphicsFor } from './graphics'
+import { useGraphicsStore } from '../state/graphicsStore'
 
 interface Palette {
   sky: THREE.Color
@@ -32,15 +32,23 @@ const NIGHT: Palette = {
 }
 
 const SUN_DISTANCE = 120
-/** the fog closes just inside the streamed radius so the world's edge is never seen */
-const FOG_FAR = (LOAD_RADIUS + 0.5) * CHUNK
-const FOG_NEAR = FOG_FAR * 0.55
+const FOG_NEAR_FRACTION = 0.55
 
 export function Lighting({ game }: { game: Game }) {
-  const { scene } = useThree()
+  const { scene, camera } = useThree()
   const sun = useRef<THREE.DirectionalLight>(null)
   const hemi = useRef<THREE.HemisphereLight>(null)
-  const fog = useMemo(() => new THREE.Fog(DAY.sky.clone(), FOG_NEAR, FOG_FAR), [])
+  const graphics = graphicsFor(useGraphicsStore(s => s.quality))
+  const fog = useMemo(() => new THREE.Fog(DAY.sky.clone()), [])
+
+  // the view distance: fog and far plane move together (graphics quality)
+  useEffect(() => {
+    fog.far = fogFarFor(graphics.viewChunks)
+    fog.near = fog.far * FOG_NEAR_FRACTION
+    const cam = camera as THREE.PerspectiveCamera
+    cam.far = graphics.cameraFar
+    cam.updateProjectionMatrix()
+  }, [fog, camera, graphics])
   const tmp = useMemo(() => ({ a: new THREE.Color(), b: new THREE.Color() }), [])
 
   const mix = (pick: (p: Palette) => THREE.Color, w: { day: number; sunset: number; night: number }): THREE.Color => {
@@ -91,7 +99,7 @@ export function Lighting({ game }: { game: Game }) {
         position={[60, 80, 30]}
         intensity={DAY.sunIntensity}
         color={DAY.sun}
-        castShadow
+        castShadow={graphics.shadows}
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.03}

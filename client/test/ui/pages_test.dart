@@ -72,7 +72,6 @@ Map<String, http.Response Function(http.Request)> _lobbyRoutes({
               'updated_at': DateTime.now().toIso8601String(),
             }
           : null,
-      'global': null,
     },
   }),
   'GET /api/leaderboard': (_) => _ok({
@@ -81,7 +80,26 @@ Map<String, http.Response Function(http.Request)> _lobbyRoutes({
       {'name': 'Kiddo', 'score': 100},
     ],
   }),
-  'GET /api/global/presence': (_) => _ok({'online': 2, 'host_name': 'Sam'}),
+  'GET /api/global/worlds': (_) => _ok({
+    'worlds': [
+      {
+        'id': 1,
+        'name': 'HomePC',
+        'seed': 11,
+        'state': 'online',
+        'online': 2,
+        'save': null,
+      },
+      {
+        'id': 2,
+        'name': 'Attic',
+        'seed': 4242,
+        'state': 'offline',
+        'online': 0,
+        'save': null,
+      },
+    ],
+  }),
   'GET /api/invites': (_) => _ok({
     'invites': [
       {
@@ -178,7 +196,7 @@ void main() {
   });
 
   testWidgets(
-    'the lobby shows the worlds, presence, invitations and leaderboard',
+    'the lobby shows the worlds, the global worlds, invitations and leaderboard',
     (tester) async {
       final routes = _lobbyRoutes();
       routes['POST /api/auth/token'] = (_) =>
@@ -203,11 +221,16 @@ void main() {
         find.textContaining('Night 3 · 6:40 survived · 2 players'),
         findsOneWidget,
       );
+      expect(find.textContaining('HomePC', findRichText: true), findsOneWidget);
+      expect(find.textContaining('2/4 playing now.'), findsOneWidget);
+      expect(find.text('Enter'), findsOneWidget);
+      // an offline world is listed, greyed out, and cannot be entered
+      expect(find.textContaining('Attic', findRichText: true), findsOneWidget);
       expect(
-        find.textContaining('2 online now, hosted by Sam'),
+        find.textContaining("Offline — its host PC isn't running."),
         findsOneWidget,
       );
-      expect(find.text('Enter'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Offline'), findsOneWidget);
       expect(find.textContaining("Sam's world · 1/4"), findsOneWidget);
       expect(find.text('Accept'), findsOneWidget);
       expect(find.text('Leaderboard'), findsOneWidget);

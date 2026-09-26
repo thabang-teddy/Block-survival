@@ -35,6 +35,17 @@ class BlockSurvivalApp extends StatefulWidget {
 class _BlockSurvivalAppState extends State<BlockSurvivalApp> {
   Launch? _launch;
 
+  /// one factory for the app's life, so the site's ICE servers are cached across matches
+  late final RtcFactory _rtc =
+      widget.rtc ??
+      FlutterWebRtc(iceSource: () => widget.session.api.iceServers());
+
+  Launcher _launcher(AppSession s) => Launcher(
+    api: s.api,
+    rtc: _rtc,
+    player: LocalPlayer(name: s.user?.name ?? 'Survivor', userId: s.user?.id),
+  );
+
   @override
   void initState() {
     super.initState();
@@ -57,7 +68,10 @@ class _BlockSurvivalAppState extends State<BlockSurvivalApp> {
               key: ValueKey(launch),
               launch: launch,
               api: s.api,
+              launcher: _launcher(s),
               onExit: () => setState(() => _launch = null),
+              // back into the host PC's world after a pause (or the next host's)
+              onRelaunch: (next) => setState(() => _launch = next),
             );
           }
           return switch (s.state) {
@@ -68,14 +82,7 @@ class _BlockSurvivalAppState extends State<BlockSurvivalApp> {
             AuthState.pendingApproval => PendingApprovalPage(session: s),
             AuthState.signedIn => LobbyPage(
               session: s,
-              launcher: Launcher(
-                api: s.api,
-                rtc: widget.rtc ?? const FlutterWebRtc(),
-                player: LocalPlayer(
-                  name: s.user?.name ?? 'Survivor',
-                  userId: s.user?.id,
-                ),
-              ),
+              launcher: _launcher(s),
               onLaunch: (launch) => setState(() => _launch = launch),
             ),
           };

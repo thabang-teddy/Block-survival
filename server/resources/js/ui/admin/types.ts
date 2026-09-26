@@ -77,3 +77,29 @@ export function browserName(ua: string | null): string {
   const browser = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser'
   return os ? `${browser} on ${os}` : browser
 }
+
+/** the host PC, as the admin dashboard shows it */
+/** a host key: one global world, run by a PC (docs/pc-host-research.md §8) */
+export interface AdminPcHost {
+  id: number
+  name: string
+  /** the first 8 characters of the token's hash: tells keys apart, never signs in */
+  fingerprint: string
+  /** the map this world is generated from */
+  seed: number
+  /** online: its PC runs the world; paused: the world waits for the PC; offline: closed */
+  state: 'online' | 'paused' | 'offline'
+  enabled: boolean
+  version: string | null
+  players: number
+  last_seen_at: string | null
+  offline_at: string | null
+  stats: Record<string, unknown> | null
+  created_at: string | null
+}
+
+/** a host key as the Host PCs page lists it: with who is inside and its save */
+export interface AdminHostKey extends AdminPcHost {
+  online: number
+  save: AdminWorld | null
+}

@@ -128,57 +128,113 @@ final class PlayerRow {
   final String name;
 }
 
-/// what the global world tells a player who is in it
-sealed class GlobalState {
-  const GlobalState(this.online);
+/// who runs the world at the other end: the host PC
+/// (docs/pc-host-research.md), or another player's browser or app
+enum HostKind { pc, browser }
 
-  factory GlobalState.fromJson(Map<String, dynamic> j) {
-    final online = j['online'] as int;
-    return switch (j['status']) {
-      'host' => GlobalHost(online),
-      'client' => GlobalClient(
-        online,
-        RoomInfo.fromJson(j['room'] as Map<String, dynamic>),
-      ),
-      _ => GlobalPending(online, j['host_name'] as String? ?? ''),
-    };
-  }
+/// What a global world tells a player who is in it (docs/pc-host-research.md
+/// §8): connect to its host PC's room, wait for the paused PC, or go back to
+/// the lobby because the world closed.
+sealed class GlobalState {
+  const GlobalState();
+
+  factory GlobalState.fromJson(Map<String, dynamic> j) => switch (j['status']) {
+    'client' => GlobalClient(
+      online: j['online'] as int? ?? 0,
+      world: j['world'] as int? ?? 0,
+      hostName: j['host_name'] as String? ?? '',
+      room: RoomInfo.fromJson(j['room'] as Map<String, dynamic>),
+    ),
+    'paused' => GlobalPaused(
+      online: j['online'] as int? ?? 0,
+      world: j['world'] as int? ?? 0,
+      hostName: j['host_name'] as String? ?? '',
+    ),
+    _ => GlobalOffline(
+      j['message'] as String? ??
+          "This world is offline — its host PC isn't running.",
+    ),
+  };
+}
+
+/// connect to the host PC's room
+final class GlobalClient extends GlobalState {
+  const GlobalClient({
+    required this.online,
+    required this.world,
+    required this.hostName,
+    required this.room,
+  });
 
   final int online;
-}
-
-/// open a room and host
-final class GlobalHost extends GlobalState {
-  const GlobalHost(super.online);
-}
-
-/// connect to the host's room
-final class GlobalClient extends GlobalState {
-  const GlobalClient(super.online, this.room);
-
+  final int world;
+  final String hostName;
   final RoomInfo room;
 }
 
-/// wait for the chosen host to open theirs
-final class GlobalPending extends GlobalState {
-  const GlobalPending(super.online, this.hostName);
+/// the host PC went quiet: wait for it, however long
+final class GlobalPaused extends GlobalState {
+  const GlobalPaused({
+    required this.online,
+    required this.world,
+    required this.hostName,
+  });
 
+  final int online;
+  final int world;
   final String hostName;
 }
 
-/// who is in the shared global world right now (the lobby card)
-final class GlobalPresence {
-  const GlobalPresence({required this.online, this.hostName});
+/// the world closed: back to the lobby
+final class GlobalOffline extends GlobalState {
+  const GlobalOffline(this.message);
 
-  factory GlobalPresence.fromJson(Map<String, dynamic> j) => GlobalPresence(
-    online: j['online'] as int,
-    hostName: j['host_name'] as String?,
+  final String message;
+}
+
+/// the state of a global world's host PC
+enum WorldState {
+  online,
+  paused,
+  offline;
+
+  static WorldState parse(Object? v) =>
+      v == 'online' ? online : (v == 'paused' ? paused : offline);
+}
+
+/// one global world as the lobby lists it: run by a host PC, open only while
+/// that PC is online (or paused)
+final class GlobalWorldInfo {
+  const GlobalWorldInfo({
+    required this.id,
+    required this.name,
+    required this.seed,
+    required this.state,
+    required this.online,
+    this.save,
+  });
+
+  factory GlobalWorldInfo.fromJson(Map<String, dynamic> j) => GlobalWorldInfo(
+    id: j['id'] as int,
+    name: j['name'] as String,
+    seed: j['seed'] as int,
+    state: WorldState.parse(j['state']),
+    online: j['online'] as int? ?? 0,
+    save: j['save'] == null
+        ? null
+        : WorldMeta.fromJson(j['save'] as Map<String, dynamic>),
   );
 
-  static const empty = GlobalPresence(online: 0);
+  final int id;
+  final String name;
+  final int seed;
+  final WorldState state;
 
+  /// players inside right now
   final int online;
-  final String? hostName;
+
+  /// its save, or null before its PC first saved it
+  final WorldMeta? save;
 }
 
 final class LeaderboardRow {

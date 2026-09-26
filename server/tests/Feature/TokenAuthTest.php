@@ -152,7 +152,7 @@ class TokenAuthTest extends TestCase
         $this->assertSame($device->id, PersonalAccessToken::sole()->device_id);
         $this->assertNotNull($user->fresh()->last_login_at);
 
-        $this->asToken($token)->getJson('/api/auth/me')->assertOk()->assertJsonPath('user.id', $user->id)->assertJsonStructure(['worlds' => ['own', 'global']]);
+        $this->asToken($token)->getJson('/api/auth/me')->assertOk()->assertJsonPath('user.id', $user->id)->assertJsonStructure(['worlds' => ['own']]);
         $this->asToken($token)->getJson('/api/leaderboard')->assertOk();
         $this->asToken($token)->postJson('/api/rooms', ['code' => 'ABCDEF', 'host_peer_id' => 'peer-1', 'host_name' => 'Teddy'])->assertSuccessful();
         $this->asNobody()->getJson('/api/leaderboard')->assertUnauthorized();

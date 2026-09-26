@@ -346,6 +346,11 @@ body { user-select: none; }
 .menu .open-games .seats { font: 700 12px ui-monospace, Consolas, monospace; color: var(--hud-accent); }
 .menu .open-games button { padding: 5px 12px; font-size: 12px; }
 .menu .open-games .empty { display: block; text-align: center; font-size: 12px; opacity: .55; background: none; }
+.menu .global-worlds { max-height: 220px; }
+.menu .global-worlds li { grid-template-columns: 1fr auto; }
+.menu .global-worlds .host { white-space: normal; }
+.menu .global-worlds .world-state { display: block; font-size: 11px; opacity: .75 !important; margin-top: 2px; }
+.menu .global-worlds li.offline { opacity: .5; }
 .menu .error { margin: 12px 0 0; color: #ff8a7a; font-size: 13px; }
 
 /* ---- pause actions / account / leaderboard */
@@ -354,6 +359,8 @@ body { user-select: none; }
 .restart.secondary { background: rgba(255,255,255,.12); color: var(--hud-ink); }
 .menu .wide { width: 100%; margin-top: 10px; }
 .menu .link { background: none; border: 0; padding: 0; color: var(--hud-accent); cursor: pointer; font: 600 13px inherit; text-decoration: underline; }
+.graphics-toggle { pointer-events: auto; }
+.graphics-toggle .link { background: none; border: 0; padding: 0; color: var(--hud-accent); cursor: pointer; font: 600 12px inherit; text-decoration: underline; }
 .menu .account-line { margin: 12px 0 0; font-size: 13px; opacity: .9; }
 .menu .account { display: grid; gap: 8px; margin-top: 12px; padding: 12px; border-radius: 8px; background: rgba(255,255,255,.04); }
 /* dev-only guest sign-in under the form */

@@ -2,12 +2,18 @@
 /// host through the rooms API + WebRTC, says hello, builds the world from the
 /// welcome (seed + edits) and then follows snapshots, block edits and private
 /// state. Its own movement is authoritative and goes up at [inputHz].
+///
+/// With the host PC (docs/pc-host-research.md §5.4) a silence or a dropped
+/// link is a pause, not the end: the session goes [ClientStatus.paused] (the
+/// game holds the player still and the play page waits for the PC), and
+/// snapshots arriving again on the same link lift it.
 library;
 
 import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:block_survival/api/game_api.dart';
+import 'package:block_survival/api/models.dart';
 import 'package:block_survival/game/game.dart';
 import 'package:block_survival/game/host_sim.dart';
 import 'package:block_survival/game/score.dart';
@@ -16,10 +22,32 @@ import 'package:block_survival/net/protocol.dart';
 import 'package:block_survival/net/rtc.dart';
 import 'package:block_survival/net/transport.dart';
 
-enum ClientStatus { connecting, joined, full, hostLeft, error }
+enum ClientStatus { connecting, joined, paused, full, hostLeft, error }
+
+/// a PC-hosted game that sends no snapshot for this long is paused
+const Duration pauseAfterSilence = Duration(seconds: 3);
 
 final class ClientSession implements TransportEvents {
-  ClientSession(this._api, this._rtc, this.code, this.name, {this.userId});
+  ClientSession(
+    this._api,
+    this._rtc,
+    this.code,
+    this.name, {
+    this.userId,
+    this.hostKind = HostKind.browser,
+    Duration Function()? clock,
+  }) : _clock = clock ?? _monotonic;
+
+  static final Stopwatch _watch = Stopwatch()..start();
+  static Duration _monotonic() => _watch.elapsed;
+
+  /// who runs the world at the other end
+  final HostKind hostKind;
+  final Duration Function() _clock;
+  Duration _lastSnapAt = Duration.zero;
+
+  /// the host PC went quiet: the game holds still until it is back
+  bool get paused => status == ClientStatus.paused;
 
   final GameApi _api;
   final RtcFactory _rtc;
@@ -72,6 +100,12 @@ final class ClientSession implements TransportEvents {
   }
 
   void tick(double dt) {
+    if (status == ClientStatus.joined &&
+        hostKind == HostKind.pc &&
+        _clock() - _lastSnapAt > pauseAfterSilence) {
+      _setStatus(ClientStatus.paused);
+    }
+    // paused: nothing is sent — the world is not moving, so neither are we
     final game = _game;
     if (game == null || status != ClientStatus.joined) return;
     _inputTimer += dt;
@@ -126,6 +160,7 @@ final class ClientSession implements TransportEvents {
           _fail('The host runs another version of the game');
           return;
         }
+        _lastSnapAt = _clock();
         _setStatus(ClientStatus.joined);
         _you = msg.you;
         final w = _welcome;
@@ -136,8 +171,17 @@ final class ClientSession implements TransportEvents {
         final w = _welcome;
         if (w != null && !w.isCompleted) w.completeError(StateError(error));
       case Bye():
-        _setStatus(ClientStatus.hostLeft);
+        // the PC restarting or handing the world over: wait for the server's
+        // word (the play page follows it); a player host has simply left
+        _setStatus(
+          hostKind == HostKind.pc ? ClientStatus.paused : ClientStatus.hostLeft,
+        );
       case Snapshot(:final players, :final time):
+        _lastSnapAt = _clock();
+        // the PC froze the world and carried on over the same link
+        if (status == ClientStatus.paused && _link != null) {
+          _setStatus(ClientStatus.joined);
+        }
         if (game == null) return;
         game.dayNight.time = time;
         game.sim.applySnapshot(msg);
@@ -223,6 +267,13 @@ final class ClientSession implements TransportEvents {
 
   @override
   void onClose(Link link) {
+    _link = null;
+    // the host PC dropped out: paused until it is back; a player host is gone for good
+    if (hostKind == HostKind.pc &&
+        (status == ClientStatus.joined || status == ClientStatus.paused)) {
+      _setStatus(ClientStatus.paused);
+      return;
+    }
     if (status == ClientStatus.joined) _setStatus(ClientStatus.hostLeft);
     if (status == ClientStatus.connecting) {
       _fail('The connection to the host dropped');

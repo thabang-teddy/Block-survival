@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Device;
+use App\Models\GameHost;
 use App\Models\Room;
 use App\Models\RoomSignal;
 use App\Models\Setting;
@@ -209,12 +210,13 @@ class AdminTest extends TestCase
         $admin = $this->admin();
         $player = User::factory()->create(['name' => 'Player']);
         World::create(['user_id' => $player->id, 'payload' => base64_encode(gzencode('{}')), 'size' => 22]);
-        World::create(['user_id' => null, 'kind' => 'global', 'payload' => base64_encode(gzencode('{}')), 'size' => 22]);
+        [$pc] = GameHost::register('HomePC');
+        World::put(null, World::GLOBAL, gzencode('{}'), [], $pc);
 
-        // the shared global world is not theirs to lose
+        // a global world is not theirs to lose
         $this->actingAs($admin)->delete("/admin/users/{$player->id}/world")->assertRedirect()->assertSessionHas('status', "Player's world was reset.");
         $this->assertSame(1, World::count());
-        $this->assertNotNull(World::global());
+        $this->assertNotNull(World::global($pc));
         $this->actingAs($admin)->delete("/admin/users/{$player->id}/world")->assertRedirect(); // nothing to reset is fine
     }
 

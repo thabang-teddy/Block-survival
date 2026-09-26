@@ -8,16 +8,53 @@ import 'package:block_survival/net/rtc.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 
 final class FlutterWebRtc implements RtcFactory {
-  const FlutterWebRtc({this.iceServers = stunServers});
+  FlutterWebRtc({this.iceServers = stunServers, this.iceSource});
 
+  /// used when there is no [iceSource], or it cannot be reached
   final List<String> iceServers;
+
+  /// the site's list (STUN, and Cloudflare TURN when configured —
+  /// docs/pc-host-research.md §3.1), as `/api/ice-servers` returns it
+  final Future<List<Map<String, dynamic>>> Function()? iceSource;
+
+  static const Duration _cacheFor = Duration(minutes: 10);
+  static const Duration _failureCacheFor = Duration(minutes: 1);
+
+  /// a peer never waits longer than this for the site's list
+  static const Duration _waitAtMost = Duration(seconds: 2);
+
+  List<Map<String, dynamic>>? _cached;
+  DateTime _cachedUntil = DateTime.fromMillisecondsSinceEpoch(0);
+  Future<void>? _fetching;
+
+  List<Map<String, dynamic>> get _stun => [
+    {'urls': iceServers},
+  ];
+
+  Future<List<Map<String, dynamic>>> _servers() async {
+    final source = iceSource;
+    if (source == null) return _stun;
+    if (_cached != null && DateTime.now().isBefore(_cachedUntil)) {
+      return _cached!;
+    }
+    _fetching ??= source()
+        .then((list) {
+          _cached = list.isEmpty ? _stun : list;
+          _cachedUntil = DateTime.now().add(_cacheFor);
+        })
+        .catchError((Object _) {
+          _cached = _stun;
+          _cachedUntil = DateTime.now().add(_failureCacheFor);
+        })
+        .whenComplete(() => _fetching = null);
+    await _fetching!.timeout(_waitAtMost, onTimeout: () {});
+    return _cached ?? _stun;
+  }
 
   @override
   Future<RtcPeer> createPeer() async {
     final pc = await webrtc.createPeerConnection({
-      'iceServers': [
-        {'urls': iceServers},
-      ],
+      'iceServers': await _servers(),
       // the browser client negotiates data channels only
       'sdpSemantics': 'unified-plan',
     });

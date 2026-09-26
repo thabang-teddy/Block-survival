@@ -1,42 +1,48 @@
 /**
- * Lobby for the signed-in player. Two worlds to play — their own (a random seed; solo
- * or hosted for friends) and the shared global world (the classic seed, one save for
- * everyone, hosted by whoever is in it — entering either hosts it or joins the host),
- * plus the invitations other hosts have sent and the leaderboard. The user, the
- * leaderboard, the world summaries and who is in the global world are Inertia props
- * from PlayController; invitations are polled from /api/invites (issue #5).
+ * Lobby for the signed-in player: their own world (a random seed; solo or hosted for
+ * friends), the global worlds (each run by a host PC, shared by everyone, open only
+ * while its PC is — docs/pc-host-research.md §8), the invitations other hosts have sent
+ * and the leaderboard. The user, the leaderboard, the world summaries and the global
+ * worlds are Inertia props from PlayController; invitations are polled from
+ * /api/invites (issue #5).
  */
 import { useEffect, useState } from 'react'
 import { router, usePage } from '@inertiajs/react'
-import { useUiStore } from '../state/uiStore'
+import { followClientStatus, useUiStore } from '../state/uiStore'
 import { HostSession } from '../net/HostSession'
 import { ClientSession, type ClientStatus } from '../net/ClientSession'
-import { api, type Invite, type SaveData, type WorldMeta } from '../net/api'
+import { api, type GlobalWorldInfo, type Invite, type SaveData, type WorldMeta } from '../net/api'
 import type { PlayProps } from '../net/pageProps'
 import { formatTime, timeAgo } from '../game/score'
-import { GLOBAL_SEED, newWorldSeed, seedTag } from '../world/seed'
+import { newWorldSeed, seedTag } from '../world/seed'
 import { useInvites } from './useInvites'
+import { GraphicsToggle } from './GraphicsToggle'
 import { seatsText, worldLabel } from './invites'
 import { enterGlobal, liveDeps } from '../net/globalWorld'
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
-type Busy = '' | 'host' | 'solo' | 'reset' | 'global' | `join:${number}`
+type Busy = '' | 'host' | 'solo' | 'reset' | `global:${number}` | `join:${number}`
+
+/** how often the lobby refreshes the global worlds' states while it is open */
+const WORLDS_REFRESH_MS = 15_000
 
 export function MainMenu() {
-  const { auth, leaderboard, worlds, presence } = usePage<PlayProps>().props
+  const { auth, leaderboard, worlds, globalWorlds } = usePage<PlayProps>().props
   const user = auth.user
   const start = useUiStore(s => s.start)
-  const setNetStatus = useUiStore(s => s.setNetStatus)
   const [busy, setBusy] = useState<Busy>('')
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const invites = useInvites(!busy)
 
-  // the leaderboard, the worlds and who is in the global world change while a run is
-  // in progress (autosaves, scores); pull fresh copies whenever the menu comes back
+  // the leaderboard, the worlds and who is in the global ones change while a run is
+  // in progress (autosaves, scores); pull fresh copies whenever the menu comes back,
+  // and keep the global worlds' states current while it stays open (PCs come and go)
   useEffect(() => {
-    router.reload({ only: ['leaderboard', 'worlds', 'presence'] })
+    router.reload({ only: ['leaderboard', 'worlds', 'globalWorlds'] })
+    const timer = setInterval(() => router.reload({ only: ['globalWorlds'] }), WORLDS_REFRESH_MS)
+    return () => clearInterval(timer)
   }, [])
 
   const playerName = user.name
@@ -46,10 +52,7 @@ export function MainMenu() {
     worlds.own ? (await api.loadWorld('own')) ?? undefined : undefined
 
   /** a client hears about the end of the match through the net-status overlay */
-  const onClientStatus = (session: ClientSession, st: ClientStatus) => {
-    if (st === 'host-left') setNetStatus('host-left')
-    else if (st === 'error') setNetStatus('error', session.error)
-  }
+  const onClientStatus = (session: ClientSession, st: ClientStatus) => followClientStatus(session, st)
   const watch = (session: ClientSession) => { session.onStatus = st => onClientStatus(session, st) }
 
   const solo = async () => {
@@ -77,22 +80,18 @@ export function MainMenu() {
     }
   }
 
-  /** the global world: host it if nobody is, otherwise join whoever is */
-  const enter = async () => {
-    setBusy('global')
+  /** a global world: join its host PC, or wait for it while it is paused */
+  const enter = async (world: GlobalWorldInfo) => {
+    setBusy(`global:${world.id}`)
     setStatus('Entering…')
     setError('')
     try {
-      start(await enterGlobal(playerName, liveDeps({
-        onStatus: setStatus,
-        onClientStatus,
-        onHostLost: reason => setNetStatus('error', reason),
-      })))
+      start(await enterGlobal(world.id, playerName, liveDeps({ onStatus: setStatus, onClientStatus })))
     } catch (e) {
       setError(errorText(e))
       setBusy('')
       setStatus('')
-      router.reload({ only: ['presence'] })
+      router.reload({ only: ['globalWorlds'] })
     }
   }
 
@@ -141,9 +140,12 @@ export function MainMenu() {
       ? `Night ${w.night} · ${formatTime(w.seconds)} survived · ${w.players} player${w.players === 1 ? '' : 's'} have played · saved ${timeAgo(w.updated_at)}.`
       : fresh
 
-  const whoIsIn = presence.online > 0
-    ? `${presence.online} online now, hosted by ${presence.host_name ?? 'someone'} — you would join them.`
-    : 'Nobody is in it right now — you would host it.'
+  const worldState = (w: GlobalWorldInfo): string =>
+    w.state === 'offline'
+      ? 'Offline — its host PC isn’t running.'
+      : w.state === 'paused'
+        ? `Paused — waiting for the host PC${w.online > 0 ? ` (${w.online} waiting)` : ''}.`
+        : w.online > 0 ? `${w.online}/4 playing now.` : 'Online — nobody in it yet.'
 
   return (
     <div className="menu">
@@ -177,12 +179,22 @@ export function MainMenu() {
             )}
           </section>
           <section className="option">
-            <h3>Global world</h3>
-            <p>The classic map ({seedTag(GLOBAL_SEED)}) everyone builds in together. Whoever is in it hosts it; when they leave, the next player in takes over.</p>
-            <p className="fine">{summary(worlds.global, 'Nobody has played the global world yet.')} {whoIsIn}</p>
-            <button className="wide primary" onClick={() => void enter()} disabled={!!busy}>
-              {busy === 'global' ? status : 'Enter'}
-            </button>
+            <h3>Global worlds</h3>
+            <p>Shared maps everyone builds in together, each run by a host PC. A world is open only while its PC is running.</p>
+            <ul className="open-games global-worlds" aria-label="Global worlds">
+              {globalWorlds.map(w => (
+                <li key={w.id} className={w.state === 'offline' ? 'offline' : undefined}>
+                  <span className="host">
+                    {w.name}<small> · {seedTag(w.seed)}</small>
+                    <small className="world-state">{worldState(w)} {w.save ? summary(w.save, '') : ''}</small>
+                  </span>
+                  <button className={w.state === 'online' ? 'primary' : undefined} onClick={() => void enter(w)} disabled={!!busy || w.state === 'offline'}>
+                    {busy === `global:${w.id}` ? status : w.state === 'offline' ? 'Offline' : 'Enter'}
+                  </button>
+                </li>
+              ))}
+              {globalWorlds.length === 0 && <li className="empty">No global worlds yet — an admin sets them up.</li>}
+            </ul>
           </section>
 
           <section className="option">
@@ -217,7 +229,8 @@ export function MainMenu() {
             </ol>
           </div>
         )}
-        <p className="fine">Up to 4 players. The host&apos;s browser runs the world — in your own world the match ends when you leave; in the global world the next player takes over. Invite friends from the pause screen once you are hosting your own world.</p>
+        <p className="fine">Up to 4 players per world. In your own world your browser runs it and the match ends when you leave; global worlds are run by their host PCs. Invite friends from the pause screen once you are hosting your own world.</p>
+        <GraphicsToggle />
       </div>
     </div>
   )

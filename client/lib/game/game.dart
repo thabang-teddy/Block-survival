@@ -213,8 +213,12 @@ final class Game implements SimHost {
 
   // ---------------------------------------------------------------- frame
 
+  /// the host PC went away (docs/pc-host-research.md §5.4): no moving, no
+  /// predicting, the last frame stays — the play page sets it every frame
+  bool netPaused = false;
+
   void update(double dt, FrameInput input) {
-    final frozen = panel != Panel.none || me.dead;
+    final frozen = panel != Panel.none || me.dead || netPaused;
     if (!frozen) {
       player.look(input.look.dx, input.look.dy);
       if (input.jump) player.queueJump();

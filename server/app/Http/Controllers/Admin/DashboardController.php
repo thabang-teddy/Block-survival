@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Device;
+use App\Models\GameHost;
 use App\Models\Room;
 use App\Models\User;
-use App\Models\World;
 use App\Services\GlobalWorld;
 use App\Support\LoginWindow;
 use Inertia\Inertia;
@@ -31,7 +31,9 @@ class DashboardController extends Controller
             ],
             'loginWindow' => $window->toArray(),
             'windowOpen' => $window->isOpen(now()),
-            'globalWorld' => ['save' => World::global()?->meta(), ...$global->presence()],
+            // one per host key: its state, who is in it and its save
+            'globalWorlds' => $global->worlds(),
+            'hostKeys' => GameHost::query()->count(),
         ]);
     }
 }

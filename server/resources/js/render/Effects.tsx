@@ -29,7 +29,12 @@ export function Effects() {
     composer.setSize(size.width, size.height)
   }, [composer, gl, size])
 
-  useEffect(() => () => composer.dispose(), [composer])
+  // the composer does not dispose the passes it was given; the bloom pass owns a dozen render
+  // targets, and this unmounts whenever graphics drop to low
+  useEffect(() => () => {
+    for (const pass of composer.passes) pass.dispose()
+    composer.dispose()
+  }, [composer])
   useEffect(() => {
     if (import.meta.env.DEV) Object.assign(window, { __composer: composer })
   }, [composer])

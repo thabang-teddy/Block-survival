@@ -28,9 +28,9 @@ class PlayController extends Controller
                 ->get()
                 ->map(fn (Score $row) => ['name' => $row->user?->name ?? 'Unknown', 'score' => (int) $row->best])
                 ->values(),
-            'worlds' => fn () => $user?->worldsMeta() ?? ['own' => null, 'global' => null],
-            // who is in the shared global world right now
-            'presence' => fn () => $global->presence(),
+            'worlds' => fn () => $user?->worldsMeta() ?? ['own' => null],
+            // the global worlds, one per host PC, and who is in each
+            'globalWorlds' => fn () => $global->worlds(),
             // the admin's day/night clock and zombie schedule
             'rules' => GameRules::fromSettings()->toArray(),
         ]);

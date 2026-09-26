@@ -4,43 +4,59 @@ namespace App\Services;
 
 use App\Exceptions\GlobalWorldException;
 use App\Http\Controllers\Api\RoomController;
+use App\Models\GameHost;
 use App\Models\GlobalSeat;
 use App\Models\Room;
 use App\Models\RoomSignal;
 use App\Models\User;
 use App\Models\World;
+use App\Support\GameRules;
 
 /**
- * The shared global world is hosted by whoever is in it. `global_seats` is the queue of
- * players inside, in arrival order; the front of the queue hosts, the rest join their
- * room. A seat stays fresh while the host's room refresh vouches for it (or, once the
- * host is gone, while the player polls `claim`); stale seats are pruned on every look
- * at the queue — there is no scheduler on shared hosting.
+ * The global worlds (docs/pc-host-research.md §8). Each host key is one world, run by a
+ * PC: only while that PC is online can players get in, and while it is paused they wait
+ * for it. Browsers never host a global world. A player holds at most one seat — they are
+ * in one world at a time; the PC's heartbeat vouches for everyone connected to it, and a
+ * player waiting on a paused PC keeps their seat by asking (`claim`). Stale seats are
+ * pruned on every look — there is no scheduler on shared hosting.
  */
 class GlobalWorld
 {
-    /** drop seats nobody has vouched for, and the rooms of hosts who no longer hold one */
-    public function prune(): void
+    public const OFFLINE_MESSAGE = 'This world is offline — its host PC isn\'t running.';
+
+    /**
+     * Every enabled world, for the lobby: offline ones too, greyed out.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function worlds(): array
     {
         GlobalSeat::query()->stale()->delete();
-        $seated = GlobalSeat::query()->pluck('user_id');
-        $orphans = Room::query()->where('world_kind', World::GLOBAL)
-            ->where(fn ($q) => $q->whereNull('user_id')->orWhereNotIn('user_id', $seated))
-            ->get();
-        foreach ($orphans as $room) {
-            $this->closeRoom($room);
-        }
+        $online = GlobalSeat::query()->fresh()->selectRaw('game_host_id, count(*) as n')->groupBy('game_host_id')->pluck('n', 'game_host_id');
+
+        return GameHost::query()->where('enabled', true)->orderBy('id')->with('world')->get()
+            ->map(fn (GameHost $pc) => [
+                'id' => $pc->id,
+                'name' => $pc->name,
+                'seed' => $pc->seed,
+                'state' => $pc->state(),
+                'online' => (int) ($online[$pc->id] ?? 0),
+                'save' => $pc->world?->meta(),
+            ])->values()->all();
     }
 
-    /** the front of the queue: the fresh seat that arrived first */
-    public function host(): ?GlobalSeat
+    /** the enabled host key with this id */
+    public function find(int $id): ?GameHost
     {
-        return GlobalSeat::query()->fresh()->orderBy('id')->first();
+        return GameHost::query()->whereKey($id)->where('enabled', true)->first();
     }
 
-    public function isHost(User $user): bool
+    /** the first open world, else the first enabled one: where a client that names none goes */
+    public function defaultWorld(): ?GameHost
     {
-        return $this->host()?->user_id === $user->id;
+        $enabled = GameHost::query()->where('enabled', true)->orderBy('id')->get();
+
+        return $enabled->first(fn (GameHost $pc) => $pc->isOpen()) ?? $enabled->first();
     }
 
     public function seatOf(User $user): ?GlobalSeat
@@ -48,39 +64,38 @@ class GlobalWorld
         return GlobalSeat::query()->where('user_id', $user->id)->first();
     }
 
-    public function online(): int
+    /** players inside this world right now */
+    public function online(GameHost $pc): int
     {
-        return GlobalSeat::query()->fresh()->count();
+        return $pc->seats()->fresh()->count();
     }
 
     /**
-     * Enter from the lobby: a new seat at the back of the queue (an old one is dropped
-     * first, which is what puts a returning host behind everyone else).
+     * Enter a world from the lobby. A seat in another world is given up first.
      *
      * @return array<string, mixed> the state the player should act on
      *
-     * @throws GlobalWorldException when the world is full or the player already hosts it elsewhere
+     * @throws GlobalWorldException when the world is offline or full
      */
-    public function join(User $user): array
+    public function join(User $user, GameHost $pc): array
     {
-        $this->prune();
-        $mine = $this->seatOf($user);
-        if ($mine?->room_code !== null && $this->liveRoom($mine->room_code) !== null) {
-            throw new GlobalWorldException('You are already hosting the global world in another tab.', 409);
+        GlobalSeat::query()->stale()->delete();
+        if (! $pc->enabled || ! $pc->isOpen()) {
+            throw new GlobalWorldException(self::OFFLINE_MESSAGE, 409);
         }
-        $others = GlobalSeat::query()->fresh()->where('user_id', '!=', $user->id)->count();
+        $others = $pc->seats()->fresh()->where('user_id', '!=', $user->id)->count();
         if ($others >= RoomController::MAX_PLAYERS) {
-            throw new GlobalWorldException('The global world is full right now — try again in a moment.', 409);
+            throw new GlobalWorldException('This world is full right now — try again in a moment.', 409);
         }
-        $mine?->delete();
-        GlobalSeat::create(['user_id' => $user->id, 'last_seen_at' => now(), 'created_at' => now()]);
+        GlobalSeat::query()->where('user_id', $user->id)->delete();
+        GlobalSeat::create(['user_id' => $user->id, 'game_host_id' => $pc->id, 'last_seen_at' => now(), 'created_at' => now()]);
 
         return $this->state($user);
     }
 
     /**
-     * A player whose host went away keeps their place and asks who hosts now. Touching
-     * their seat is what keeps it fresh while there is no host to vouch for them.
+     * A player whose link dropped, or who waits on a paused PC, keeps their seat and
+     * asks where to go. Asking is what keeps the seat fresh while the PC cannot vouch.
      *
      * @return array<string, mixed>
      *
@@ -90,119 +105,188 @@ class GlobalWorld
     {
         $mine = $this->seatOf($user);
         if (! $mine) {
-            throw new GlobalWorldException('You are not in the global world — enter it from the lobby.', 404);
+            throw new GlobalWorldException('You are not in a global world — enter one from the lobby.', 404);
         }
         $mine->update(['last_seen_at' => now()]);
-        $this->prune();
 
         return $this->state($user);
     }
 
-    /** give up the seat; a host's room goes with it */
     public function leave(User $user): void
     {
-        $mine = $this->seatOf($user);
-        if (! $mine) {
-            return;
-        }
-        if ($mine->room_code !== null) {
-            $room = Room::query()->where('code', $mine->room_code)->first();
-            if ($room) {
-                $this->closeRoom($room);
-            }
-        }
-        $mine->delete();
-    }
-
-    /** the host opened its room: record it on the seat so the queue can hand it out */
-    public function roomOpened(User $user, Room $room): void
-    {
-        // one global room at a time: an earlier room of this or any other host is dead
-        foreach (Room::query()->where('world_kind', World::GLOBAL)->whereKeyNot($room->id)->get() as $old) {
-            $this->closeRoom($old);
-        }
-        GlobalSeat::query()->where('user_id', $user->id)->update(['room_code' => $room->code, 'last_seen_at' => now()]);
+        GlobalSeat::query()->where('user_id', $user->id)->delete();
     }
 
     /**
-     * The host's refresh is its own sign of life. A tab in the background gets no frames,
-     * so no heartbeat, and its seat goes stale — but until someone sweeps the queue that
-     * seat is still there, and the host asking again is what proves it is back. False once
-     * the queue has moved on without them (the seat was swept).
-     */
-    public function heartbeat(User $host): bool
-    {
-        GlobalSeat::query()->where('user_id', $host->id)->update(['last_seen_at' => now()]);
-
-        return $this->isHost($host);
-    }
-
-    /** a global room closed: its host has left the world, whoever's session sent the request */
-    public function roomClosed(Room $room): void
-    {
-        $host = $room->user_id !== null ? User::find($room->user_id) : null;
-        if ($host) {
-            $this->leave($host);
-        }
-    }
-
-    /**
-     * The host's periodic refresh vouches for everyone connected to it.
-     *
-     * @param  list<int>  $userIds
-     */
-    public function touch(User $host, array $userIds): void
-    {
-        GlobalSeat::query()->whereIn('user_id', [...$userIds, $host->id])->update(['last_seen_at' => now()]);
-    }
-
-    /**
-     * What the player should do: open a room (`host`), connect to one (`client`), or
-     * wait for the chosen host to open theirs (`pending`).
+     * What the seated player should do: connect to the PC's room (`client`), wait for
+     * the paused PC (`paused`), or give up — the world went offline (`offline`, and the
+     * seat goes with it).
      *
      * @return array<string, mixed>
      */
     public function state(User $user): array
     {
-        $host = $this->host();
-        $online = $this->online();
-        if ($host === null || $host->user_id === $user->id) {
-            return ['status' => 'host', 'online' => $online];
+        $seat = $this->seatOf($user);
+        $pc = $seat?->host;
+        if ($pc === null || ! $pc->enabled || ! $pc->isOpen()) {
+            $seat?->delete();
+
+            return ['status' => 'offline', 'host' => 'pc', 'message' => self::OFFLINE_MESSAGE];
         }
-        $room = $host->room_code !== null ? $this->liveRoom($host->room_code) : null;
-        if ($room !== null) {
-            return ['status' => 'client', 'room' => $room->toPublic(), 'online' => $online];
+        $base = ['host' => 'pc', 'world' => $pc->id, 'host_name' => $pc->name, 'online' => $this->online($pc)];
+        $room = $this->pcRoom($pc);
+
+        return $room !== null
+            ? ['status' => 'client', 'room' => $room->toPublic(), ...$base]
+            : ['status' => 'paused', ...$base];
+    }
+
+    /**
+     * Wipe a world; refused while someone is in it. A running PC is told to start over
+     * on its next heartbeat.
+     *
+     * @throws GlobalWorldException when players are inside
+     */
+    public function reset(GameHost $pc): void
+    {
+        GlobalSeat::query()->stale()->delete();
+        if ($this->online($pc) > 0) {
+            throw new GlobalWorldException('Someone is in this world — reset it when it is empty.', 409);
+        }
+        if ($pc->isOpen()) {
+            $pc->queueCommand(GameHost::COMMAND_RESET);
+        }
+        World::global($pc)?->delete();
+    }
+
+    // ================================================================ the host PC
+
+    /**
+     * One heartbeat from a PC (every 15 s). `going: offline` is a clean shutdown: the
+     * world closes and nobody can enter until it runs again. `going: restart` (Windows
+     * stopping the service) keeps players paused until the PC is back. Anything else
+     * means the PC runs the world, and the reply carries its seed, rules and commands.
+     *
+     * @param  array{version: string, peer_id: string, going?: string, room?: array{code: string, players: int, user_ids?: list<int>}, stats?: array<string, mixed>}  $data
+     * @return array<string, mixed> the reply the PC acts on
+     *
+     * @throws GlobalWorldException when the PC's room code belongs to someone else's room
+     */
+    public function pcHeartbeat(GameHost $pc, array $data): array
+    {
+        $pc->fill([
+            'version' => $data['version'],
+            'peer_id' => $data['peer_id'],
+            'last_seen_at' => now(),
+            'stats' => $data['stats'] ?? $pc->stats,
+        ]);
+        $going = $data['going'] ?? null;
+        if ($going === 'offline') {
+            $pc->fill(['offline_at' => now(), 'paused_at' => null, 'players' => 0])->save();
+            $this->closePcRoom($pc);
+            $pc->seats()->delete();
+
+            return ['state' => GameHost::OFFLINE];
+        }
+        if ($going === 'restart') {
+            $pc->fill(['paused_at' => now()])->save();
+
+            return ['state' => $pc->state()];
         }
 
-        return ['status' => 'pending', 'host_name' => $host->user?->name ?? 'Survivor', 'online' => $online];
-    }
-
-    /** @return array{online: int, host_name: string|null} what the lobby shows on the card */
-    public function presence(): array
-    {
-        $host = $this->host();
-
-        return ['online' => $this->online(), 'host_name' => $host?->user?->name];
-    }
-
-    /** wipe the shared world; refused while someone is hosting it */
-    public function reset(): void
-    {
-        if ($this->host() !== null) {
-            throw new GlobalWorldException('Someone is in the global world — reset it when it is empty.', 409);
+        $pc->fill(['paused_at' => null, 'offline_at' => null]);
+        $room = $data['room'];
+        $taken = Room::query()->live()->where('code', $room['code'])->where('host_peer_id', '!=', $data['peer_id'])->exists();
+        if ($taken && $pc->room_code !== $room['code']) {
+            $pc->save();
+            throw new GlobalWorldException('That room code is in use — pick another.', 409);
         }
-        GlobalSeat::query()->delete();
-        World::query()->whereNull('user_id')->where('kind', World::GLOBAL)->delete();
+        if ($pc->room_code !== null && $pc->room_code !== $room['code']) {
+            $this->closePcRoom($pc);
+        }
+        $pc->fill(['room_code' => $room['code'], 'players' => $room['players']])->save();
+        $row = $this->openPcRoom($pc, $room['players']);
+        $pc->seats()->whereIn('user_id', $room['user_ids'] ?? [])->update(['last_seen_at' => now()]);
+        // no scheduler on shared hosting: a PC's heartbeat sweeps stale mail and seats too
+        RoomSignal::pruneStale();
+        GlobalSeat::query()->stale()->delete();
+
+        return [
+            'state' => GameHost::ONLINE,
+            'room' => $row->toPublic(),
+            'seed' => $pc->seed,
+            'rules' => GameRules::fromSettings()->toArray(),
+            'commands' => $this->takePcCommands($pc),
+        ];
     }
 
-    private function liveRoom(string $code): ?Room
+    /**
+     * The admin's "mark offline", for a PC that is paused and will not be back soon:
+     * the world closes and its waiting players are sent back to the lobby. A PC that is
+     * in fact still running opens it again on its next heartbeat.
+     */
+    public function markOffline(GameHost $pc): void
     {
-        return Room::query()->live()->where('code', $code)->first();
+        $pc->update(['offline_at' => now(), 'paused_at' => null, 'players' => 0]);
+        $this->closePcRoom($pc);
+        $pc->seats()->delete();
     }
 
-    private function closeRoom(Room $room): void
+    /** the PC's room row, while it is online and refreshing it */
+    public function pcRoom(GameHost $pc): ?Room
     {
-        RoomSignal::query()->where('room_code', $room->code)->delete();
-        $room->delete();
+        if ($pc->state() !== GameHost::ONLINE || $pc->room_code === null) {
+            return null;
+        }
+
+        return Room::query()->live()->where('code', $pc->room_code)->first();
+    }
+
+    /** the host key whose PC runs this room, if it is a global world's */
+    public function pcOfRoom(Room $room): ?GameHost
+    {
+        if (! $room->isGlobal()) {
+            return null;
+        }
+
+        return GameHost::query()->where('room_code', $room->code)->where('enabled', true)->first();
+    }
+
+    private function openPcRoom(GameHost $pc, int $players): Room
+    {
+        return Room::query()->updateOrCreate(
+            ['code' => $pc->room_code],
+            [
+                'host_peer_id' => $pc->peer_id,
+                'host_name' => $pc->name,
+                'world_kind' => World::GLOBAL,
+                'user_id' => null,
+                'players' => $players,
+                'expires_at' => now()->addHours(Room::TTL_HOURS),
+                'last_seen_at' => now(),
+            ],
+        );
+    }
+
+    private function closePcRoom(GameHost $pc): void
+    {
+        if ($pc->room_code === null) {
+            return;
+        }
+        $room = Room::query()->where('code', $pc->room_code)->whereNull('user_id')->first();
+        if ($room) {
+            RoomSignal::query()->where('room_code', $room->code)->delete();
+            $room->delete();
+        }
+        $pc->update(['room_code' => null]);
+    }
+
+    /** @return list<string> */
+    private function takePcCommands(GameHost $pc): array
+    {
+        $commands = $pc->takeCommands();
+        $pc->save();
+
+        return $commands;
     }
 }

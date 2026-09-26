@@ -139,13 +139,7 @@ final class VeinField {
     }
     final vein = ore == null
         ? null
-        : Vein(
-            ore,
-            x,
-            y,
-            z,
-            _walk(rng, rng.randint(ore.sizeMin, ore.sizeMax)),
-          );
+        : Vein(ore, x, y, z, _walk(rng, rng.randint(ore.sizeMin, ore.sizeMax)));
     if (_cache.length >= _veinCache) _cache.remove(_cache.keys.first);
     _cache[key] = vein;
     return vein;

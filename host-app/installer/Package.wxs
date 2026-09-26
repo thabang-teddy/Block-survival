@@ -1,0 +1,71 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <!--
+    Installs the app to Program Files (pc-host, its Node runtime and WinSW under
+    pc-host\), with Start Menu and desktop shortcuts. Config and logs live in
+    %ProgramData%\BlockSurvivalHost and survive upgrades and removal. The service and
+    the firewall rule are made by the app's first-run setup (one UAC prompt), and
+    removed here on uninstall; an upgrade stops the service to replace its files and
+    starts it again afterwards.
+  -->
+  <Package Name="Block Survival Host" Manufacturer="Block Survival" Version="$(ProductVersion)"
+           UpgradeCode="8474d6ef-7a24-4d21-b077-533364f3a78c" Scope="perMachine" Compressed="yes">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Block Survival Host is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Icon Id="HostIcon" SourceFile="..\src\BlockSurvivalHost\Assets\host.ico" />
+    <Property Id="ARPPRODUCTICON" Value="HostIcon" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/thabang-teddy/Block-survival" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Block Survival Host">
+        <Directory Id="PCHOSTFOLDER" Name="pc-host" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="DATAFOLDER" Name="BlockSurvivalHost" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+    <StandardDirectory Id="DesktopFolder" />
+
+    <Feature Id="Main" Title="Block Survival Host">
+      <Files Directory="INSTALLFOLDER" Include="$(AppDir)\**" />
+      <Files Directory="PCHOSTFOLDER" Include="$(PcHostDir)\**">
+        <!-- written by setup for this PC -->
+        <Exclude Files="$(PcHostDir)\pc-host-service.xml" />
+        <Exclude Files="$(PcHostDir)\config.json" />
+      </Files>
+      <ComponentRef Id="Shortcuts" />
+      <ComponentRef Id="DataFolder" />
+      <ComponentRef Id="StopServiceForUpgrade" />
+    </Feature>
+
+    <Component Id="Shortcuts" Directory="INSTALLFOLDER" Guid="3e6c1b8a-7a55-4c1e-9d0e-2b3b6a0b7f21">
+      <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="Block Survival Host"
+                Target="[INSTALLFOLDER]BlockSurvivalHost.exe" WorkingDirectory="INSTALLFOLDER" Icon="HostIcon" />
+      <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="Block Survival Host"
+                Target="[INSTALLFOLDER]BlockSurvivalHost.exe" WorkingDirectory="INSTALLFOLDER" Icon="HostIcon" />
+      <RegistryValue Root="HKLM" Key="Software\Block Survival\Host" Name="Shortcuts" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- kept on uninstall: it holds the owner's worlds and logs -->
+    <Component Id="DataFolder" Directory="DATAFOLDER" Guid="a1d0f3b4-58c2-4a57-8d1e-5f6a2c9e0b44" Permanent="yes">
+      <CreateFolder />
+    </Component>
+
+    <!-- the service runs node.exe from pc-host\: stop it so its files can be replaced -->
+    <Component Id="StopServiceForUpgrade" Directory="INSTALLFOLDER" Guid="c7e2d9a0-1b3f-4e6d-9a8c-0f4b2e7d5a19">
+      <ServiceControl Id="StopHostService" Name="block-survival-pc-host" Stop="both" Wait="yes" />
+      <RegistryValue Root="HKLM" Key="Software\Block Survival\Host" Name="ServiceControl" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- uninstall: the service and the firewall rule go (the app does it, elevated as the installer is) -->
+    <CustomAction Id="RemoveHostSetup" Directory="INSTALLFOLDER" ExeCommand="&quot;[INSTALLFOLDER]BlockSurvivalHost.exe&quot; --admin uninstall"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+    <!-- upgrade: start the service again if setup had installed it -->
+    <CustomAction Id="RestartHostService" Directory="INSTALLFOLDER" ExeCommand="&quot;[INSTALLFOLDER]BlockSurvivalHost.exe&quot; --admin start"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="RemoveHostSetup" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="RestartHostService" After="InstallFiles" Condition="NOT REMOVE" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

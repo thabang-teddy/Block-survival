@@ -10,11 +10,14 @@ import { PlayerBody } from './PlayerBody'
 import { Lighting } from './Lighting'
 import { Effects } from './Effects'
 import { useUiStore } from '../state/uiStore'
+import { useGraphicsStore } from '../state/graphicsStore'
+import { graphicsFor } from './graphics'
 
 const SKY_COLOUR = '#87b4d8'
 
 function GameLoop() {
   const { gl, camera } = useThree()
+  const bloom = useGraphicsStore(s => graphicsFor(s.quality).bloom)
   const [game, setGame] = useState<Game | null>(null)
   const run = useUiStore(s => s.run)
   const launch = useUiStore(s => s.launch)
@@ -55,17 +58,22 @@ function GameLoop() {
       <Suspense fallback={null}>
         <PlayerBody game={game} />
       </Suspense>
-      <Effects />
+      {/* without Effects, R3F goes back to rendering the scene itself */}
+      {bloom && <Effects />}
     </>
   )
 }
 
 export function Scene() {
+  const graphics = graphicsFor(useGraphicsStore(s => s.quality))
+  // antialias is fixed when the WebGL context is made; a change applies on the next page load
+  const [antialias] = useState(graphics.antialias)
   return (
     <Canvas
       shadows={{ type: THREE.PCFShadowMap }}
-      camera={{ fov: 75, near: 0.05, far: 400, position: [0, 4, 0] }}
-      gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
+      dpr={graphics.dpr}
+      camera={{ fov: 75, near: 0.05, far: graphics.cameraFar, position: [0, 4, 0] }}
+      gl={{ antialias, toneMapping: THREE.ACESFilmicToneMapping }}
       onCreated={({ scene }) => { scene.background = new THREE.Color(SKY_COLOUR) }}
       style={{ position: 'fixed', inset: 0 }}
     >

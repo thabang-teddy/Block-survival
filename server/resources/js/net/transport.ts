@@ -29,8 +29,34 @@ export interface SignalMessage {
 
 const CONNECT_TIMEOUT_MS = 15_000
 const DATA_CHANNEL = 'game'
+/** STUN only: what a connection uses when the site cannot say more */
 const RTC_CONFIG: RTCConfiguration = {
   iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }],
+}
+/** the site's ICE servers are asked for at most this often (its TURN credentials last two hours) */
+export const ICE_CACHE_MS = 10 * 60_000
+
+let iceCache: { config: RTCConfiguration; at: number } | null = null
+
+/**
+ * The ICE servers for the next connection: the site's list (STUN, and Cloudflare TURN
+ * for the connections STUN alone cannot make, docs/pc-host-research.md §3.1), cached
+ * for a while; STUN only when the site cannot be asked.
+ */
+export async function iceConfig(now: number = Date.now()): Promise<RTCConfiguration> {
+  if (iceCache && now - iceCache.at < ICE_CACHE_MS) return iceCache.config
+  try {
+    const servers = await api.iceServers()
+    iceCache = { config: { iceServers: servers.length ? servers : RTC_CONFIG.iceServers }, at: now }
+    return iceCache.config
+  } catch {
+    return RTC_CONFIG
+  }
+}
+
+/** tests: forget the cached list */
+export function resetIceCache(): void {
+  iceCache = null
 }
 
 /** poll cadence: quick while a handshake is in flight, relaxed once the room is quiet */
@@ -162,12 +188,13 @@ export class Signaller {
 
 /** One peer connection: candidates are queued until the remote description is set. */
 class Peer {
-  readonly pc = new RTCPeerConnection(RTC_CONFIG)
+  readonly pc: RTCPeerConnection
   readonly remoteId: string
   private pending: RTCIceCandidateInit[] = []
   private remoteSet = false
 
-  constructor(signaller: Signaller, remoteId: string) {
+  constructor(signaller: Signaller, remoteId: string, config: RTCConfiguration = RTC_CONFIG) {
+    this.pc = new RTCPeerConnection(config)
     this.remoteId = remoteId
     this.pc.onicecandidate = e => {
       if (e.candidate) void signaller.send(remoteId, 'candidate', e.candidate.toJSON() as Record<string, unknown>)
@@ -212,6 +239,7 @@ export class HostTransport {
   private signaller: Signaller | null = null
   private readonly peers = new Map<string, Peer>()
   private readonly events: TransportEvents
+  private rtc: RTCConfiguration = RTC_CONFIG
 
   constructor(events: TransportEvents) {
     this.events = events
@@ -219,6 +247,7 @@ export class HostTransport {
 
   /** Open the room's mailbox and answer every offer that names us. */
   async listen(code: string): Promise<void> {
+    this.rtc = await iceConfig()
     const s = new Signaller(code, this.id)
     this.signaller = s
     s.on(m => { this.onSignal(s, m).catch((err: unknown) => console.error('signalling failed', m.type, err)) })
@@ -229,7 +258,9 @@ export class HostTransport {
     let peer = this.peers.get(m.from)
     if (m.type === 'offer') {
       peer?.pc.close()
-      peer = new Peer(s, m.from)
+      // synchronous, so the candidates right behind the offer find their peer
+      peer = new Peer(s, m.from, this.rtc)
+      void iceConfig().then(c => { this.rtc = c })
       this.peers.set(m.from, peer)
       peer.pc.ondatachannel = ev => {
         const link = wrap(peer!, ev.channel, {
@@ -278,10 +309,10 @@ export class ClientTransport {
 
   /** Resolve the host through the rooms API, then offer it a DataChannel. */
   async connect(code: string): Promise<Link> {
-    const { room } = await api.resolveRoom(code)
+    const [{ room }, config] = await Promise.all([api.resolveRoom(code), iceConfig()])
     const s = new Signaller(code, this.id, { alwaysActive: true })
     this.signaller = s
-    const peer = new Peer(s, room.host_peer_id)
+    const peer = new Peer(s, room.host_peer_id, config)
     this.peer = peer
     const dc = peer.pc.createDataChannel(DATA_CHANNEL, { ordered: true })
 

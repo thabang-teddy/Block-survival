@@ -9,10 +9,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * A saved world: the gzipped save the host uploads (table `saves`). Every player has
- * their own world (`own`, a random seed, `user_id` set); the shared global world
- * (`global`, the classic seed) is one row with no owner, uploaded by whoever hosts it.
+ * their own world (`own`, a random seed, `user_id` set); each global world (`global`)
+ * is a row with no owner, tied to the host key whose PC runs it and uploads it.
  */
-#[Fillable(['user_id', 'kind', 'payload', 'size', 'night', 'seconds', 'players'])]
+#[Fillable(['user_id', 'game_host_id', 'kind', 'payload', 'size', 'night', 'seconds', 'players'])]
 #[Hidden(['payload'])]
 class World extends Model
 {
@@ -32,10 +32,61 @@ class World extends Model
         return in_array($kind, self::KINDS, true);
     }
 
-    /** the shared global world's row, or null before its first save */
-    public static function global(): ?self
+    /** a global world's row, or null before its PC's first save */
+    public static function global(GameHost $host): ?self
     {
-        return static::query()->whereNull('user_id')->where('kind', self::GLOBAL)->first();
+        return static::query()->whereNull('user_id')->where('game_host_id', $host->id)->where('kind', self::GLOBAL)->first();
+    }
+
+    /**
+     * Why these bytes cannot be stored as a save, as [message, HTTP status], or null.
+     *
+     * @return array{0: string, 1: int}|null
+     */
+    public static function uploadProblem(string $bytes): ?array
+    {
+        if ($bytes === '' || strlen($bytes) > self::MAX_BYTES) {
+            return ['Save must be between 1 byte and '.(self::MAX_BYTES / 1024 / 1024).' MB.', 413];
+        }
+        if (! str_starts_with($bytes, "\x1f\x8b")) {
+            return ['Save must be gzip-compressed JSON.', 422];
+        }
+
+        return null;
+    }
+
+    /**
+     * Replace a save: a player's own world, or a host key's global world.
+     *
+     * @param  array{night?: int, seconds?: int}  $meta
+     */
+    public static function put(?int $userId, string $kind, string $bytes, array $meta, ?GameHost $host = null): self
+    {
+        return static::query()->updateOrCreate(
+            ['user_id' => $userId, 'game_host_id' => $host?->id, 'kind' => $kind],
+            [
+                'payload' => base64_encode($bytes),
+                'size' => strlen($bytes),
+                'night' => (int) ($meta['night'] ?? 0),
+                'seconds' => (int) ($meta['seconds'] ?? 0),
+                'players' => self::playerCount($bytes),
+            ],
+        );
+    }
+
+    /** how many accounts the save holds gear for; older formats held only the host */
+    private static function playerCount(string $gzip): int
+    {
+        $json = @gzdecode($gzip);
+        if ($json === false) {
+            return 1;
+        }
+        $data = json_decode($json, true);
+        if (! is_array($data) || ! isset($data['players']) || ! is_array($data['players'])) {
+            return 1;
+        }
+
+        return max(1, min(65535, count($data['players'])));
     }
 
     /** @return BelongsTo<User, $this> */

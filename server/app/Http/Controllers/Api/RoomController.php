@@ -6,22 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Models\Room;
 use App\Models\RoomSignal;
 use App\Models\World;
-use App\Services\GlobalWorld;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
  * Room codes → host peer ids. Hosting does not require an account (guests can
- * host), but the room is tied to the account when one is logged in. The global
- * world's room may only be opened by the player at the front of its queue.
+ * host), but the room is tied to the account when one is logged in. Global worlds'
+ * rooms are opened by their host PCs through the host API, never here.
  */
 class RoomController extends Controller
 {
     private const CODE_RULE = 'regex:/^[ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/';
 
     public const MAX_PLAYERS = 4;
-
-    public function __construct(private readonly GlobalWorld $global) {}
 
     public function store(Request $request): JsonResponse
     {
@@ -37,8 +34,8 @@ class RoomController extends Controller
             return response()->json(['message' => 'That room code is in use.'], 409);
         }
         $kind = $data['world_kind'] ?? World::OWN;
-        if ($kind === World::GLOBAL && ! $this->global->isHost($request->user())) {
-            return response()->json(['message' => 'Someone else is hosting the global world.'], 409);
+        if ($kind === World::GLOBAL) {
+            return response()->json(['message' => 'Global worlds are hosted by host PCs only.'], 409);
         }
 
         // no scheduler on shared hosting: opening a room is when stale mail is swept
@@ -53,16 +50,16 @@ class RoomController extends Controller
                 'user_id' => $request->user()?->id,
                 'players' => 1,
                 'expires_at' => now()->addHours(Room::TTL_HOURS),
+                'last_seen_at' => now(),
             ],
         );
-        if ($room->isGlobal()) {
-            $this->global->roomOpened($request->user(), $room);
-        }
+        // invites follow the host: the ones into their earlier rooms move here
+        $room->adoptInvitesOfHost();
 
         return response()->json(['room' => $room->toPublic()], 201);
     }
 
-    /** resolve a code to the host's peer id: the host, or a player with an accepted invite (issue #5) */
+    /** resolve a code to the host's peer id: the host, or a player with an accepted invite (issue #5) while it is hosting */
     public function show(Request $request, string $code): JsonResponse
     {
         $room = Room::query()->live()->where('code', strtoupper($code))->first();
@@ -76,10 +73,7 @@ class RoomController extends Controller
         return response()->json(['room' => $room->toPublic()]);
     }
 
-    /**
-     * The host refreshes the TTL and player count while the match is running; in the
-     * global world the accounts it lists as connected keep their seats fresh.
-     */
+    /** the host refreshes the TTL and player count while the match is running */
     public function update(Request $request, string $code): JsonResponse
     {
         $data = $request->validate([
@@ -89,24 +83,14 @@ class RoomController extends Controller
             'user_ids.*' => ['integer'],
         ]);
 
-        $room = Room::query()->where('code', strtoupper($code))->where('host_peer_id', $data['host_peer_id'])->first();
+        // a PC's room is refreshed by its heartbeat only
+        $room = Room::query()->where('code', strtoupper($code))->where('host_peer_id', $data['host_peer_id'])
+            ->where('world_kind', '!=', World::GLOBAL)->first();
         if (! $room) {
             return response()->json(['message' => 'Not your room.'], 404);
         }
-        if ($room->isGlobal()) {
-            // a sign-in in another tab of the same browser swaps the session under the game tab
-            if ($room->user_id !== null && $room->user_id !== $request->user()->id) {
-                return response()->json(['message' => 'This browser is signed in as another player now — reload the page to carry on.'], 403);
-            }
-            if (! $this->global->heartbeat($request->user())) {
-                return response()->json(['message' => 'The global world has moved to another host.'], 409);
-            }
-        }
 
-        $room->update(['players' => $data['players'], 'expires_at' => now()->addHours(Room::TTL_HOURS)]);
-        if ($room->isGlobal()) {
-            $this->global->touch($request->user(), $data['user_ids'] ?? []);
-        }
+        $room->update(['players' => $data['players'], 'expires_at' => now()->addHours(Room::TTL_HOURS), 'last_seen_at' => now()]);
 
         return response()->json(['room' => $room->toPublic()]);
     }
@@ -114,14 +98,11 @@ class RoomController extends Controller
     public function destroy(Request $request, string $code): JsonResponse
     {
         $data = $request->validate(['host_peer_id' => ['required', 'string', 'max:128']]);
-        $room = Room::query()->where('code', strtoupper($code))->where('host_peer_id', $data['host_peer_id'])->first();
+        $room = Room::query()->where('code', strtoupper($code))->where('host_peer_id', $data['host_peer_id'])
+            ->where('world_kind', '!=', World::GLOBAL)->first();
         if ($room) {
             RoomSignal::query()->where('room_code', $room->code)->delete();
             $room->delete();
-            // closing the global world's room is its host leaving the world
-            if ($room->isGlobal()) {
-                $this->global->roomClosed($room);
-            }
         }
 
         return response()->json(['ok' => true]);

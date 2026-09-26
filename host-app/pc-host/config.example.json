@@ -1,0 +1,9 @@
+{
+  "site": "https://your-site.example",
+  "portRange": [50000, 50199],
+  "relayOnly": false,
+  "controlPort": 47810,
+  "worlds": [
+    { "id": "home", "name": "Home", "token": "paste a host token from Admin -> Host PCs here" }
+  ]
+}

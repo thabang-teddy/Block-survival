@@ -18,6 +18,7 @@ const SECTIONS = [
   { href: '/admin/hours', label: 'Hours' },
   { href: '/admin/rules', label: 'Rules' },
   { href: '/admin/rooms', label: 'Rooms' },
+  { href: '/admin/pc-hosts', label: 'Host PCs' },
 ] as const
 
 interface Props {

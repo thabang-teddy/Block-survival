@@ -223,6 +223,7 @@ Copy `deploy/.env.cpanel.example` to `~/<env>/app/.env`, `chmod 600`, fill in:
 | `APP_ENV` | `staging` / `production` | yes |
 | `APP_DEBUG` | `false` | yes — `true` leaks `.env` on any error page |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | the one account that can open `/admin` (issue #1) | yes — without an admin nobody can approve a PC, and no player can sign in |
+| `CLOUDFLARE_TURN_KEY_ID` / `CLOUDFLARE_TURN_KEY_API_TOKEN` | a Cloudflare Realtime TURN key (docs/pc-host-research.md §3.1) | no — without it players get STUN only, and networks that block direct UDP cannot join |
 
 Everything else in the example file is a fixed decision, not a secret.
 

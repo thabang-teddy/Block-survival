@@ -4,22 +4,19 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\World;
-use App\Services\GlobalWorld;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
- * The player's own world (`own`) and the shared global world (`global`, one row with no
- * owner that only its current host may upload). The host uploads a world as gzipped
+ * The player's own world (`own`). Global worlds are saved by their host PCs through the
+ * host API, never by a browser. The host uploads a world as gzipped
  * JSON (block diff, clock, every player's gear, live zombies / drops / crates) in the
  * request body; GET streams the same bytes back. A page that is closing cannot await a
  * PUT, so it posts the same bytes as a multipart beacon instead (issue #13).
  */
 class WorldController extends Controller
 {
-    public function __construct(private readonly GlobalWorld $global) {}
-
     public function update(Request $request, string $kind = World::OWN): JsonResponse
     {
         $meta = $request->validate([
@@ -45,51 +42,19 @@ class WorldController extends Controller
 
     private function store(Request $request, string $kind, string $bytes, array $meta): JsonResponse
     {
-        abort_unless(World::isKind($kind), 404);
-        if ($bytes === '' || strlen($bytes) > World::MAX_BYTES) {
-            return response()->json(['message' => 'Save must be between 1 byte and '.(World::MAX_BYTES / 1024 / 1024).' MB.'], 413);
+        abort_unless($kind === World::OWN, 404);
+        if ($problem = World::uploadProblem($bytes)) {
+            return response()->json(['message' => $problem[0]], $problem[1]);
         }
-        if (! str_starts_with($bytes, "\x1f\x8b")) {
-            return response()->json(['message' => 'Save must be gzip-compressed JSON.'], 422);
-        }
-
-        if ($kind === World::GLOBAL && ! $this->global->isHost($request->user())) {
-            return response()->json(['message' => 'You are not hosting the global world.'], 409);
-        }
-
-        $world = World::query()->updateOrCreate(
-            ['user_id' => $kind === World::GLOBAL ? null : $request->user()->id, 'kind' => $kind],
-            [
-                'payload' => base64_encode($bytes),
-                'size' => strlen($bytes),
-                'night' => (int) ($meta['night'] ?? 0),
-                'seconds' => (int) ($meta['seconds'] ?? 0),
-                'players' => self::playerCount($bytes),
-            ],
-        );
+        $world = World::put($request->user()->id, $kind, $bytes, $meta);
 
         return response()->json(['world' => $world->meta()]);
     }
 
-    /** how many accounts the save holds gear for; older formats held only the host */
-    private static function playerCount(string $gzip): int
-    {
-        $json = @gzdecode($gzip);
-        if ($json === false) {
-            return 1;
-        }
-        $data = json_decode($json, true);
-        if (! is_array($data) || ! isset($data['players']) || ! is_array($data['players'])) {
-            return 1;
-        }
-
-        return max(1, min(65535, count($data['players'])));
-    }
-
     public function show(Request $request, string $kind = World::OWN): Response|JsonResponse
     {
-        abort_unless(World::isKind($kind), 404);
-        $world = $kind === World::GLOBAL ? World::global() : $request->user()->worlds()->where('kind', $kind)->first();
+        abort_unless($kind === World::OWN, 404);
+        $world = $request->user()->world()->first();
         if (! $world) {
             return response()->json(['message' => 'No world yet.'], 404);
         }
@@ -102,7 +67,7 @@ class WorldController extends Controller
         ]);
     }
 
-    /** start over in the player's own world: the next save creates a fresh one (the global world is reset by an admin) */
+    /** start over in the player's own world: the next save creates a fresh one (an admin resets the global worlds) */
     public function destroy(Request $request): JsonResponse
     {
         $request->user()->worlds()->where('kind', World::OWN)->delete();
