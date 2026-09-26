@@ -94,9 +94,11 @@ stop, restart, logs, adding and removing worlds all work. One copy of the app ru
 data folder, so this runs beside an installed one. Stopping the `node` process (Ctrl+C)
 pauses the worlds, as a service stop would.
 
-Leave **Set up this PC / Repair setup** alone in a dev copy: it needs admin, and with
-`BSH_PCHOST_DIR` set it would register the Windows service from the repo's `pc-host\`
-in place of the installed app's.
+**Set up this PC / Repair setup** in a dev copy works too (one UAC prompt): it installs
+the Windows service from the repo's `pc-host\` (`BSH_PCHOST_DIR`) with its data in
+`BSH_DATA_DIR`, so the worlds run without the MSI and start with Windows. Stop the
+hand-run `node` first. If the MSI is installed as well, the two share one service name:
+whichever ran setup last owns it, and the other offers to take it back.
 
 ```bash
 dotnet test                       # Core: config, DPAPI, site check, control client, admin steps

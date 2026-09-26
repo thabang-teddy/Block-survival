@@ -374,7 +374,7 @@ public sealed class MainViewModel : Observable
         if (portsChanged && ServiceInstalled)
         {
             Say("The ports changed: Windows asks to update the firewall rule…");
-            var result = await Elevation.RunAsync("firewall", "--ports", $"{next.FirstPort}-{next.LastPort}");
+            var result = await Elevation.RunAsync(_paths, "firewall", "--ports", $"{next.FirstPort}-{next.LastPort}");
             if (result != ElevationResult.Done)
             {
                 Say(result == ElevationResult.Declined
@@ -395,7 +395,7 @@ public sealed class MainViewModel : Observable
         if (cfg is null) return false;
         Say("Windows asks for permission to set this PC up…");
         var user = $"{Environment.UserDomainName}\\{Environment.UserName}";
-        var result = await Elevation.RunAsync("setup", "--user", user, "--ports", $"{cfg.FirstPort}-{cfg.LastPort}");
+        var result = await Elevation.RunAsync(_paths, "setup", "--user", user, "--ports", $"{cfg.FirstPort}-{cfg.LastPort}");
         switch (result)
         {
             case ElevationResult.Declined:

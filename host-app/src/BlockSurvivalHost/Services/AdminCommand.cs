@@ -11,12 +11,19 @@ namespace BlockSurvivalHost.Services;
 ///   --admin uninstall
 ///   --admin start          (after an upgrade: start the service if setup installed it)
 ///
+/// Each may end with `--data-dir <folder> --pchost-dir <folder>`: the app passes the
+/// folders it uses, since the elevated process does not inherit its environment.
+///
 /// What happened goes to logs\admin.log in the data folder; the exit code says whether it worked.
 /// </summary>
 public static class AdminCommand
 {
-    public static int Run(IReadOnlyList<string> args, HostPaths paths)
+    public const string DataDirOption = "--data-dir";
+    public const string PcHostDirOption = "--pchost-dir";
+
+    public static int Run(IReadOnlyList<string> args, HostPaths defaults)
     {
+        var paths = WithFolders(args, defaults);
         Directory.CreateDirectory(paths.LogDir);
         var logPath = Path.Combine(paths.LogDir, "admin.log");
         void Log(string line) => File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {line}{Environment.NewLine}");
@@ -65,6 +72,15 @@ public static class AdminCommand
             Log($"FAILED: {e.Message}");
             return 1;
         }
+    }
+
+    /// <summary>the folders the app passed on, else the defaults</summary>
+    internal static HostPaths WithFolders(IReadOnlyList<string> args, HostPaths defaults)
+    {
+        var data = Option(args, DataDirOption);
+        var pcHost = Option(args, PcHostDirOption);
+        var paths = string.IsNullOrWhiteSpace(data) ? defaults : defaults with { DataDir = Path.GetFullPath(data) };
+        return string.IsNullOrWhiteSpace(pcHost) ? paths : paths with { PcHostDir = Path.GetFullPath(pcHost) };
     }
 
     private static string? Option(IReadOnlyList<string> args, string name)
