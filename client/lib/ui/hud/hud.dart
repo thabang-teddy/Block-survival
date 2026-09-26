@@ -419,8 +419,8 @@ class _HudLayerState extends State<HudLayer> {
   );
 
   Widget _netDown(GameUiState u) {
-    final handover = u.netStatus == NetStatus.handover;
     final hostLeft = u.netStatus == NetStatus.hostLeft;
+    final global = widget.launch.worldKind == WorldKind.global;
     final paused = u.netStatus == NetStatus.paused;
     return Container(
       color: const Color(0xCC000000),
@@ -431,8 +431,8 @@ class _HudLayerState extends State<HudLayer> {
           Text(
             paused
                 ? 'Game paused'
-                : hostLeft || handover
-                ? 'The host left'
+                : hostLeft
+                ? (global ? 'World offline' : 'The host left')
                 : 'Connection lost',
             style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w900),
           ),
@@ -440,10 +440,10 @@ class _HudLayerState extends State<HudLayer> {
           Text(
             paused
                 ? u.netError
-                : handover
-                ? 'The world moves to the next player in. ${u.netError}'
                 : hostLeft
-                ? 'The match is over: the host was running the world.'
+                ? (global
+                      ? 'The host PC closed this world. Pick another from the menu.'
+                      : 'The match is over: the host was running the world.')
                 : (u.netError.isEmpty
                       ? 'The connection to the host dropped.'
                       : u.netError),

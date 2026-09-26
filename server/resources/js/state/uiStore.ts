@@ -63,7 +63,8 @@ export interface ProspectorState {
 /** how the current run was started; null = main menu */
 export type Launch =
   | { role: 'host'; name: string; session: HostSession; restore?: SaveData; worldKind: WorldKind; seed: number }
-  | { role: 'client'; name: string; session: ClientSession; worldKind: WorldKind }
+  /** `globalWorld`: which global world (its host key's id), for a reconnect */
+  | { role: 'client'; name: string; session: ClientSession; worldKind: WorldKind; globalWorld?: number }
 
 export interface UiSnapshot {
   locked: boolean

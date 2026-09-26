@@ -81,7 +81,8 @@ const List<OreDef> ores = [
     sizeMax: 12,
     tier: 2,
     hardness: 5.5,
-    note: 'Big shallow veins. A copper pickaxe is the cheap step up from stone.',
+    note:
+        'Big shallow veins. A copper pickaxe is the cheap step up from stone.',
   ),
   OreDef(
     block: Block.oreIron,

@@ -1,0 +1,113 @@
+# Builds the Block Survival Host installer (host-app/) on Windows and publishes it
+# as a GitHub Release tagged host-app-v<version>. The site's admin downloads it
+# from Admin -> Host PCs, which links to the newest such release (docs/pc-host-research.md §8).
+#
+# Start it either way:
+#   - push a tag:      git tag host-app-v1.0.2 && git push origin host-app-v1.0.2
+#   - Actions tab:     "Release host-app" -> Run workflow -> version 1.0.2
+#                      (tags the commit it ran on)
+#
+# The MSI is unsigned unless signing is configured (host-app/README.md, "Signing"):
+# Windows Smart App Control blocks unsigned installers on most PCs.
+name: Release host-app
+
+on:
+  push:
+    tags: ['host-app-v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version, e.g. 1.0.2 (three numbers: MSI versions allow nothing else)'
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24'
+  # WinSW v2.12.0 WinSW-x64.exe, the service wrapper the installer ships as pc-host-service.exe
+  WINSW_URL: https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe
+  WINSW_SHA256: 05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0da
+
+jobs:
+  release:
+    name: Build the MSI and publish it
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: host-app-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Work out the version
+        id: version
+        shell: bash
+        env:
+          INPUT: ${{ github.event.inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then v="${GITHUB_REF_NAME#host-app-v}"; else v="$INPUT"; fi
+          if ! [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version must be three numbers like 1.0.2, not '$v'"
+            exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "tag=host-app-v$v" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            host-app/pc-host/package-lock.json
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install the shared game code's dependencies
+        working-directory: server
+        run: npm ci --ignore-scripts
+
+      - name: Install pc-host dependencies
+        # not --ignore-scripts: node-datachannel fetches its prebuilt Windows binary on install
+        working-directory: host-app/pc-host
+        run: npm ci
+
+      - name: Fetch WinSW
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'WinSW-x64.exe'
+          Invoke-WebRequest -Uri $env:WINSW_URL -OutFile $out
+          $hash = (Get-FileHash $out -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne $env:WINSW_SHA256) { throw "WinSW checksum mismatch: $hash" }
+          "WINSW_PATH=$out" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - name: Build (tests, pc-host, app, MSI)
+        # Windows PowerShell 5.1, which build.ps1 is written for
+        shell: powershell
+        working-directory: host-app
+        run: .\build.ps1 -Version ${{ steps.version.outputs.version }} -WinSW $env:WINSW_PATH
+
+      - name: Publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          msi="host-app/out/BlockSurvivalHost-$VERSION.msi"
+          notes="Block Survival Host $VERSION for Windows (x64). Install it on the PC that hosts global worlds, then add each world's host token from Admin -> Host PCs.
+
+          Built from ${GITHUB_SHA::7}. Unsigned: Windows Smart App Control may block it (host-app/README.md, Signing)."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$msi" --clobber
+          else
+            gh release create "$TAG" "$msi" --target "$GITHUB_SHA" --title "Block Survival Host $VERSION" --notes "$notes" --latest=false
+          fi
+          echo "Published $TAG with $(basename "$msi")" >> "$GITHUB_STEP_SUMMARY"

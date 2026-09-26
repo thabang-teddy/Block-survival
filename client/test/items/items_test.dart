@@ -59,24 +59,29 @@ void main() {
   });
 
   test('the prospector ladder reaches further at every rung', () {
-    final ranges = ['prospector', 'prospector_tuned', 'prospector_far']
-        .map((id) => getItem(id).senseRange!)
-        .toList();
+    final ranges = [
+      'prospector',
+      'prospector_tuned',
+      'prospector_far',
+    ].map((id) => getItem(id).senseRange!).toList();
     expect(ranges.first, greaterThan(0));
     for (var i = 1; i < ranges.length; i++) {
       expect(ranges[i], greaterThan(ranges[i - 1]));
     }
   });
 
-  test('the first prospector costs only wood, so it comes before any mining', () {
-    for (final i in getRecipe('prospector').inputs) {
-      expect(
-        const {'planks', 'stick', 'log'}.contains(i.id),
-        isTrue,
-        reason: '${i.id} is not wood',
-      );
-    }
-  });
+  test(
+    'the first prospector costs only wood, so it comes before any mining',
+    () {
+      for (final i in getRecipe('prospector').inputs) {
+        expect(
+          const {'planks', 'stick', 'log'}.contains(i.id),
+          isTrue,
+          reason: '${i.id} is not wood',
+        );
+      }
+    },
+  );
 
   test('every mineral has a recipe to go into', () {
     final used = {for (final r in recipes) ...r.inputs.map((i) => i.id)};

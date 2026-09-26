@@ -1,6 +1,7 @@
-// The host PC (docs/pc-host-research.md §5.4): the global world's answers that
-// name it, a PC-hosted session pausing on silence or a dropped link, and the
-// launcher waiting for the PC — however long — then joining it again.
+// The host PC (docs/pc-host-research.md §5.4, §8): a global world's answers,
+// a PC-hosted session pausing on silence or a dropped link, and the launcher
+// waiting for the PC — however long — then joining it again, or reporting the
+// world closed.
 import 'package:block_survival/api/api_client.dart';
 import 'package:block_survival/api/models.dart';
 import 'package:block_survival/app/launch.dart';
@@ -25,9 +26,13 @@ Map<String, dynamic> roomJson(String code) => {
   'expires_at': '',
 };
 
+const int world = 3;
+
 GlobalState pc(String code) => GlobalState.fromJson({
   'status': 'client',
   'host': 'pc',
+  'world': world,
+  'host_name': 'HomePC',
   'room': roomJson(code),
   'online': 1,
 });
@@ -35,8 +40,15 @@ GlobalState pc(String code) => GlobalState.fromJson({
 final GlobalState paused = GlobalState.fromJson({
   'status': 'paused',
   'host': 'pc',
+  'world': world,
   'host_name': 'HomePC',
   'online': 1,
+});
+
+final GlobalState offline = GlobalState.fromJson({
+  'status': 'offline',
+  'host': 'pc',
+  'message': "This world is offline — its host PC isn't running.",
 });
 
 /// the global world's answers in order (the last one repeats), over the fake mailbox
@@ -45,7 +57,7 @@ final class FakeGlobalApi extends FakeSignalApi {
 
   final List<Object> answers;
   int claims = 0;
-  int joins = 0;
+  final List<int> joins = [];
 
   Future<GlobalState> _next() async {
     final a = answers.length > 1 ? answers.removeAt(0) : answers.first;
@@ -60,8 +72,8 @@ final class FakeGlobalApi extends FakeSignalApi {
   }
 
   @override
-  Future<GlobalState> joinGlobal() {
-    joins++;
+  Future<GlobalState> joinGlobal(int world) {
+    joins.add(world);
     return _next();
   }
 
@@ -83,47 +95,42 @@ Future<HostSession> fakePc(FakeSignalApi api, FakeRtc rtc, String code) async {
 }
 
 void main() {
-  group('the global world names the host PC', () {
-    test(
-      'a PC-hosted room and a paused PC are told apart from browser hosts',
-      () {
-        expect(
-          pc('PCPCPC'),
-          isA<GlobalClient>().having(
-            (c) => c.hostKind,
-            'hostKind',
-            HostKind.pc,
-          ),
-        );
-        final browser = GlobalState.fromJson({
-          'status': 'client',
-          'room': roomJson('ABCDEF'),
-          'online': 2,
-        });
-        expect(
-          browser,
-          isA<GlobalClient>().having(
-            (c) => c.hostKind,
-            'hostKind',
-            HostKind.browser,
-          ),
-        );
-        expect(
-          paused,
-          isA<GlobalPaused>().having((p) => p.hostName, 'hostName', 'HomePC'),
-        );
-        final presence = GlobalPresence.fromJson({
-          'online': 1,
-          'host_name': 'HomePC',
-          'paused': true,
-        });
-        expect(presence.paused, isTrue);
-        expect(
-          GlobalPresence.fromJson({'online': 0, 'host_name': null}).paused,
-          isFalse,
-        );
-      },
-    );
+  group('a global world answers', () {
+    test('join its PC, wait for it, or go back: it closed', () {
+      expect(
+        pc('PCPCPC'),
+        isA<GlobalClient>()
+            .having((c) => c.world, 'world', world)
+            .having((c) => c.room.code, 'code', 'PCPCPC'),
+      );
+      expect(
+        paused,
+        isA<GlobalPaused>().having((p) => p.hostName, 'hostName', 'HomePC'),
+      );
+      expect(
+        offline,
+        isA<GlobalOffline>().having(
+          (o) => o.message,
+          'message',
+          contains('offline'),
+        ),
+      );
+    });
+
+    test('the lobby list reads every world and its state', () {
+      final w = GlobalWorldInfo.fromJson({
+        'id': 2,
+        'name': 'Attic',
+        'seed': 4242,
+        'state': 'paused',
+        'online': 1,
+        'save': null,
+      });
+      expect(w.state, WorldState.paused);
+      expect(w.seed, 4242);
+      expect(w.save, isNull);
+      expect(WorldState.parse('nonsense'), WorldState.offline);
+    });
   });
 
   group('a PC-hosted session', () {
@@ -220,10 +227,11 @@ void main() {
           api,
           rtc,
           slept,
-        ).awaitHostPc(null, stillPaused: () => true, onStatus: statuses.add);
+        ).awaitHostPc(world, stillPaused: () => true, onStatus: statuses.add);
         expect(next, isNotNull);
         expect(next!.client?.hostKind, HostKind.pc);
         expect(next.client?.code, 'PCPCPC');
+        expect(next.globalWorld, world);
         expect(api.claims, 3);
         expect(slept, everyElement(pausePoll));
         expect(statuses.first, pausedText);
@@ -241,7 +249,7 @@ void main() {
           api,
           FakeRtc(),
           [],
-        ).awaitHostPc(null, stillPaused: () => ++polls < 3);
+        ).awaitHostPc(world, stillPaused: () => ++polls < 3);
         expect(next, isNull);
       },
     );
@@ -261,16 +269,55 @@ void main() {
           api,
           rtc,
           [],
-        ).awaitHostPc(null, stillPaused: () => true);
+        ).awaitHostPc(world, stillPaused: () => true);
         expect(next?.client?.code, 'PCPCPC');
-        expect(api.joins, 1);
+        expect(api.joins, [world]);
         await next?.dispose();
         await host.dispose();
       },
     );
 
     test(
-      'entering while the PC is paused waits past the handover deadline',
+      'a world closed while we wait ends the wait with its message',
+      () async {
+        final api = FakeGlobalApi(FakeMailbox(), [paused, offline]);
+        await expectLater(
+          launcher(
+            api,
+            FakeRtc(),
+            [],
+          ).awaitHostPc(world, stillPaused: () => true),
+          throwsA(isA<WorldOfflineError>()),
+        );
+        final swept = FakeGlobalApi(FakeMailbox(), [
+          const ApiError(404, 'no seat'),
+          const ApiError(
+            409,
+            "This world is offline — its host PC isn't running.",
+          ),
+        ]);
+        await expectLater(
+          launcher(
+            swept,
+            FakeRtc(),
+            [],
+          ).awaitHostPc(world, stillPaused: () => true),
+          throwsA(isA<WorldOfflineError>()),
+        );
+      },
+    );
+
+    test('entering an offline world is refused', () async {
+      final api = FakeGlobalApi(FakeMailbox(), [offline]);
+      await expectLater(
+        launcher(api, FakeRtc(), []).enterGlobal(world),
+        throwsA(isA<WorldOfflineError>()),
+      );
+      expect(api.joins, [world]);
+    });
+
+    test(
+      'entering while the PC is paused waits for as long as it takes',
       () async {
         final mailbox = FakeMailbox();
         final rtc = FakeRtc();
@@ -281,20 +328,17 @@ void main() {
           pc('PCPCPC'),
         ]);
         final host = await fakePc(api, rtc, 'PCPCPC');
-        var clock = DateTime(2026, 9, 26);
+        var waited = Duration.zero;
         final l = Launcher(
           api: api,
           rtc: rtc,
           player: const LocalPlayer(name: 'Ana', userId: 1),
-          sleep: (d) async => clock = clock.add(d),
-          now: () => clock,
+          sleep: (d) async => waited += d,
         );
-        final launch = await l.enterGlobal();
+        final launch = await l.enterGlobal(world);
         expect(launch.client?.hostKind, HostKind.pc);
-        expect(
-          clock.difference(DateTime(2026, 9, 26)),
-          greaterThan(handoverTimeout * 10),
-        );
+        expect(launch.globalWorld, world);
+        expect(waited, greaterThanOrEqualTo(const Duration(hours: 2)));
         await launch.dispose();
         await host.dispose();
       },

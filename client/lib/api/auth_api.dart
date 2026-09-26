@@ -81,7 +81,7 @@ final class AuthApi {
   /// who the stored token belongs to, or null when there is no usable token
   Future<ApiUser?> me() async => (await meWithWorlds())?.user;
 
-  /// the account plus the lobby's world summaries (own / global)
+  /// the account plus the lobby's own-world summary (global worlds are listed apart)
   Future<Me?> meWithWorlds() async {
     if (await _store.readAccessToken() == null) return null;
     try {
@@ -90,7 +90,7 @@ final class AuthApi {
       return (
         user: ApiUser.fromJson(json['user'] as Map<String, dynamic>),
         worlds: {
-          for (final k in const ['own', 'global'])
+          for (final k in const ['own'])
             k: worlds[k] == null
                 ? null
                 : WorldMeta.fromJson(worlds[k] as Map<String, dynamic>),

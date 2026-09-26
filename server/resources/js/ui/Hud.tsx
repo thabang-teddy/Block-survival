@@ -17,9 +17,8 @@ import { GraphicsToggle } from './GraphicsToggle'
 import { formatTime } from '../game/score'
 import { verticalHint } from '../game/locator'
 import type { ScoreRow } from '../state/uiStore'
-import { savedPlayerOf } from '../game/saveState'
 import { api } from '../net/api'
-import { awaitHostPc, handover, liveDeps, PAUSED_TEXT, reconnectGlobal, rejoinRoom } from '../net/globalWorld'
+import { awaitHostPc, liveDeps, PAUSED_TEXT, reconnectGlobal, rejoinRoom } from '../net/globalWorld'
 import type { ClientSession } from '../net/ClientSession'
 import { router } from '@inertiajs/react'
 import { useEffect, useState } from 'react'
@@ -121,45 +120,25 @@ export function Hud() {
   const [saving, setSaving] = useState('')
   const [leaving, setLeaving] = useState(false)
   const [inviting, setInviting] = useState(false)
-  /** progress while a handover or reconnect is under way */
+  /** progress while a reconnect or a wait for the host PC is under way */
   const [netText, setNetText] = useState('')
   const isGlobal = launch?.worldKind === 'global'
+  /** which global world we are in (its host key's id), for a reconnect */
+  const globalWorld = launch?.role === 'client' ? launch.globalWorld ?? null : null
 
-  /** wired onto every session a handover or reconnect opens, so the HUD hears when that match ends too */
+  /** wired onto every session a reconnect opens, so the HUD hears when that match ends too */
   const onClientStatus = (session: ClientSession, st: ClientSession['status']) => followClientStatus(session, st)
-  const onHostLost = (reason: string) => setNetStatus('error', reason)
-
-  // the global world's host left: keep our seat and follow the queue — either we host
-  // now (with our own gear carried over) or we connect to whoever does. The old game
-  // stays on screen behind the overlay until the new launch replaces it.
-  useEffect(() => {
-    if (netStatus !== 'host-left' || !launch || launch.role !== 'client' || launch.worldKind !== 'global' || !game) return
-    setNetStatus('handover')
-    setNetText('Choosing the next host…')
-    const mine = api.user ? savedPlayerOf(game.local) : null
-    const deps = liveDeps({ onStatus: setNetText, onClientStatus, onHostLost })
-    handover(launch.name, mine, launch.session.code, deps).then(
-      next => {
-        // the player may have gone back to the menu while we waited
-        if (useUiStore.getState().netStatus === 'handover') useUiStore.getState().start(next)
-        else next.session.dispose()
-      },
-      e => { if (useUiStore.getState().netStatus === 'handover') setNetStatus('error', errorText(e)) },
-    )
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per host-left
-  }, [netStatus])
 
   // the host PC went quiet (docs/pc-host-research.md §5.4): the game is frozen; wait for
-  // the PC — however long — and go back in, or follow the queue if it was released. A
-  // pause the PC lifts over the same link just clears the overlay (followClientStatus).
+  // the PC — however long — and go back in, or go back to the lobby if its world closed.
+  // A pause the PC lifts over the same link just clears the overlay (followClientStatus).
   useEffect(() => {
-    if (netStatus !== 'paused' || !launch || launch.role !== 'client' || !game) return
+    if (netStatus !== 'paused' || !launch || launch.role !== 'client' || !game || globalWorld === null) return
     setNetText(PAUSED_TEXT)
     const old = launch.session
-    const mine = api.user ? savedPlayerOf(game.local) : null
     const stillPaused = () => useUiStore.getState().netStatus === 'paused' && useUiStore.getState().launch?.session === old
-    const deps = liveDeps({ onStatus: setNetText, onClientStatus, onHostLost })
-    awaitHostPc(launch.name, mine, deps, stillPaused).then(
+    const deps = liveDeps({ onStatus: setNetText, onClientStatus })
+    awaitHostPc(globalWorld, launch.name, deps, stillPaused).then(
       next => {
         if (!next) return
         if (!stillPaused()) { next.session.dispose(); return }
@@ -185,22 +164,21 @@ export function Hud() {
       }
       setLeaving(false)
     }
-    // a global host's room closes with its game, which is leaving; a client says so itself
+    // a seat in a global world is given up; a host's own room closes with its game
     if (isGlobal && role === 'client') api.leaveGlobal().catch(() => {})
     restart()
   }
 
   /**
    * The link dropped: get back into the world we were in. Our old session is finished
-   * first — a host's room is closed (its seat in the global world goes with it) before
-   * we ask for a place again, so the server sees the world without us. The old game
-   * stays on screen behind the overlay until the new launch replaces it.
+   * first — a host's room is closed before we ask for a place again, so the server sees
+   * the world without us. The old game stays on screen behind the overlay until the new
+   * launch replaces it.
    */
   const reconnect = async () => {
     if (!launch) return
     setNetStatus('reconnecting')
     setNetText('Reconnecting…')
-    const mine = api.user && game ? savedPlayerOf(game.local) : null
     if (launch.role === 'host') {
       launch.session.onLost = null
       await launch.session.close()
@@ -208,10 +186,10 @@ export function Hud() {
       launch.session.onStatus = null
       launch.session.dispose()
     }
-    const deps = liveDeps({ onStatus: setNetText, onClientStatus, onHostLost })
+    const deps = liveDeps({ onStatus: setNetText, onClientStatus })
     try {
-      const next = isGlobal
-        ? await reconnectGlobal(launch.name, mine, deps)
+      const next = globalWorld !== null
+        ? await reconnectGlobal(globalWorld, launch.name, deps)
         : await rejoinRoom(launch.session.code, launch.name, launch.worldKind, deps)
       // the player may have gone back to the menu while we waited
       if (useUiStore.getState().netStatus === 'reconnecting') useUiStore.getState().start(next)
@@ -324,17 +302,15 @@ export function Hud() {
       {netStatus && (
         <div className={`overlay netdown${netStatus === 'reconnecting' || netStatus === 'paused' ? ' busy' : ''}`}>
           <h1>
-            {netStatus === 'paused' ? 'Game paused' : netStatus === 'host-left' || netStatus === 'handover' ? 'The host left' : netStatus === 'reconnecting' ? 'Reconnecting' : 'Connection lost'}
+            {netStatus === 'paused' ? 'Game paused' : netStatus === 'host-left' ? (isGlobal ? 'World offline' : 'The host left') : netStatus === 'reconnecting' ? 'Reconnecting' : 'Connection lost'}
           </h1>
           <p>
             {netStatus === 'paused'
               ? netText || PAUSED_TEXT
-              : netStatus === 'handover'
-              ? `The world moves to the next player in. ${netText}`
               : netStatus === 'reconnecting'
                 ? netText
                 : netStatus === 'host-left'
-                  ? 'The match is over: the host was running the world.'
+                  ? isGlobal ? 'The host PC closed this world. Pick another from the menu.' : 'The match is over: the host was running the world.'
                   : netError || 'The connection to the host dropped.'}
           </p>
           <div className="pause-actions">

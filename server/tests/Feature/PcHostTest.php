@@ -13,13 +13,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
-use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 /**
- * The host PC (docs/pc-host-research.md): it holds the global world while it is online,
- * the world pauses while it is away, and the browser queue takes over only once it was
- * shut down cleanly or released — and gives the world back when the browsers are done.
+ * A host PC (docs/pc-host-research.md): each host key runs one global world. The world
+ * is open while its PC is online, waits while the PC is paused, and is closed — nobody
+ * can enter, no browser takes over — once the PC shut down cleanly or was marked offline.
  */
 class PcHostTest extends TestCase
 {
@@ -27,12 +26,14 @@ class PcHostTest extends TestCase
 
     private const PEER = 'pcPEERpcPEER0001';
 
+    private GameHost $pc;
+
     private string $token = '';
 
     protected function setUp(): void
     {
         parent::setUp();
-        [, $this->token] = GameHost::register('HomePC');
+        [$this->pc, $this->token] = GameHost::register('HomePC');
     }
 
     protected function tearDown(): void
@@ -49,24 +50,29 @@ class PcHostTest extends TestCase
         return $user;
     }
 
-    private function host(string $method, string $uri, array $data = [])
+    private function host(string $method, string $uri, array $data = [], ?string $token = null)
     {
-        return $this->withToken($this->token)->json($method, $uri, $data);
+        return $this->withToken($token ?? $this->token)->json($method, $uri, $data);
     }
 
     /** @param list<int> $userIds */
-    private function heartbeat(array $userIds = [], string $code = 'PCPCPC', array $extra = [])
+    private function heartbeat(array $userIds = [], string $code = 'PCPCPC', array $extra = [], ?string $token = null, string $peer = self::PEER)
     {
         return $this->host('POST', '/api/host/heartbeat', [
-            'version' => '0.1.0', 'peer_id' => self::PEER,
+            'version' => '0.2.0', 'peer_id' => $peer,
             'room' => ['code' => $code, 'players' => count($userIds), 'user_ids' => $userIds],
             ...$extra,
-        ]);
+        ], $token);
     }
 
-    private function pc(): GameHost
+    private function going(string $going, ?string $token = null)
     {
-        return GameHost::current()->refresh();
+        return $this->host('POST', '/api/host/heartbeat', ['version' => '0.2.0', 'peer_id' => self::PEER, 'going' => $going], $token);
+    }
+
+    private function join(User $user, ?GameHost $pc = null)
+    {
+        return $this->actingAs($user)->postJson('/api/global/join', ['world' => ($pc ?? $this->pc)->id]);
     }
 
     // ------------------------------------------------------------ the token
@@ -82,7 +88,7 @@ class PcHostTest extends TestCase
         $this->withToken($this->token)->getJson('/api/auth/me')->assertUnauthorized();
         $this->withToken($this->token)->postJson('/api/global/join')->assertUnauthorized();
 
-        GameHost::current()->update(['enabled' => false]);
+        $this->pc->update(['enabled' => false]);
         $this->heartbeat()->assertUnauthorized();
     }
 
@@ -95,28 +101,26 @@ class PcHostTest extends TestCase
     }
 
     // ------------------------------------------------------------ online
-    public function test_an_online_pc_hosts_the_global_world_and_players_join_it_through_the_mailbox(): void
+    public function test_an_online_pc_runs_its_world_and_players_join_it_through_the_mailbox(): void
     {
         $ana = $this->player('Ana');
         $device = Device::query()->where('user_id', $ana->id)->first();
-        $this->assertSame('offline', GameHost::current()->state());
+        $this->assertSame('offline', $this->pc->state());
 
         $this->heartbeat()->assertOk()
             ->assertJsonPath('state', 'online')
             ->assertJsonPath('room.code', 'PCPCPC')
+            ->assertJsonPath('seed', GameHost::CLASSIC_SEED)
             ->assertJsonPath('rules.daySeconds', 900)
             ->assertJsonPath('commands', []);
-        $this->assertSame('online', $this->pc()->state());
+        $this->assertSame('online', $this->pc->refresh()->state());
 
-        // a player entering is sent to the PC, whichever seat they hold
-        $this->actingAs($ana)->postJson('/api/global/join')->assertOk()
-            ->assertJsonPath('status', 'client')->assertJsonPath('host', 'pc')
+        $this->join($ana)->assertOk()
+            ->assertJsonPath('status', 'client')->assertJsonPath('host', 'pc')->assertJsonPath('world', $this->pc->id)
             ->assertJsonPath('room.code', 'PCPCPC')->assertJsonPath('room.host_peer_id', self::PEER);
-        $this->actingAs($ana)->getJson('/api/global/presence')->assertOk()
-            ->assertExactJson(['online' => 1, 'host_name' => 'HomePC', 'paused' => false]);
-        // no browser may host or save it meanwhile
+        // no browser may host or save a global world
         $this->actingAs($ana)->postJson('/api/rooms', ['code' => 'ABCDEF', 'host_peer_id' => 'anaAAAAAAAAA', 'host_name' => 'Ana', 'world_kind' => 'global'])->assertStatus(409);
-        $this->actingAs($ana)->call('PUT', '/api/world/global', [], $this->prepareCookiesForRequest(), [], ['CONTENT_TYPE' => 'application/gzip', 'HTTP_ACCEPT' => 'application/json'], gzencode('{}'))->assertStatus(409);
+        $this->actingAs($ana)->call('PUT', '/api/world/global', [], $this->prepareCookiesForRequest(), [], ['CONTENT_TYPE' => 'application/gzip', 'HTTP_ACCEPT' => 'application/json'], gzencode('{}'))->assertNotFound();
 
         // the offer the PC reads says who posted it; what the client claims is not asked
         $this->actingAs($ana)->getJson('/api/rooms/PCPCPC')->assertOk();
@@ -143,21 +147,6 @@ class PcHostTest extends TestCase
         $this->assertTrue(GlobalSeat::query()->where('user_id', $ana->id)->first()->isFresh());
     }
 
-    public function test_a_pc_coming_online_closes_a_browser_room_left_over_from_before(): void
-    {
-        $ana = $this->player('Ana');
-        $this->actingAs($ana)->postJson('/api/global/join')->assertJsonPath('status', 'host')->assertJsonPath('host', 'browser');
-        $this->actingAs($ana)->postJson('/api/rooms', ['code' => 'ABCDEF', 'host_peer_id' => 'anaAAAAAAAAA', 'host_name' => 'Ana', 'world_kind' => 'global'])->assertCreated();
-        $this->assertSame(1, Room::query()->count());
-
-        // the PC was never registered before, so nothing is standing by: it takes the world
-        GameHost::current()->update(['offline_at' => null]);
-        $this->heartbeat()->assertOk()->assertJsonPath('state', 'online');
-        $this->assertSame(['PCPCPC'], Room::query()->pluck('code')->all());
-        $this->actingAs($ana)->patchJson('/api/rooms/ABCDEF', ['host_peer_id' => 'anaAAAAAAAAA', 'players' => 1])->assertNotFound();
-        $this->actingAs($ana)->postJson('/api/global/claim')->assertOk()->assertJsonPath('status', 'client')->assertJsonPath('host', 'pc');
-    }
-
     public function test_a_room_code_someone_else_holds_is_refused(): void
     {
         $ana = $this->player('Ana');
@@ -167,22 +156,20 @@ class PcHostTest extends TestCase
     }
 
     // ------------------------------------------------------------ paused
-    public function test_a_pc_that_goes_quiet_pauses_the_world_for_as_long_as_it_takes(): void
+    public function test_a_pc_that_goes_quiet_pauses_its_world_for_as_long_as_it_takes(): void
     {
         $ana = $this->player('Ana');
         $ben = $this->player('Ben');
         $this->heartbeat()->assertOk();
-        $this->actingAs($ana)->postJson('/api/global/join')->assertJsonPath('status', 'client');
+        $this->join($ana)->assertJsonPath('status', 'client');
 
         // the network cable is pulled: no heartbeat for more than 45 s
         Carbon::setTestNow(now()->addSeconds(GameHost::STALE_SECONDS + 1));
-        $this->assertSame('paused', $this->pc()->state());
+        $this->assertSame('paused', $this->pc->refresh()->state());
         $this->actingAs($ana)->postJson('/api/global/claim')->assertOk()
             ->assertJsonPath('status', 'paused')->assertJsonPath('host', 'pc')->assertJsonPath('host_name', 'HomePC');
-        // a new arrival waits too; nobody becomes a browser host
-        $this->actingAs($ben)->postJson('/api/global/join')->assertOk()->assertJsonPath('status', 'paused');
-        $this->actingAs($ben)->getJson('/api/global/presence')->assertJsonPath('paused', true);
-        $this->actingAs($ben)->postJson('/api/rooms', ['code' => 'ABCDEF', 'host_peer_id' => 'benBBBBBBBBB', 'host_name' => 'Ben', 'world_kind' => 'global'])->assertStatus(409);
+        // a new arrival waits too
+        $this->join($ben)->assertOk()->assertJsonPath('status', 'paused');
         // the paused PC's room is shut to joiners
         $this->actingAs($ana)->postJson('/api/rooms/PCPCPC/signal', ['from' => 'anaAAAAAAAAA', 'to' => self::PEER, 'type' => 'offer', 'data' => ['sdp' => 'v=0']])->assertForbidden();
 
@@ -201,108 +188,110 @@ class PcHostTest extends TestCase
     {
         $ana = $this->player('Ana');
         $this->heartbeat()->assertOk();
-        $this->actingAs($ana)->postJson('/api/global/join');
+        $this->join($ana);
 
-        $this->host('POST', '/api/host/heartbeat', ['version' => '0.1.0', 'peer_id' => self::PEER, 'going' => 'restart'])
-            ->assertOk()->assertJsonPath('state', 'paused');
+        $this->going('restart')->assertOk()->assertJsonPath('state', 'paused');
         $this->actingAs($ana)->postJson('/api/global/claim')->assertJsonPath('status', 'paused');
 
-        // after the reboot the app has a new peer id and a new room code
-        $this->host('POST', '/api/host/heartbeat', ['version' => '0.1.0', 'peer_id' => 'pcPEERpcPEER0002', 'room' => ['code' => 'WXYZAB', 'players' => 0]])
-            ->assertOk()->assertJsonPath('state', 'online');
+        // after the reboot the app has a new peer id and a new room code; the old room goes
+        $this->heartbeat(code: 'WXYZAB', peer: 'pcPEERpcPEER0002')->assertOk()->assertJsonPath('state', 'online');
         $this->actingAs($ana)->postJson('/api/global/claim')->assertJsonPath('room.code', 'WXYZAB')->assertJsonPath('room.host_peer_id', 'pcPEERpcPEER0002');
         $this->assertSame(['WXYZAB'], Room::query()->pluck('code')->all());
     }
 
-    // ------------------------------------------------------------ offline, standby and taking the world back
-    public function test_a_clean_shutdown_hands_the_world_to_the_browsers_and_the_pc_takes_it_back_when_their_room_closes(): void
+    // ------------------------------------------------------------ offline
+    public function test_a_clean_shutdown_closes_the_world_and_nobody_can_enter_until_the_pc_runs_again(): void
     {
         $ana = $this->player('Ana');
         $ben = $this->player('Ben');
         $this->heartbeat()->assertOk();
-        $this->actingAs($ana)->postJson('/api/global/join');
-        $this->actingAs($ben)->postJson('/api/global/join');
+        $this->join($ana);
 
-        $this->host('POST', '/api/host/heartbeat', ['version' => '0.1.0', 'peer_id' => self::PEER, 'going' => 'offline'])
-            ->assertOk()->assertJsonPath('state', 'offline');
+        $this->going('offline')->assertOk()->assertJsonPath('state', 'offline');
         $this->assertSame(0, Room::query()->count());
+        $this->assertSame(0, GlobalSeat::query()->count());
 
-        // the browser queue takes over: Ana was first
-        $this->actingAs($ana)->postJson('/api/global/claim')->assertJsonPath('status', 'host')->assertJsonPath('host', 'browser');
-        $this->actingAs($ana)->postJson('/api/rooms', ['code' => 'ABCDEF', 'host_peer_id' => 'anaAAAAAAAAA', 'host_name' => 'Ana', 'world_kind' => 'global'])->assertCreated();
-        $this->actingAs($ben)->postJson('/api/global/claim')->assertJsonPath('status', 'client')->assertJsonPath('room.code', 'ABCDEF');
+        // Ana, who was inside, is sent back to the lobby; Ben cannot get in
+        $this->actingAs($ana)->postJson('/api/global/claim')->assertNotFound();
+        $this->join($ben)->assertStatus(409)->assertJsonPath('message', "This world is offline — its host PC isn't running.");
+        // and no browser takes over
+        $this->actingAs($ben)->postJson('/api/rooms', ['code' => 'ABCDEF', 'host_peer_id' => 'benBBBBBBBBB', 'host_name' => 'Ben', 'world_kind' => 'global'])->assertStatus(409);
 
-        // the PC starts again while they play: it does not interrupt them
-        $this->heartbeat()->assertOk()->assertJsonPath('state', 'standby');
-        $this->assertTrue($this->pc()->isStandingBy());
-        $this->actingAs($ben)->postJson('/api/global/claim')->assertJsonPath('room.code', 'ABCDEF');
-        $this->actingAs($ana)->patchJson('/api/rooms/ABCDEF', ['host_peer_id' => 'anaAAAAAAAAA', 'players' => 2, 'user_ids' => [$ben->id]])->assertOk();
-
-        // Ana leaves: her room closes and the PC takes the world back, with her last save
-        $this->actingAs($ana)->deleteJson('/api/rooms/ABCDEF', ['host_peer_id' => 'anaAAAAAAAAA'])->assertOk();
-        $this->actingAs($ben)->postJson('/api/global/claim')->assertJsonPath('status', 'paused');
-        $this->heartbeat([$ben->id])->assertOk()->assertJsonPath('state', 'online');
-        $this->actingAs($ben)->postJson('/api/global/claim')->assertJsonPath('status', 'client')->assertJsonPath('host', 'pc');
+        // the PC starts again: its world opens at once
+        $this->heartbeat()->assertOk()->assertJsonPath('state', 'online');
+        $this->join($ben)->assertOk()->assertJsonPath('status', 'client');
     }
 
-    public function test_the_admin_release_hands_a_paused_world_to_the_browsers(): void
+    public function test_the_admin_marks_a_paused_world_offline_and_its_waiting_players_go_back_to_the_lobby(): void
     {
         $ana = $this->player('Ana');
         $this->heartbeat()->assertOk();
-        $this->actingAs($ana)->postJson('/api/global/join');
+        $this->join($ana);
         Carbon::setTestNow(now()->addHours(3));
         $this->actingAs($ana)->postJson('/api/global/claim')->assertJsonPath('status', 'paused');
 
         $admin = User::factory()->admin()->create();
-        $this->actingAs($admin)->post('/admin/pc-host/release')->assertRedirect();
-        $this->assertSame('offline', $this->pc()->state());
-        $this->actingAs($ana)->postJson('/api/global/claim')->assertJsonPath('status', 'host')->assertJsonPath('host', 'browser');
+        $this->actingAs($admin)->post("/admin/pc-hosts/{$this->pc->id}/offline")->assertRedirect();
+        $this->assertSame('offline', $this->pc->refresh()->state());
+        $this->actingAs($ana)->postJson('/api/global/claim')->assertNotFound();
+        $this->join($ana)->assertStatus(409);
 
-        // a PC that comes back while nobody is in the world takes it straight back
-        $this->actingAs($ana)->postJson('/api/global/leave')->assertOk();
+        // a PC that was in fact still running opens it again on its next heartbeat
         $this->heartbeat()->assertOk()->assertJsonPath('state', 'online');
     }
 
-    public function test_a_browser_host_that_dies_while_the_pc_stands_by_gives_the_world_to_the_pc(): void
+    // ------------------------------------------------------------ many PCs
+    public function test_each_key_runs_its_own_world_with_its_own_seed_save_and_seats(): void
     {
+        [$attic, $atticToken] = GameHost::register('Attic', 12345);
         $ana = $this->player('Ana');
         $ben = $this->player('Ben');
-        $this->host('POST', '/api/host/heartbeat', ['version' => '0.1.0', 'peer_id' => self::PEER, 'going' => 'offline']);
-        $this->actingAs($ana)->postJson('/api/global/join')->assertJsonPath('status', 'host');
-        $this->actingAs($ana)->postJson('/api/rooms', ['code' => 'ABCDEF', 'host_peer_id' => 'anaAAAAAAAAA', 'host_name' => 'Ana', 'world_kind' => 'global'])->assertCreated();
-        $this->actingAs($ben)->postJson('/api/global/join')->assertJsonPath('status', 'client');
-        $this->heartbeat()->assertJsonPath('state', 'standby');
 
-        // Ana's tab dies; the PC keeps beating, Ben keeps claiming
-        Carbon::setTestNow(now()->addSeconds(30));
-        $this->heartbeat()->assertJsonPath('state', 'standby');
-        $this->actingAs($ben)->postJson('/api/global/claim');
-        Carbon::setTestNow(now()->addSeconds(20));
-        $this->heartbeat()->assertJsonPath('state', 'standby');
-        $this->actingAs($ben)->postJson('/api/global/claim')->assertJsonPath('status', 'paused')->assertJsonPath('host', 'pc');
-        $this->heartbeat([$ben->id])->assertJsonPath('state', 'online');
+        $this->heartbeat()->assertOk()->assertJsonPath('seed', GameHost::CLASSIC_SEED);
+        $this->heartbeat(code: 'ATATAT', token: $atticToken, peer: 'pcPEERatat000001')->assertOk()->assertJsonPath('seed', 12345);
+        $this->join($ana)->assertJsonPath('room.code', 'PCPCPC');
+        $this->join($ben, $attic)->assertJsonPath('room.code', 'ATATAT')->assertJsonPath('world', $attic->id);
+
+        // each PC's mailbox holds only its own room's mail
+        $this->actingAs($ana)->postJson('/api/rooms/PCPCPC/signal', ['from' => 'anaAAAAAAAAA', 'to' => self::PEER, 'type' => 'offer', 'data' => ['sdp' => 'v=0']])->assertCreated();
+        $this->host('GET', '/api/host/signals?after=0', [], $atticToken)->assertJsonCount(0, 'signals');
+        // a player seated in one world cannot reach the other's room
+        $this->actingAs($ben)->postJson('/api/rooms/PCPCPC/signal', ['from' => 'benBBBBBBBBB', 'to' => self::PEER, 'type' => 'offer', 'data' => ['sdp' => 'v=0']])->assertForbidden();
+
+        // each saves its own world
+        $put = fn (string $token, string $body) => $this->withToken($token)->call('PUT', '/api/host/world?night=2', [], [], [], [
+            'CONTENT_TYPE' => 'application/gzip', 'HTTP_ACCEPT' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+        ], $body);
+        $put($this->token, gzencode('{"home":1}'))->assertOk();
+        $put($atticToken, gzencode('{"attic":1}'))->assertOk();
+        $this->assertSame(['home' => 1], json_decode(gzdecode($this->withToken($this->token)->get('/api/host/world')->getContent()), true));
+        $this->assertSame(['attic' => 1], json_decode(gzdecode($this->withToken($atticToken)->get('/api/host/world')->getContent()), true));
+
+        // one PC going offline leaves the other world running
+        $this->going('offline', $atticToken)->assertOk();
+        $this->actingAs($ana)->postJson('/api/global/claim')->assertJsonPath('status', 'client');
+        $this->assertSame(['PCPCPC'], Room::query()->pluck('code')->all());
     }
 
     // ------------------------------------------------------------ save, scores, access
-    public function test_the_pc_reads_and_writes_the_global_save_only_while_it_holds_the_world(): void
+    public function test_the_pc_reads_and_writes_its_world_save(): void
     {
         $this->host('GET', '/api/host/world')->assertNotFound();
         $put = fn (string $body) => $this->withToken($this->token)->call('PUT', '/api/host/world?night=3&seconds=100', [], [], [], [
             'CONTENT_TYPE' => 'application/gzip', 'HTTP_ACCEPT' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
         ], $body);
 
-        $put(gzencode('{}'))->assertStatus(409);
-        $this->heartbeat()->assertOk();
         $put('not gzip')->assertUnprocessable();
         $put(gzencode(json_encode(['players' => ['1' => [], '2' => []]])))->assertOk()->assertJsonPath('world.night', 3)->assertJsonPath('world.players', 2);
-        $this->assertSame(1, World::query()->whereNull('user_id')->where('kind', 'global')->count());
+        $this->assertSame(1, World::query()->whereNull('user_id')->where('game_host_id', $this->pc->id)->count());
 
         $res = $this->withToken($this->token)->get('/api/host/world')->assertOk()->assertHeader('X-Save-Night', '3');
         $this->assertSame(['players' => ['1' => [], '2' => []]], json_decode(gzdecode($res->getContent()), true));
 
-        // paused still holds the world: its shutdown save is kept
-        Carbon::setTestNow(now()->addMinutes(5));
+        // a PC shutting down saves after it went quiet or offline: that save is kept
+        $this->going('offline')->assertOk();
         $put(gzencode('{}'))->assertOk();
+        $this->assertSame(1, World::query()->whereNull('user_id')->count());
     }
 
     public function test_the_pc_records_runs_scored_by_the_site(): void
@@ -339,19 +328,19 @@ class PcHostTest extends TestCase
     }
 
     // ------------------------------------------------------------ reset
-    public function test_resetting_the_global_world_while_the_pc_holds_it_tells_the_pc(): void
+    public function test_resetting_a_world_its_pc_runs_tells_the_pc(): void
     {
         $ana = $this->player('Ana');
         $this->heartbeat()->assertOk();
-        World::put(null, World::GLOBAL, gzencode('{}'), []);
+        World::put(null, World::GLOBAL, gzencode('{}'), [], $this->pc);
         $admin = User::factory()->admin()->create();
 
-        $this->actingAs($ana)->postJson('/api/global/join');
-        $this->actingAs($admin)->delete('/admin/global-world')->assertSessionHas('status', 'Someone is in the global world — reset it when it is empty.');
+        $this->join($ana);
+        $this->actingAs($admin)->delete("/admin/pc-hosts/{$this->pc->id}/world")->assertSessionHas('status', 'Someone is in this world — reset it when it is empty.');
         $this->actingAs($ana)->postJson('/api/global/leave');
 
-        $this->actingAs($admin)->delete('/admin/global-world')->assertSessionHas('status', 'The global world was reset.');
-        $this->assertNull(World::global());
+        $this->actingAs($admin)->delete("/admin/pc-hosts/{$this->pc->id}/world")->assertSessionHas('status', "HomePC's world was reset.");
+        $this->assertNull(World::global($this->pc));
         $this->heartbeat()->assertOk()->assertJsonPath('commands', ['reset']);
         $this->heartbeat()->assertOk()->assertJsonPath('commands', []);
     }
@@ -391,32 +380,5 @@ class PcHostTest extends TestCase
         Http::fake(['rtc.live.cloudflare.com/*' => Http::response(['error' => 'nope'], 500)]);
         $this->signIn($this->player('Ana'))->getJson('/api/ice-servers')->assertOk()
             ->assertJsonPath('ice_servers.0.urls.0', 'stun:stun.l.google.com:19302');
-    }
-
-    // ------------------------------------------------------------ admin
-    public function test_the_admin_creates_rotates_and_revokes_the_host_token(): void
-    {
-        GameHost::query()->delete();
-        $admin = User::factory()->admin()->create();
-        $this->signIn($this->player('Ana'))->post('/admin/pc-host', ['name' => 'HomePC'])->assertForbidden();
-
-        $this->actingAs($admin)->get('/admin')->assertInertia(fn (Assert $page) => $page->where('pcHost', null));
-        $this->actingAs($admin)->post('/admin/pc-host', ['name' => 'HomePC'])->assertRedirect()->assertSessionHas('host_token');
-        $first = session('host_token');
-        $this->assertNotSame($first, GameHost::current()->token_hash);
-        $this->assertSame(GameHost::hashToken($first), GameHost::current()->token_hash);
-        $this->actingAs($admin)->post('/admin/pc-host', ['name' => 'Second'])->assertSessionMissing('host_token');
-        $this->actingAs($admin)->get('/admin')->assertInertia(fn (Assert $page) => $page->where('pcHost.name', 'HomePC')->where('pcHost.state', 'offline')->missing('pcHost.token_hash'));
-
-        $this->actingAs($admin)->post('/admin/pc-host/token')->assertSessionHas('host_token');
-        $second = session('host_token');
-        $this->withToken($first)->postJson('/api/host/heartbeat')->assertUnauthorized();
-        $this->token = $second;
-        $this->heartbeat()->assertOk();
-
-        $this->actingAs($admin)->delete('/admin/pc-host')->assertRedirect();
-        $this->assertNull(GameHost::current());
-        $this->assertSame(0, Room::query()->count());
-        $this->withToken($second)->postJson('/api/host/heartbeat')->assertUnauthorized();
     }
 }

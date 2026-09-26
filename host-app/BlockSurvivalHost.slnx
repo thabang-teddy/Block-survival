@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BlockSurvivalHost.Core/BlockSurvivalHost.Core.csproj" />
+    <Project Path="src/BlockSurvivalHost/BlockSurvivalHost.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BlockSurvivalHost.Core.Tests/BlockSurvivalHost.Core.Tests.csproj" />
+  </Folder>
+</Solution>

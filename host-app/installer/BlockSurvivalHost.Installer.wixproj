@@ -1,0 +1,22 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+
+  <!--
+    The Block Survival Host MSI (per machine, x64). build.ps1 stages the app and pc-host
+    and passes their folders in; building this project on its own needs them too:
+
+      dotnet build installer -p:AppDir=<publish dir> -p:PcHostDir=<pc-host dir> -p:ProductVersion=1.0.0
+  -->
+  <PropertyGroup>
+    <OutputName>BlockSurvivalHost-$(ProductVersion)</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
+    <DefineConstants>ProductVersion=$(ProductVersion);AppDir=$(AppDir);PcHostDir=$(PcHostDir)</DefineConstants>
+    <SuppressValidation>false</SuppressValidation>
+  </PropertyGroup>
+
+  <Target Name="CheckStaging" BeforeTargets="Build">
+    <Error Condition="'$(AppDir)' == '' Or !Exists('$(AppDir)\BlockSurvivalHost.exe')" Text="AppDir must be the published app (run build.ps1)." />
+    <Error Condition="'$(PcHostDir)' == '' Or !Exists('$(PcHostDir)\dist\pc-host.mjs') Or !Exists('$(PcHostDir)\pc-host-service.exe')" Text="PcHostDir must be the staged pc-host with WinSW (run build.ps1)." />
+  </Target>
+
+</Project>

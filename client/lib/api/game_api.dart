@@ -77,9 +77,11 @@ class GameApi implements GameApiSignals {
     (await _client.get('/rules')).json!['rules'] as Map<String, dynamic>?,
   );
 
-  // ---- the shared global world
-  Future<GlobalPresence> presence() async =>
-      GlobalPresence.fromJson((await _client.get('/global/presence')).json!);
+  // ---- the global worlds, one per host PC (docs/pc-host-research.md §8)
+  Future<List<GlobalWorldInfo>> globalWorlds() async =>
+      ((await _client.get('/global/worlds')).json!['worlds'] as List)
+          .map((w) => GlobalWorldInfo.fromJson(w as Map<String, dynamic>))
+          .toList();
 
   /// STUN, plus short-lived TURN credentials when the site has a Cloudflare
   /// TURN key: RTCIceServer maps, as flutter_webrtc takes them
@@ -87,8 +89,10 @@ class GameApi implements GameApiSignals {
       ((await _client.get('/ice-servers')).json!['ice_servers'] as List)
           .cast<Map<String, dynamic>>();
 
-  Future<GlobalState> joinGlobal() async =>
-      GlobalState.fromJson((await _client.post('/global/join')).json!);
+  /// enter a world from the lobby (a seat in another one is given up)
+  Future<GlobalState> joinGlobal(int world) async => GlobalState.fromJson(
+    (await _client.post('/global/join', {'world': world})).json!,
+  );
   Future<GlobalState> claimGlobal() async =>
       GlobalState.fromJson((await _client.post('/global/claim')).json!);
   Future<void> leaveGlobal() => _client.post('/global/leave');
