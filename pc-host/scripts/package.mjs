@@ -1,4 +1,5 @@
-// Assembles release/pc-host/: a folder to copy to the host PC (docs/pc-host-research.md §5.2).
+// Assembles release/pc-host/: a folder to copy to another PC (docs/pc-host-research.md §5.2).
+// On the dev PC the service runs straight from pc-host/ instead (README).
 // It holds a portable node.exe (the one running this script), the bundled app, the
 // production node_modules (node-datachannel's native .node file must sit there),
 // config.example.json and the WinSW service definition. WinSW itself is not bundled:
@@ -17,8 +18,8 @@ rmSync(out, { recursive: true, force: true })
 mkdirSync(out, { recursive: true })
 cpSync(join(root, 'dist'), join(out, 'dist'), { recursive: true })
 for (const f of ['package.json', 'package-lock.json', 'config.example.json', 'README.md']) cpSync(join(root, f), join(out, f))
-cpSync(join(root, 'windows', 'pc-host-service.xml'), join(out, 'pc-host-service.xml'))
-cpSync(join(root, 'windows', 'pc-host.cmd'), join(out, 'pc-host.cmd'))
+cpSync(join(root, 'pc-host-service.xml'), join(out, 'pc-host-service.xml'))
+cpSync(join(root, 'pc-host.cmd'), join(out, 'pc-host.cmd'))
 cpSync(process.execPath, join(out, process.platform === 'win32' ? 'node.exe' : basename(process.execPath)))
 
 // only what runs: node-datachannel (and its prebuilt binary for this platform)

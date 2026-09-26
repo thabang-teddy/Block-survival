@@ -14,7 +14,7 @@ below. The research text is unchanged except where that section says so.
 | 4. Save, scores, access | `pc-host/src/site.ts`, `/api/host/world·scores·access` | Done |
 | 5. Pause and reconnect | `GameRoom.freeze/resume` + held places; web `ClientSession` `paused`, `awaitHostPc`; Flutter same | Done, Vitest + Flutter tests |
 | 6. `/api/ice-servers` + Cloudflare TURN | `App\Support\IceServers`; both clients and the PC fetch it | Done (HTTP faked in tests) |
-| 7. Packaging, power, logs | `pc-host/scripts/package.mjs`, `windows/pc-host-service.xml` (WinSW), `src/power.ts`, `src/log.ts` | Done, see *not verified* |
+| 7. Packaging, power, logs | `pc-host/scripts/package.mjs`, `pc-host/pc-host-service.xml` (WinSW, run from `pc-host/`), `src/power.ts`, `src/log.ts` | Done, see *not verified* |
 
 **Verified live on the dev machine** (site on PHP 8.4 in Docker, PC host on Node, the
 web client in a browser):

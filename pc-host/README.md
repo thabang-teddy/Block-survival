@@ -24,22 +24,30 @@ certificate or open TCP port.
 2. **TURN (recommended).** Create a Cloudflare Realtime TURN key and put it in the
    site's `.env` as `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_KEY_API_TOKEN`.
    Without it, players whose networks block direct UDP cannot connect.
-3. **Build the folder** (on a Windows machine with Node 24):
+3. **Build it** (Node 24):
 
    ```bash
    cd server && npm ci        # the game code the PC imports lives here
-   cd ../pc-host && npm ci && npm run package
+   cd ../pc-host && npm ci && npm run build
    ```
 
-   This creates `release/pc-host/`, which holds a portable `node.exe`, the bundled
-   app, `node_modules` (for node-datachannel's native module), the service definition
-   and `config.example.json`.
-4. **On the host PC:** copy the folder, e.g. to `C:\BlockSurvival\pc-host`. Copy
-   `config.example.json` to `config.json` and fill it in:
+   The service runs straight from this `pc-host\` folder: `dist\pc-host.mjs`, with
+   `node_modules` next to it for node-datachannel's native module. Copy the Node you
+   built with into the folder as `node.exe` (gitignored), so the service does not
+   depend on whichever Node is on the PATH:
+
+   ```bat
+   copy "C:\nvm4w\nodejs\node.exe" node.exe
+   ```
+
+   To host from another PC instead, `npm run package` assembles `release\pc-host\`:
+   the same files with `node.exe` included, ready to copy.
+4. **Configure:** copy `config.example.json` to `config.json` (gitignored) and fill
+   it in:
 
    | key | |
    |---|---|
-   | `site` | the site's `https://` address |
+   | `site` | the site's `https://` address (plain `http` only for localhost or a `.test` dev site) |
    | `token` | the host token from step 1 |
    | `portRange` | UDP ports WebRTC may use. Forwarding them on the router is optional (it helps when there is no CGNAT) |
    | `relayOnly` | `true` sends all traffic through TURN, so players never see the PC's IP. Costs a little latency |
@@ -48,16 +56,18 @@ certificate or open TCP port.
 5. **Try it in a window first:** `pc-host.cmd`. When Windows Firewall asks, allow
    `node.exe` on private and public networks (it only needs UDP). The admin page
    should now show the PC as online.
-6. **Run it as a service:** download `WinSW-x64.exe` from the WinSW GitHub releases,
-   put it next to `pc-host-service.xml` and rename it `pc-host-service.exe`. Then, from
-   an administrator prompt in the folder:
+6. **Run it as a service:** download `WinSW-x64.exe` (v2.12) from the WinSW GitHub
+   releases, put it in this folder next to `pc-host-service.xml` and rename it
+   `pc-host-service.exe` (gitignored). Then, from an administrator prompt:
 
    ```bat
+   cd "C:\Users\Teddy\projects\Block survival\pc-host"
    pc-host-service.exe install
    pc-host-service.exe start
    ```
 
-   The service starts with Windows, no login needed. A crash restarts it.
+   The service starts with Windows, no login needed. A crash restarts it. After
+   `npm run build`, `pc-host-service.exe restart` picks up the new bundle.
 
 ## Everyday use
 
