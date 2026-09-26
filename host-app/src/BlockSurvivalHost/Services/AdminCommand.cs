@@ -34,7 +34,9 @@ public static class AdminCommand
                     var user = Option(args, "--user") ?? throw new ArgumentException("--user is required");
                     Directory.CreateDirectory(paths.DataDir);
                     File.WriteAllText(paths.ServiceXml, AdminSetup.ServiceXml(paths));
-                    failures = AdminSetup.Run(AdminSetup.SetupSteps(paths, user, first, last, AdminSetup.ServiceInstalled()), Log);
+                    var service = AdminSetup.Registration(paths);
+                    if (service.Kind == ServiceKind.Foreign) Log($"the service is registered from {service.ExePath}: replacing it with this app's");
+                    failures = AdminSetup.Run(AdminSetup.SetupSteps(paths, user, first, last, service), Log);
                     break;
                 }
                 case "firewall":
@@ -44,10 +46,10 @@ public static class AdminCommand
                     break;
                 }
                 case "uninstall":
-                    failures = AdminSetup.Run(AdminSetup.UninstallSteps(paths), Log);
+                    failures = AdminSetup.Run(AdminSetup.UninstallSteps(paths, AdminSetup.Registration(paths).Kind), Log);
                     break;
                 case "start":
-                    failures = AdminSetup.ServiceInstalled()
+                    failures = AdminSetup.Registration(paths).Kind == ServiceKind.Ours
                         ? AdminSetup.Run([new AdminStep("Start the host service", paths.ServiceExe, ["start"])], Log)
                         : [];
                     break;

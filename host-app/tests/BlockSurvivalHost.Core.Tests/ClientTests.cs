@@ -165,7 +165,7 @@ public sealed class AdminSetupTests
     [Fact]
     public void Setup_keeps_the_data_folder_to_the_owner_admins_and_the_service_and_installs_or_restarts_it()
     {
-        var fresh = AdminSetup.SetupSteps(Paths, @"PC\Teddy", 50000, 50199, serviceInstalled: false);
+        var fresh = AdminSetup.SetupSteps(Paths, @"PC\Teddy", 50000, 50199, new ServiceRegistration(ServiceKind.None, null));
         Assert.Equal("icacls", fresh[0].FileName);
         // other accounts lose the read access ProgramData would give them: control.key stops every world
         Assert.Equal(
@@ -173,14 +173,55 @@ public sealed class AdminSetupTests
             fresh[0].Args);
         Assert.Equal(["install", "start"], fresh.Where(s => s.FileName == Paths.ServiceExe).Select(s => s.Args[0]));
 
-        var again = AdminSetup.SetupSteps(Paths, @"PC\Teddy", 50000, 50199, serviceInstalled: true);
+        var again = AdminSetup.SetupSteps(Paths, @"PC\Teddy", 50000, 50199, new ServiceRegistration(ServiceKind.Ours, Paths.ServiceExe));
         Assert.Equal(["stopwait", "start"], again.Where(s => s.FileName == Paths.ServiceExe).Select(s => s.Args[0]));
+    }
+
+    [Fact]
+    public void A_same_named_service_from_another_folder_is_replaced_by_ours()
+    {
+        // e.g. a hand-made pc-host service in a repo checkout: it reads another config and writes its key elsewhere
+        var dir = Path.Combine(Path.GetTempPath(), "bsh-foreign-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var foreignExe = Path.Combine(dir, "pc-host-service.exe");
+        File.WriteAllText(foreignExe, "");
+        try
+        {
+            var steps = AdminSetup.SetupSteps(Paths, @"PC\Teddy", 50000, 50199, new ServiceRegistration(ServiceKind.Foreign, foreignExe));
+            var service = steps.Where(s => s.FileName is var f && (f == foreignExe || f == Paths.ServiceExe)).Select(s => (s.FileName == foreignExe ? "old " : "new ") + s.Args[0]);
+            Assert.Equal(["old stopwait", "old uninstall", "new install", "new start"], service);
+
+            // its WinSW is gone: Windows' own sc removes the registration
+            var gone = AdminSetup.SetupSteps(Paths, @"PC\Teddy", 50000, 50199, new ServiceRegistration(ServiceKind.Foreign, Path.Combine(dir, "missing.exe")));
+            Assert.Contains(gone, s => s.FileName == "sc.exe" && s.Args.SequenceEqual(["delete", HostPaths.ServiceName]));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData("\"C:\\Users\\Teddy\\pc-host\\pc-host-service.exe\"", @"C:\Users\Teddy\pc-host\pc-host-service.exe")]
+    [InlineData(@"C:\Program Files\Block Survival Host\pc-host\pc-host-service.exe", @"C:\Program Files\Block Survival Host\pc-host\pc-host-service.exe")]
+    [InlineData(@"C:\tools\winsw.exe --flag", @"C:\tools\winsw.exe")]
+    public void The_program_is_read_out_of_a_service_command_line(string imagePath, string exe)
+    {
+        Assert.Equal(exe, AdminSetup.ExeOf(imagePath));
+    }
+
+    [Fact]
+    public void Uninstall_leaves_a_service_that_is_not_ours()
+    {
+        var steps = AdminSetup.UninstallSteps(Paths, ServiceKind.Foreign);
+        Assert.DoesNotContain(steps, s => s.Args.Contains("uninstall"));
+        Assert.Contains(steps, s => s.FileName == "netsh");
     }
 
     [Fact]
     public void Uninstall_removes_the_service_and_the_rule_even_when_half_of_it_is_gone()
     {
-        var steps = AdminSetup.UninstallSteps(Paths);
+        var steps = AdminSetup.UninstallSteps(Paths, ServiceKind.Ours);
         Assert.All(steps, s => Assert.True(s.MayFail));
         Assert.Contains(steps, s => s.Args.Contains("uninstall"));
         Assert.Contains(steps, s => s.FileName == "netsh");

@@ -52,7 +52,8 @@ if (-not (Test-Path $WinSW)) { throw "WinSW not found at $WinSW - download WinSW
 
 Step "pc-host"
 if (-not (Test-Path (Join-Path $root "server\node_modules"))) { Run "npm" @("ci") (Join-Path $root "server") }
-Run "npm" @("ci") (Join-Path $root "pc-host")
+# a running pc-host service locks node_modules; packaging makes its own clean install anyway
+if (-not (Test-Path (Join-Path $root "pc-host\node_modules"))) { Run "npm" @("ci") (Join-Path $root "pc-host") }
 if (-not $SkipTests) { Run "npm" @("test") (Join-Path $root "pc-host") }
 Run "npm" @("run", "package") (Join-Path $root "pc-host")
 

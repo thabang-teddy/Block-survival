@@ -172,6 +172,14 @@ public sealed class MainViewModel : Observable
                 foreach (var w in Worlds) w.ApplyUnknown();
                 return;
             }
+            var registration = AdminSetup.Registration(_paths);
+            if (registration.Kind == ServiceKind.Foreign)
+            {
+                ServiceOk = false;
+                ServiceText = $"The host service on this PC runs from another folder ({Path.GetDirectoryName(registration.ExePath)}). Press Repair setup to switch it to this app.";
+                foreach (var w in Worlds) w.ApplyUnknown();
+                return;
+            }
             if (state != ServiceControllerStatus.Running)
             {
                 ServiceOk = false;

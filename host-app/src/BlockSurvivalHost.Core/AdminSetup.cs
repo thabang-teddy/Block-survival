@@ -1,8 +1,23 @@
 using System.Diagnostics;
 using System.Security;
 using System.ServiceProcess;
+using Microsoft.Win32;
 
 namespace BlockSurvivalHost.Core;
+
+public enum ServiceKind
+{
+    /// <summary>not installed</summary>
+    None,
+
+    /// <summary>installed from this app's folder</summary>
+    Ours,
+
+    /// <summary>a service of the same name from another folder (a hand-made pc-host service)</summary>
+    Foreign,
+}
+
+public sealed record ServiceRegistration(ServiceKind Kind, string? ExePath);
 
 /// <summary>one program run by an admin step; a step that may fail (removing what is not there) says so</summary>
 public sealed record AdminStep(string Description, string FileName, IReadOnlyList<string> Args, bool MayFail = false);
@@ -60,9 +75,11 @@ public static class AdminSetup
     /// <summary>
     /// Set the PC up: the owner may edit the data folder (so the app needs no admin rights
     /// afterwards) and no other account may read it, the firewall allows the ports, and
-    /// the service is installed and running.
+    /// the service is installed and running. A service of the same name registered from
+    /// another folder (a hand-made pc-host service, an older install) is stopped and
+    /// removed first: it would read another config and write its key elsewhere.
     /// </summary>
-    public static IReadOnlyList<AdminStep> SetupSteps(HostPaths paths, string user, int firstPort, int lastPort, bool serviceInstalled)
+    public static IReadOnlyList<AdminStep> SetupSteps(HostPaths paths, string user, int firstPort, int lastPort, ServiceRegistration service)
     {
         var steps = new List<AdminStep>
         {
@@ -71,26 +88,79 @@ public static class AdminSetup
                 [paths.DataDir, "/inheritance:r", "/grant:r", $"{SystemSid}:(OI)(CI)F", "/grant:r", $"{AdministratorsSid}:(OI)(CI)F", "/grant:r", $"{user}:(OI)(CI)M"]),
         };
         steps.AddRange(FirewallSteps(paths, firstPort, lastPort));
-        if (serviceInstalled)
+        switch (service.Kind)
         {
-            // WinSW reads the service definition each time it starts: a stop and a start pick up a new one
-            steps.Add(new("Stop the host service", paths.ServiceExe, ["stopwait"], MayFail: true));
-        }
-        else
-        {
-            steps.Add(new("Install the host service", paths.ServiceExe, ["install"]));
+            case ServiceKind.Ours:
+                // WinSW reads the service definition each time it starts: a stop and a start pick up a new one
+                steps.Add(new("Stop the host service", paths.ServiceExe, ["stopwait"], MayFail: true));
+                break;
+            case ServiceKind.Foreign:
+                steps.AddRange(RemoveForeignSteps(service.ExePath));
+                steps.Add(new("Install the host service", paths.ServiceExe, ["install"]));
+                break;
+            default:
+                steps.Add(new("Install the host service", paths.ServiceExe, ["install"]));
+                break;
         }
         steps.Add(new("Start the host service", paths.ServiceExe, ["start"]));
         return steps;
     }
 
-    /// <summary>undo it all (the installer runs this when the app is removed)</summary>
-    public static IReadOnlyList<AdminStep> UninstallSteps(HostPaths paths) =>
-    [
-        new("Stop the host service", paths.ServiceExe, ["stop"], MayFail: true),
-        new("Remove the host service", paths.ServiceExe, ["uninstall"], MayFail: true),
-        new("Remove the firewall rule", "netsh", ["advfirewall", "firewall", "delete", "rule", $"name={FirewallRule}"], MayFail: true),
-    ];
+    /// <summary>take down a same-named service from another folder, with its own WinSW when it is still there</summary>
+    private static IEnumerable<AdminStep> RemoveForeignSteps(string? exe)
+    {
+        if (exe is not null && File.Exists(exe))
+        {
+            yield return new($"Stop the host service registered from {Path.GetDirectoryName(exe)}", exe, ["stopwait"], MayFail: true);
+            yield return new("Remove that service", exe, ["uninstall"]);
+        }
+        else
+        {
+            yield return new("Stop the old host service", "sc.exe", ["stop", HostPaths.ServiceName], MayFail: true);
+            yield return new("Remove the old host service", "sc.exe", ["delete", HostPaths.ServiceName]);
+        }
+    }
+
+    /// <summary>is the service installed, and from this app's folder?</summary>
+    public static ServiceRegistration Registration(HostPaths paths)
+    {
+        using var key = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{HostPaths.ServiceName}");
+        if (key?.GetValue("ImagePath") is not string image) return new ServiceRegistration(ServiceKind.None, null);
+        var exe = ExeOf(image);
+        return new ServiceRegistration(SamePath(exe, paths.ServiceExe) ? ServiceKind.Ours : ServiceKind.Foreign, exe);
+    }
+
+    internal static bool SamePath(string a, string b) =>
+        string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>the program of a service's command line: quoted, or up to the ".exe"</summary>
+    internal static string ExeOf(string imagePath)
+    {
+        var s = Environment.ExpandEnvironmentVariables(imagePath.Trim());
+        if (s.StartsWith('"'))
+        {
+            var end = s.IndexOf('"', 1);
+            return end > 0 ? s[1..end] : s.Trim('"');
+        }
+        var exeEnd = s.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+        return exeEnd > 0 ? s[..(exeEnd + 4)] : s.Split(' ')[0];
+    }
+
+    /// <summary>
+    /// Undo it all (the installer runs this when the app is removed). Only this app's own
+    /// service goes: one registered from another folder is not ours to remove.
+    /// </summary>
+    public static IReadOnlyList<AdminStep> UninstallSteps(HostPaths paths, ServiceKind service)
+    {
+        var steps = new List<AdminStep>();
+        if (service == ServiceKind.Ours)
+        {
+            steps.Add(new("Stop the host service", paths.ServiceExe, ["stop"], MayFail: true));
+            steps.Add(new("Remove the host service", paths.ServiceExe, ["uninstall"], MayFail: true));
+        }
+        steps.Add(new("Remove the firewall rule", "netsh", ["advfirewall", "firewall", "delete", "rule", $"name={FirewallRule}"], MayFail: true));
+        return steps;
+    }
 
     public static bool ServiceInstalled() =>
         ServiceController.GetServices().Any(s => string.Equals(s.ServiceName, HostPaths.ServiceName, StringComparison.OrdinalIgnoreCase));
