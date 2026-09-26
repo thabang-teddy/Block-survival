@@ -29,6 +29,8 @@ export interface RunWorldOptions {
   echo: boolean
   /** the token was refused: nothing more this process can do */
   onRevoked(): void
+  /** something the owner must fix before players can connect (null once it is fine) */
+  onProblem?(problem: string | null): void
 }
 
 export function runWorld(cfg: Config, opts: RunWorldOptions): RunningWorld {
@@ -43,6 +45,7 @@ export function runWorld(cfg: Config, opts: RunWorldOptions): RunningWorld {
     log,
     keepAwake: on => power.set(on),
     onRevoked: opts.onRevoked,
+    onProblem: opts.onProblem,
   })
   let stopping: Promise<void> | null = null
   let stopped = false

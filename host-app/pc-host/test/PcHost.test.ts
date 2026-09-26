@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'vitest'
 import { RTCPeerConnection } from 'node-datachannel/polyfill'
-import { FREEZE_AFTER_MS, PcHost } from '../src/PcHost'
+import { describe as describeErr, FREEZE_AFTER_MS, PcHost } from '../src/PcHost'
 import { SiteError } from '../src/site'
 import { decode, encode, PROTOCOL_VERSION, type HostMessage } from '@game/net/protocol'
 import type { Player } from '../src/room/GameRoom'
@@ -44,6 +44,62 @@ async function joinWithHello(site: FakeSite, host: PcHost): Promise<TestClient> 
   await until(() => host.room!.playerCount === 1 && messages(client).some(m => m.t === 'welcome'))
   return client
 }
+
+describe('PcHost and its ICE servers', () => {
+  const STUN = { urls: ['stun:stun.l.google.com:19302'] }
+  const TURN = { urls: ['turn:turn.cloudflare.com:3478?transport=udp'], username: 'u', credential: 'c' }
+
+  function hostWith(site: FakeSite, relayOnly: boolean) {
+    const problems: (string | null)[] = []
+    const host = new PcHost({
+      site, version: 'test', log: quiet, peerId: 'pcPEERpcPEER0001',
+      makePeer: c => new RTCPeerConnection(c) as unknown as globalThis.RTCPeerConnection,
+      transport: { relayOnly },
+      onProblem: p => problems.push(p),
+    })
+    return { host, problems }
+  }
+
+  test('relay-only with no TURN server says why nobody can connect', async () => {
+    const site = new FakeSite()
+    site.ice = [[STUN]]
+    const { host, problems } = hostWith(site, true)
+    await host.start()
+    expect(problems.at(-1)).toMatch(/Relay-only is on, but the site has no TURN server/)
+    await host.stop('restart')
+  }, 30_000)
+
+  test('relay-only with a TURN server, or without relay-only, is fine', async () => {
+    for (const [ice, relayOnly] of [[[STUN, TURN], true], [[STUN], false]] as const) {
+      const site = new FakeSite()
+      site.ice = [[...ice]]
+      const { host, problems } = hostWith(site, relayOnly)
+      await host.start()
+      expect(problems).toEqual([null])
+      await host.stop('restart')
+    }
+  }, 30_000)
+
+  test('an ICE list that could not be fetched at start is fetched again on the next good heartbeat', async () => {
+    const site = new FakeSite()
+    site.ice = [new Error('timeout'), [STUN, TURN]]
+    const { host, problems } = hostWith(site, true)
+    await host.start()
+    // start() ran one heartbeat after the failed fetch: that one asked again
+    await new Promise(r => setTimeout(r, 50))
+    expect(site.iceCalls).toBe(2)
+    expect(problems).toEqual([null])
+    await host.beat()
+    expect(site.iceCalls).toBe(2)
+    await host.stop('restart')
+  }, 30_000)
+
+  test('a transport error\'s details are logged as JSON, not [object Object]', () => {
+    expect(describeErr({ userId: 7 })).toBe('{"userId":7}')
+    expect(describeErr(new Error('boom'))).toBe('boom')
+    expect(describeErr('plain')).toBe('plain')
+  })
+})
 
 describe('PcHost', () => {
   const cleanup: (() => unknown)[] = []

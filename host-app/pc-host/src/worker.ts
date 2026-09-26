@@ -31,6 +31,8 @@ export function runWorker(version: string, appDir: string): void {
       appDir,
       echo: false,
       onRevoked: () => { report({ t: 'revoked' }); void exit('restart', 0) },
+      // the host app shows it on the world's card
+      onProblem: problem => report({ t: 'error', message: problem ?? '' }),
     })
     process.on('uncaughtException', err => {
       world?.log.error('crashed', { err: err.stack ?? String(err) })
