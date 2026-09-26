@@ -354,6 +354,8 @@ body { user-select: none; }
 .restart.secondary { background: rgba(255,255,255,.12); color: var(--hud-ink); }
 .menu .wide { width: 100%; margin-top: 10px; }
 .menu .link { background: none; border: 0; padding: 0; color: var(--hud-accent); cursor: pointer; font: 600 13px inherit; text-decoration: underline; }
+.graphics-toggle { pointer-events: auto; }
+.graphics-toggle .link { background: none; border: 0; padding: 0; color: var(--hud-accent); cursor: pointer; font: 600 12px inherit; text-decoration: underline; }
 .menu .account-line { margin: 12px 0 0; font-size: 13px; opacity: .9; }
 .menu .account { display: grid; gap: 8px; margin-top: 12px; padding: 12px; border-radius: 8px; background: rgba(255,255,255,.04); }
 /* dev-only guest sign-in under the form */

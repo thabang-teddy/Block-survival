@@ -13,6 +13,7 @@ import { MainMenu } from './MainMenu'
 import { InvitePanel } from './InvitePanel'
 import { PlayerMarkers } from './PlayerMarkers'
 import { OreMarkers } from './OreMarkers'
+import { GraphicsToggle } from './GraphicsToggle'
 import { formatTime } from '../game/score'
 import { verticalHint } from '../game/locator'
 import type { ScoreRow } from '../state/uiStore'
@@ -387,6 +388,7 @@ export function Hud() {
           {!isGlobal && role === 'client' && timeAlive > 2 && (
             <p className="fine">Your gear and respawn point are saved with the host's world — rejoin it to get them back.</p>
           )}
+          <GraphicsToggle />
         </div>
       )}
     </div>
