@@ -163,11 +163,14 @@ public sealed class AdminSetupTests
     }
 
     [Fact]
-    public void Setup_grants_the_owner_the_data_folder_and_installs_or_restarts_the_service()
+    public void Setup_keeps_the_data_folder_to_the_owner_admins_and_the_service_and_installs_or_restarts_it()
     {
         var fresh = AdminSetup.SetupSteps(Paths, @"PC\Teddy", 50000, 50199, serviceInstalled: false);
         Assert.Equal("icacls", fresh[0].FileName);
-        Assert.Equal([Paths.DataDir, "/grant", @"PC\Teddy:(OI)(CI)M"], fresh[0].Args);
+        // other accounts lose the read access ProgramData would give them: control.key stops every world
+        Assert.Equal(
+            [Paths.DataDir, "/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F", "/grant:r", "*S-1-5-32-544:(OI)(CI)F", "/grant:r", @"PC\Teddy:(OI)(CI)M"],
+            fresh[0].Args);
         Assert.Equal(["install", "start"], fresh.Where(s => s.FileName == Paths.ServiceExe).Select(s => s.Args[0]));
 
         var again = AdminSetup.SetupSteps(Paths, @"PC\Teddy", 50000, 50199, serviceInstalled: true);

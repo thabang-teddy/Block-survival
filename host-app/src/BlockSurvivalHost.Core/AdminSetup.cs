@@ -17,6 +17,10 @@ public static class AdminSetup
 {
     public const string FirewallRule = "Block Survival Host (UDP)";
 
+    /// <summary>LocalSystem and BUILTIN\Administrators by SID, so icacls works in any Windows language</summary>
+    private const string SystemSid = "*S-1-5-18";
+    private const string AdministratorsSid = "*S-1-5-32-544";
+
     /// <summary>the WinSW service definition: pc-host's supervisor, with its data in ProgramData</summary>
     public static string ServiceXml(HostPaths paths) => $"""
         <!-- Written by the Block Survival Host app (docs/pc-host-research.md §8). -->
@@ -55,13 +59,16 @@ public static class AdminSetup
 
     /// <summary>
     /// Set the PC up: the owner may edit the data folder (so the app needs no admin rights
-    /// afterwards), the firewall allows the ports, and the service is installed and running.
+    /// afterwards) and no other account may read it, the firewall allows the ports, and
+    /// the service is installed and running.
     /// </summary>
     public static IReadOnlyList<AdminStep> SetupSteps(HostPaths paths, string user, int firstPort, int lastPort, bool serviceInstalled)
     {
         var steps = new List<AdminStep>
         {
-            new($"Let {user} change the host's settings", "icacls", [paths.DataDir, "/grant", $"{user}:(OI)(CI)M"]),
+            // only SYSTEM (the service), Administrators and the owner: control.key in here stops every world
+            new($"Let only {user}, administrators and the service use the host's settings", "icacls",
+                [paths.DataDir, "/inheritance:r", "/grant:r", $"{SystemSid}:(OI)(CI)F", "/grant:r", $"{AdministratorsSid}:(OI)(CI)F", "/grant:r", $"{user}:(OI)(CI)M"]),
         };
         steps.AddRange(FirewallSteps(paths, firstPort, lastPort));
         if (serviceInstalled)
