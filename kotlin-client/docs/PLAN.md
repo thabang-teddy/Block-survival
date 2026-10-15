@@ -248,3 +248,26 @@ no multiplayer, no saving. It is a controllable camera in the real voxel world
 with real collision — the smallest slice proving the ported modules compose, not
 a milestone in §4's phase list. Visual correctness on a device/emulator has not
 yet been eyeballed against the browser client.
+
+### On-device run attempt (2026-10-15)
+
+Ran the debug APK on the local Android emulators (`adb install` + launch). The
+app **installs, launches, stays up without an app crash, and the Jetpack Compose
+HUD renders** (the W/A/S/D + Jump/Sprint controls, in landscape — screenshotted).
+Two real runtime bugs were found by running and fixed (committed):
+
+1. `eglChooseConfig failed` on the default `GLSurfaceView` config chooser →
+   `setEGLConfigChooser(8, 8, 8, 8, 16, 0)`.
+2. The GL world was hidden behind the opaque window background (the SurfaceView
+   is hosted in a Compose `AndroidView`) → `setZOrderMediaOverlay(true)`.
+
+**The GLES-3.0 voxel world itself was not confirmed rendered**, blocked by the
+dev machine's emulators, not by the app: the only ES 3.0 backend available
+(`-gpu swiftshader_indirect`) destabilises under the voxel GL load (`bad color
+buffer handle`, emulator process dies), while the host-GPU and `angle_indirect`
+paths both resolve to the Intel UHD 620 translator that exposes **only ES 2.0**
+(`eglCreateContext … maj 2 min 0 rcv 2`), so an ES 3.0 context can't be created
+there. Confirming the render needs a physical device, an emulator system image /
+driver combo that gives a stable ES 3.0 surface, or a desktop (LWJGL/ANGLE) GL
+harness for the pure mesher output. The logic underneath is independently green
+(all fixture suites + the JVM `SliceSmokeTest`).
