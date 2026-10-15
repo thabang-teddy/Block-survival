@@ -22,6 +22,6 @@ include(":world")
 include(":net")
 include(":physics")
 
-// Android app module (Jetpack Compose + OpenGL ES). Enabled once the pure-logic
-// spikes are GO and the slice is built — see docs/PLAN.md §4 (P1).
-// include(":app")
+// Android app module (Jetpack Compose + OpenGL ES) — the vertical slice.
+// See docs/PLAN.md §7.
+include(":app")
