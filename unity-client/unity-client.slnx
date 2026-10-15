@@ -1,0 +1,13 @@
+﻿<Solution>
+  <Project Path="MCPForUnity.Editor.csproj" />
+  <Project Path="MCPForUnity.Runtime.csproj" />
+  <Project Path="BlockSurvival.World.csproj" />
+  <Project Path="BlockSurvival.App.csproj" />
+  <Project Path="BlockSurvival.Net.Tests.csproj" />
+  <Project Path="BlockSurvival.App.Tests.csproj" />
+  <Project Path="BlockSurvival.Physics.csproj" />
+  <Project Path="Assembly-CSharp-Editor.csproj" />
+  <Project Path="BlockSurvival.Net.csproj" />
+  <Project Path="BlockSurvival.Physics.Tests.csproj" />
+  <Project Path="BlockSurvival.World.Tests.csproj" />
+</Solution>

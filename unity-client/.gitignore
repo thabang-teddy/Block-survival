@@ -1,0 +1,48 @@
+# Unity generated
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+
+# Asset meta checksums Unity writes on import; crash/log files
+sysinfo.txt
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Visual Studio / Rider / VS Code cache Unity regenerates
+.vs/
+.vsconfig
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# local test run artifacts
+*-test-results.xml
+*-test.log
+
+# debug screenshots captured via MCP for Unity / manage_camera
+/Assets/Screenshots/
+
+# local dev tooling (MCP for Unity editor integration), not game code
+/Packages/com.coplaydev.unity-mcp/
