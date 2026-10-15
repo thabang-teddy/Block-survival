@@ -12,6 +12,14 @@ class GameSurfaceView(context: Context, input: InputState) : GLSurfaceView(conte
 
     init {
         setEGLContextClientVersion(3)
+        // Some emulators / drivers can't match an ES3 config with the default
+        // chooser and throw "eglChooseConfig failed"; request an explicit
+        // RGBA8888 + 16-bit depth config.
+        setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+        // Hosted in a Compose AndroidView: raise this SurfaceView above the
+        // (opaque) window background so the world is visible, while the Compose
+        // control overlay still draws on top of it.
+        setZOrderMediaOverlay(true)
         setRenderer(GameRenderer(input))
         renderMode = RENDERMODE_CONTINUOUSLY
     }
