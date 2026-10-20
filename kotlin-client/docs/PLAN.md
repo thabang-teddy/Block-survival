@@ -246,8 +246,9 @@ With S2/S3 GO, the first thing you can actually run, pulled forward from P1:
 (the radius loads once), no HUD, no inventory/crafting, no combat, no day/night,
 no multiplayer, no saving. It is a controllable camera in the real voxel world
 with real collision — the smallest slice proving the ported modules compose, not
-a milestone in §4's phase list. Visual correctness on a device/emulator has not
-yet been eyeballed against the browser client.
+a milestone in §4's phase list. Visual correctness has now been eyeballed on a
+physical device (see below); it has still not been diffed side by side against
+the browser client.
 
 ### On-device run attempt (2026-10-15)
 
@@ -271,3 +272,36 @@ there. Confirming the render needs a physical device, an emulator system image /
 driver combo that gives a stable ES 3.0 surface, or a desktop (LWJGL/ANGLE) GL
 harness for the pure mesher output. The logic underneath is independently green
 (all fixture suites + the JVM `SliceSmokeTest`).
+
+### On-device render CONFIRMED (2026-10-20)
+
+Ran the same debug APK on a physical phone, which settles what the emulators
+could not.
+
+- **Device:** Redmi A3 (`23129RN51X`), Android 15 / SDK 35, MediaTek.
+  `ro.opengles.version` = 196610 (0x30002 — ES 3.2), so the ES 3.0 context
+  the app asks for in `GameSurfaceView.setEGLContextClientVersion(3)` was
+  actually available. Both 10-15 fixes (`setEGLConfigChooser`,
+  `setZOrderMediaOverlay`) hold on real hardware.
+- **The voxel world renders.** Screenshotted at spawn and again after holding W
+  for 2.5s: stepped dirt terrain, grass top faces against dirt sides, a river
+  with sand banks, tree trunks with leaf canopies, a floating island with its
+  canopy, and visible ambient-occlusion darkening in a ledge undercut. The
+  Compose HUD composites correctly over the GL layer in landscape.
+- **Movement and collision work on-device** — holding W walked the camera to
+  a different part of the world, grounded, not just the headless tick loop.
+- **Performance: locked 60 fps.** SurfaceFlinger's BLAST queue for the
+  `GLSurfaceView` layer reports `fps=60.17–60.20`, frame times 16.0–17.3ms,
+  over an 8s window. `dumpsys gfxinfo` is the wrong instrument here and reports
+  ~6 frames at 83% jank — it only sees the Compose HUD, because the
+  `GLSurfaceView` swaps on its own thread outside HWUI.
+
+So the three previously unproven things — the ES 3.0 context, the mesher's
+output being visually *correct* rather than merely non-empty, and the
+`PlayerController` driving a real camera — are all confirmed.
+
+**Open smell, not a blocker:** the app logged 49 GC events in ~20s, each
+freeing 5–6MB on a 13MB heap, i.e. per-frame allocation in the render/mesh
+path. It costs nothing today (the 16.0ms floor / 17.3ms ceiling show no GC
+hitches), but it is the first thing likely to bite at a larger view distance
+or once chunk streaming follows the player.
